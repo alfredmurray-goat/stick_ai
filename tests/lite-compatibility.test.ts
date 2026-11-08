@@ -10,7 +10,7 @@ it("uses the Mamba2-capable pinned release and applies the Lite-specific formatt
     expect(llamaRelease).toBe("v0.9.0");
     expect(await modelTemplateArgs(root, "stellan-1-lite")).toEqual([]);
     await mkdir(join(root, "app")); await writeFile(join(root, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }));
-    expect(await modelTemplateArgs(root, "stellan-1-lite")).toEqual(["--chat-template", "mistral-v1"]);
+    expect(await modelTemplateArgs(root, "stellan-1-lite")).toEqual(["--no-jinja", "--skip-chat-parsing", "--chat-template", "mistral-v1"]);
     expect(await modelTemplateArgs(root, "stellan-1-max")).toEqual([]);
     await writeFile(join(root, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "../../untrusted" }));
     await expect(modelTemplateArgs(root, "stellan-1-lite")).rejects.toThrow("Unsupported");

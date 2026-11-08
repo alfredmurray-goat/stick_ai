@@ -35,7 +35,7 @@ export async function modelTemplateArgs(root: string, model: ModelName): Promise
     const name = (templates as Record<string, unknown>)[model];
     if (name !== undefined) {
       if (name !== "mistral-v1") { throw new Error("Unsupported release chat template"); }
-      templateArgs = ["--chat-template", name];
+      templateArgs = ["--no-jinja", "--skip-chat-parsing", "--chat-template", name];
     }
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; } }
   return templateArgs;

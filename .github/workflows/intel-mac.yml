@@ -27,18 +27,42 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
       - run: npm test
       - run: npm run build
       - run: npm run licenses
+      - uses: actions/cache/restore@v4
+        id: native-cache
+        with:
+          path: |
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Stick AI.app
+            src-tauri/Cargo.lock
+          key: intel-native-${{ hashFiles('src-tauri/Cargo.toml', 'src-tauri/src/**', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json', 'src-tauri/capabilities/**', 'src-tauri/icons/**', 'portable/ui/**') }}
       - name: Build the Intel desktop app
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: npx --yes @tauri-apps/cli@2.12.2 build --target x86_64-apple-darwin --bundles app
+      - uses: actions/cache/save@v4
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Stick AI.app
+            src-tauri/Cargo.lock
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Download and verify Lite and portable Node
         run: node scripts/fetch-intel-assets.mjs release-assets
       - name: Extract portable Node
         run: tar -xzf release-assets/node-v24.22.1-darwin-x64.tar.gz -C release-assets
+      - uses: actions/cache/restore@v4
+        id: server-cache
+        with:
+          path: |
+            release-assets/llama-build/bin/llama-server
+            release-assets/llama.cpp/LICENSE
+          key: intel-server-v0.9.0-static-no-openmp
       - name: Build the pinned Mamba2-compatible inference server
+        if: steps.server-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           git init release-assets/llama.cpp
@@ -46,8 +70,15 @@ jobs:
           git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
           git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
           test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
-          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
           cmake --build release-assets/llama-build --config Release --target llama-server -j 3
+      - uses: actions/cache/save@v4
+        if: steps.server-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            release-assets/llama-build/bin/llama-server
+            release-assets/llama.cpp/LICENSE
+          key: ${{ steps.server-cache.outputs.cache-primary-key }}
       - name: Collect native redistribution notices
         run: node scripts/native-licenses.mjs release-assets/desktop-licenses
       - name: Assemble the complete Intel Mac folder
@@ -71,6 +102,7 @@ jobs:
           name: intel-build-diagnostics
           path: |
             src-tauri/Cargo.lock
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app
             release-assets/smoke.log
             release-assets/model-smoke.json
           if-no-files-found: ignore
