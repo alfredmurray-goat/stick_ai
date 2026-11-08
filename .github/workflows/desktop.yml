@@ -1,0 +1,51 @@
+name: Desktop
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux webview build libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm run desktop:dry-run
+      - run: cargo install tauri-cli --version 2.12.2 --locked
+      - run: cargo tauri build --target ${{ matrix.target }} --bundles app
+        if: runner.os == 'macOS'
+      - run: cargo tauri build --target ${{ matrix.target }} --no-bundle
+        if: runner.os != 'macOS'
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }} --no-default-features
+        if: runner.os != 'macOS' || matrix.target == 'aarch64-apple-darwin'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/stick-ai*
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+            src-tauri/Cargo.lock

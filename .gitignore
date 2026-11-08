@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.stick/
+coverage/
+*.gguf
+
+src-tauri/target/
+src-tauri/gen/
+
+release-assets/

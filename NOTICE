@@ -1,0 +1,39 @@
+stick_ai
+Copyright (c) 2026 localilabs
+
+Inspired by gpt-engineer: https://github.com/gpt-engineer-org/gpt-engineer
+Project generation and prompt-handling ideas only; no Python code is included.
+The upstream MIT notice is retained below:
+
+MIT License
+
+Copyright (c) 2023 Anton Osika
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Stellan 1.0 base model attribution:
+Devstral Small 2505, developed by Mistral AI.
+https://huggingface.co/mistralai/Devstral-Small-2505
+Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+Stellan 1.0 is described by localilabs as a LoRA fine-tune of this model.
+No model weights, adapter weights, dataset records or upstream model NOTICE
+files are distributed in this repository. Preserve the original model's
+licence and applicable notices when distributing weights. Mark the LoRA
+fine-tune, merge and quantization as modifications. See MODEL_LICENSE.md.

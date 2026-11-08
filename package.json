@@ -1,0 +1,55 @@
+{
+  "name": "stick-ai",
+  "version": "0.1.0",
+  "description": "Offline terminal coding agent",
+  "type": "module",
+  "license": "MIT",
+  "author": "localilabs",
+  "engines": {
+    "node": "24.22.1"
+  },
+  "bin": {
+    "stick": "dist/cli/index.js",
+    "stick-verify": "dist/portable/verify.js"
+  },
+  "files": [
+    "dist/agent",
+    "dist/cli",
+    "dist/config",
+    "dist/model",
+    "dist/sandbox",
+    "dist/tools",
+    "dist/portable",
+    "LICENSE",
+    "NOTICE",
+    "MODEL_LICENSE.md",
+    "THIRD_PARTY_LICENSES.md",
+    "Modelfile",
+    "scripts",
+    "Modelfile.max",
+    "portable",
+    "licenses",
+    "PORTABLE.md",
+    "src-tauri",
+    "DESKTOP.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "licenses": "node scripts/licenses.mjs",
+    "prepack": "npm run build",
+    "sandbox:prepare": "node scripts/prepare-runtime.mjs",
+    "build:stick": "npm run build && node scripts/build-stick.ts",
+    "stick:dry-run": "npm run build && node scripts/dry-run-stick.ts",
+    "desktop:dry-run": "npm run build && node scripts/dry-run-desktop.ts",
+    "desktop:build": "cargo tauri build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4",
+    "esbuild": "0.28.2"
+  }
+}

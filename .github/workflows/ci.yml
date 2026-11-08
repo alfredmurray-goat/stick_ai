@@ -1,0 +1,30 @@
+name: CI
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - name: Install Linux sandbox
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: node scripts/dry-run-stick.ts
+      - run: node scripts/dry-run-desktop.ts
+      - run: node dist/cli/index.js doctor
+      - run: npm run licenses
+      - run: git diff --exit-code -- THIRD_PARTY_LICENSES.md
