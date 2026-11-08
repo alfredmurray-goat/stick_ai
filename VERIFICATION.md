@@ -1,35 +1,58 @@
-# Desktop update verification
+# Intel Mac Lite build verification
 
-Verified in the supplied Linux workspace with Node.js 24.22.1:
+Verified on 8 November 2026.
 
-- TypeScript strict application check and build passed.
-- Strict type checking of all test files passed.
-- 121 tests passed, including all 98 inherited tests; one live Ollama test was skipped as configured.
-- New tests cover byte inactivity, SSE heartbeats beyond five minutes, live thought and summary streaming, specialist code streaming, progress timing, focused context, RAM boundaries, mocked launch order/failure cleanup, loading cancellation, repeated-idle faster settings and desktop bundle hashing/tampering.
-- Legacy and desktop dry-run plans completed without launching an assistant.
-- UI JavaScript and native-notice generator syntax checks passed.
-- Third-party licence generation completed offline; no npm dependency was added.
-- The original MIT LICENSE is byte-for-byte unchanged.
+## Downloadable build
 
-The container cannot exercise Linux bubblewrap isolation; its confinement test explicitly verifies the restricted-mode warning. This is not proof of kernel confinement.
+The Intel Mac packaging run succeeded:
 
-Rust and Cargo are not installed in this environment. Native Tauri compilation, generated Cargo.lock, native runtime tests, signed bundles and hosted CI results are unverified. The CI matrix is source configuration, not evidence of a passing native build. No actual model weights or inference/runtime executables were supplied, so this archive contains source and build tooling, not a complete plug-and-play stick.
+https://github.com/alfredmurray-goat/stick_ai/actions/runs/42517759406
 
-Release checks still needed on actual machines:
+Build commit: 1f7b166981922d5e6982f11437cc422f533ecf91
 
-- Clean Mac and Windows first-run experience, no terminal or administrator prompt, both Mac architectures and Linux system-webview compatibility.
-- Gatekeeper/notarization and SmartScreen prompts for the desktop app and all nested runtimes.
-- Cancellation and quit/crash cleanup during hashing, loading, inference and swaps, including temporary webview data and owned process trees.
-- Actual Stellan GGUF/template/protocol compatibility, authenticated health/slot behavior and local-only listeners.
-- Cold and warm first-reply times, total memory pressure and swap times on 8 GB and 16 GB machines using the actual USB storage and weights.
-- Complete resolved Rust and supplied native-runtime redistribution notices, signed asset provenance and final manifest verification after packaging.
+Complete Lite-only app artifact:
 
-## Intel Lite compatibility update
+https://github.com/alfredmurray-goat/stick_ai/actions/runs/42517759406/artifacts/13632203606
 
-Local strict checks and all 124 tests pass after adding Mamba2 server compatibility, target-specific manifests, Lite-only packaging and a template-selection regression suite. The supplied Lite metadata was read from its pinned public GGUF revision: mamba2, 7.3B, llama tokenizer with [INST]/[/INST], no embedded chat template. llama.cpp v0.9.0 at cd959bae99ff4bed22bef2604f45241c09bbb8c8 supports mamba2; b5046 does not. Mistral-v1 is an explicit compatibility fallback, not verified training provenance. The Intel Mac CI build includes a real-model streaming protocol gate before releasing the package. Check the actual workflow outcome before describing native compilation or live inference as passed.
+Artifact archive size: 4,145,940,806 bytes.
+Artifact SHA256: 3b826d7d9cd872460821010e85f164380b8fa82b96dac00809d150c7e59074d3
+The artifact expires on 11 November 2026 at 21:20 Copenhagen time. Download and retain a local copy. The GitHub source and pinned model inputs remain available for rebuilding.
 
-The first Intel GitHub run compiled the native Tauri app and the v0.9.0 CPU inference server and verified both downloads. Its 121 inherited tests passed on macOS. Packaging stopped at notice collection for alloc-stdlib 0.3.0; no working app artifact was released and live inference was not reached. The collector now follows the exact source commit from .cargo_vcs_info.json to recover omitted upstream notices and filters to the target dependency graph. Lite explicitly disables Jinja and server-side response parsing for its legacy Mistral formatter; a new real read_file/tool_result/done check is required before shipping.
+The download contains a ZIP inside the GitHub artifact ZIP so the app's executable permissions are preserved. Extract both layers, keep the resulting folder together, open Stick AI.app and click Start. This build requires an Intel Mac with macOS 13.5 or newer and at least 8 GiB RAM. Lite and its local runtimes are included; Max is not included.
 
-Further Lite testing in the 8 GiB-limited Linux diagnostic environment confirmed model load, streamed tagged completion and a real read_file/tool_result/done exchange. Default CPU weight repacking drove resident memory near 7.7 GiB; disabling it reduced observed resident memory to approximately 4.2 GiB during the simple test. Batches, recurrent checkpoints and RAM prompt caching are now bounded or disabled. A GBNF response grammar enforces tagged text only for managed Lite; ordinary Ollama requests remain unchanged. A clearer system instruction requires actual tool evidence. Long random UUID readback was inconsistent even when tool calls succeeded; the packaging integration test uses a human-readable note with an unknown random suffix and requires exact readback. This is a protocol/integration check, not a claim that Lite always produces accurate code or quotes.
+## Passed checks
 
-Two independent human-readable note/unknown-suffix exchanges passed in the Linux diagnostic after the memory/grammar changes. The supplied model still showed factual errors with long UUID fixtures; this model-quality limitation is retained rather than describing a basic protocol smoke test as comprehensive accuracy validation. The Mac server is rebuilt without OpenSSL to remove its observed Homebrew library dependency; native portability is checked using otool before live inference.
+- Strict TypeScript application and test-file checks passed locally.
+- All 127 unit tests passed, including the 98 inherited tests; the independent live Ollama test remains opt-in and skipped.
+- The native Tauri application and pinned llama.cpp v0.9.0 server compiled for Intel macOS.
+- The native application executed its dry-run successfully.
+- The binary architecture checks and otool library checks passed without dependencies on Homebrew libraries.
+- Model and portable Node downloads passed their pinned SHA256 checks.
+- Package assembly and complete manifest verification passed.
+- The real Lite model loaded on the Intel Mac runner with authenticated loopback readiness checks.
+- A streamed tagged reply and an actual read_file/tool_result/done exchange passed. The assistant read a note containing an unknown random suffix and accurately reported its contents.
+- Runtime CPU weight repacking, large RAM prompt caching and recurrent checkpoint copies are disabled for Lite; smaller processing batches preserve the configured 8192 context window.
+- The default inactivity interval remains 300 seconds, reset by received bytes, with configurable settings and progress/cancellation support.
+- The MIT licence for authored stick_ai code is unchanged. Resolved native notices, required covered source and the pinned llama.cpp source archive accompany the app.
+
+## Model accuracy and performance limits
+
+The supplied Lite file identifies itself as mamba2, 7.3B, with a Mistral-style tokenizer and no embedded chat template. The old b5046 server cannot load that architecture. The packaged Mistral-v1 formatter is a tested compatibility fallback; the original training template and Lite base-model provenance have not been supplied or verified.
+
+In an 8 GiB-limited Linux diagnostic environment, disabling duplicate CPU weight repacking reduced observed server resident memory from approximately 7.7 GiB to approximately 4.2 GiB during a simple test. These are diagnostic observations, not performance guarantees for an 8 GB Mac.
+
+Repeated long random UUID readback tests were inconsistent, including hallucinated file contents. The readable-note integration test verifies basic tool/protocol integration, not comprehensive coding accuracy. Review proposed changes and verify important facts.
+
+The hosted Mac integration step took about two minutes and twenty-one seconds, including startup and the test exchanges. This is not a benchmark of the buyer's machine or a promise about first-reply latency.
+
+## Still needs real-machine verification
+
+- Clean first launch on the user's Intel Mac, including Gatekeeper and quarantine handling for the app and nested runtimes.
+- Signing and notarization: this is an unsigned test build, not a qualified signed buyer release.
+- Visual welcome, progress, thinking and Cancel behavior inside the actual desktop window.
+- Performance and memory pressure on physical 8 GB and 16 GB Intel Macs using the actual USB storage.
+- Window-close, crash, unplug/reinsert and temporary-file cleanup behavior.
+- Actual Stellan Max behavior and swap timings; this Lite-only package makes no Max qualification claim.
+- Native Windows and Linux desktop qualification; only the Intel Mac package is supplied here.
+
+The container's Linux sandbox confinement test asserted the restricted-mode warning because bubblewrap could not enforce isolation there; that is not proof of kernel confinement. The portable UI continues to disable run_shell.
