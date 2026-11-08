@@ -1,5 +1,14 @@
 # stick_ai
 
+## Download the Intel Mac Lite app
+
+[Download the complete Intel Mac Lite build (4.15 GB)](https://github.com/alfredmurray-goat/stick_ai/actions/runs/42517759406/artifacts/13632203606).
+
+Extract the download, then extract the ZIP inside it. Open the resulting folder, double-click **Stick AI.app** and click **Start**. Keep the folder together. No Node.js or Ollama installation is required. Requires **Intel macOS 13.5+** and **8 GiB RAM**. Lite is included; Max is not included.
+
+This is an unsigned test build. Gatekeeper and clean first launch on the user's own Mac remain unverified. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for measured checks and limitations. Download before **11 November 2026**; the artifact is retained for three days.
+
+
 An offline desktop and terminal coding assistant by localilabs. It streams responses from Stellan-1 Lite or Stellan-1 Max through Ollama or the portable llama.cpp server, plans work, calls tools, reads results and continues until finished or the configured step limit is reached. It is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
 
 ## Desktop app
