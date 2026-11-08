@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 const output = resolve(process.argv[2] ?? "dist/desktop-licenses");
 const args = ["metadata", "--manifest-path", "src-tauri/Cargo.toml", "--format-version", "1", "--locked"];
@@ -38,9 +38,15 @@ for (const pkg of metadata.packages.filter((pkg) => used.has(pkg.id)).sort((a, b
   let texts = [];
   try {
     if (names.length) { for (const name of names.sort()) { texts.push(`${name}\n\n${await readFile(join(root, name), "utf8")}`); } }
+    else if (pkg.license === "MPL-2.0") { texts = [`MPL-2.0 standard text\n\n${await readFile("licenses/MPL-2.0.txt", "utf8")}`]; }
     else { texts = await upstreamNotices(pkg, root); }
+    if (pkg.license.includes("MPL-2.0")) {
+      const destination = join(output, "sources", `${pkg.name}-${pkg.version}`);
+      await mkdir(dirname(destination), { recursive: true }); await cp(root, destination, { recursive: true });
+      texts.push(`The exact published covered source is included at sources/${pkg.name}-${pkg.version}; its file-level notices are retained.`);
+    }
   } catch (error) { missing.push(`${pkg.name}@${pkg.version}: ${String(error)}`); continue; }
-  sections.push(`## ${pkg.name}@${pkg.version}\n\n${pkg.license}\n\n${pkg.repository ?? pkg.source ?? ""}\n\n${texts.join("\n\n")}`);
+  sections.push(`## ${pkg.name}@${pkg.version}\n\n${pkg.license}\n\n${pkg.repository ?? pkg.source ?? ""}\n\nExact published source: https://crates.io/api/v1/crates/${pkg.name}/${pkg.version}/download\n\n${texts.join("\n\n")}`);
 }
 if (missing.length) { throw new Error(`Missing audited native notices:\n${missing.join("\n")}`); }
 await mkdir(output, { recursive: true });

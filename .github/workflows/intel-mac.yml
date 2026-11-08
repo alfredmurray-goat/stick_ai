@@ -60,7 +60,7 @@ jobs:
           path: |
             release-assets/llama-build/bin/llama-server
             release-assets/llama.cpp/LICENSE
-          key: intel-server-v0.9.0-static-no-openmp
+          key: intel-server-v0.9.0-static-no-openmp-no-tls
       - name: Build the pinned Mamba2-compatible inference server
         if: steps.server-cache.outputs.cache-hit != 'true'
         shell: bash
@@ -70,7 +70,7 @@ jobs:
           git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
           git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
           test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
-          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_CURL=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
           cmake --build release-assets/llama-build --config Release --target llama-server -j 3
       - uses: actions/cache/save@v4
         if: steps.server-cache.outputs.cache-hit != 'true'
@@ -80,7 +80,9 @@ jobs:
             release-assets/llama.cpp/LICENSE
           key: ${{ steps.server-cache.outputs.cache-primary-key }}
       - name: Collect native redistribution notices
-        run: node scripts/native-licenses.mjs release-assets/desktop-licenses
+        run: |
+          node scripts/native-licenses.mjs release-assets/desktop-licenses
+          curl --fail --location --retry 3 "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/$LLAMA_COMMIT" --output release-assets/desktop-licenses/llama.cpp-source.tar.gz
       - name: Assemble the complete Intel Mac folder
         shell: bash
         run: |

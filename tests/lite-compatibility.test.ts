@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { modelTemplateArgs } from "../src/portable/engine.js";
+import { modelTemplateArgs, modelRuntimeArgs } from "../src/portable/engine.js";
 import { llamaRelease } from "../src/portable/platform.js";
 it("uses the Mamba2-capable pinned release and applies the Lite-specific formatter only to Lite", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-lite-template-"));
@@ -40,4 +40,10 @@ it("builds a Lite-only Intel package with its own template and complete target-s
     const index = JSON.parse(await readFile(join(output, "manifest.json"), "utf8")); index.targets = ["untrusted-platform"];
     await writeFile(join(output, "manifest.json"), JSON.stringify(index)); await expect(verifyStick(output)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it("bounds Lite recurrent-state memory without reducing its configured context window", () => {
+  const args = modelRuntimeArgs("stellan-1-lite");
+  expect(args).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"]);
+  expect(args).not.toContain("--ctx-size"); expect(modelRuntimeArgs("stellan-1-max")).toEqual(["--parallel", "1"]);
 });

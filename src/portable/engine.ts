@@ -27,6 +27,9 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
     await engine.start("stellan-1-lite", new AbortController().signal, 30000);
   }
 }
+export function modelRuntimeArgs(model: ModelName): string[] {
+  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"] : ["--parallel", "1"];
+}
 export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
   let templateArgs: string[] = [];
   try {
@@ -67,7 +70,7 @@ export class ManagedEngine implements Switchable {
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(this.contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
-      "--no-webui", "--no-warmup", "--gpu-layers", "0", "--parallel", "1", ...templateArgs
+      "--no-webui", "--no-warmup", "--gpu-layers", "0", ...modelRuntimeArgs(model), ...templateArgs
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
     this.onProcess?.(child.pid ?? null);

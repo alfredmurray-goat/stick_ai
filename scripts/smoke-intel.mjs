@@ -32,11 +32,11 @@ try {
   await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", response: result.content, protocol: parsed.step.kind }, null, 2));
   if (parsed.step.kind !== "done") { throw new Error("Lite loaded, but did not follow its required tagged protocol; inspect model-smoke.json before shipping"); }
   const project = join(temporary, "project"); await mkdir(project);
-  const expected = randomUUID(); await writeFile(join(project, "startup-check.txt"), expected);
+  const expected = `Violet otter ${randomUUID().slice(0, 4)}`; await writeFile(join(project, "note.txt"), expected);
   const tools = new Tools(await Sandbox.create(project), async () => false);
   const messages = []; let read = false; let summary = "";
   const outcome = await runAgent({
-    task: "Use read_file to read startup-check.txt, then finish by reporting the exact text inside the file. Do not change files or run programs.",
+    task: "Use read_file to read note.txt, then quote the entire file contents exactly in your done summary; use the returned content, without guessing. Do not change files or run programs.",
     messages, model: client, maxSteps: 4, signal,
     tools: { execute: async (call, stepSignal) => {
       if (!["read_file", "list_dir", "search_files"].includes(call.function.name)) { return "Only reading tools are allowed in this startup check."; }

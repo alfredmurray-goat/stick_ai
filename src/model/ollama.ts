@@ -1,3 +1,4 @@
+import { stellanGrammar } from "./grammar.js";
 import { CodeThinkingStream } from "./thinking.js";
 import { IdleWatchdog } from "./idle.js";
 import { boundedToolHistory } from "../agent/context.js";
@@ -15,7 +16,7 @@ export class Ollama implements Model {
     const idle = new IdleWatchdog();
     try {
       let response: Response;
-      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
+      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: false } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
       try {
         response = await fetch(this.url, {
           method: "POST",
