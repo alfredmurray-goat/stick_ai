@@ -27,6 +27,19 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
     await engine.start("stellan-1-lite", new AbortController().signal, 30000);
   }
 }
+export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
+  let templateArgs: string[] = [];
+  try {
+    const templates: unknown = JSON.parse(await readFile(join(root, "app/model-templates.json"), "utf8"));
+    if (!templates || typeof templates !== "object" || Array.isArray(templates)) { throw new Error("Invalid model template configuration"); }
+    const name = (templates as Record<string, unknown>)[model];
+    if (name !== undefined) {
+      if (name !== "mistral-v1") { throw new Error("Unsupported release chat template"); }
+      templateArgs = ["--chat-template", name];
+    }
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; } }
+  return templateArgs;
+}
 export class ManagedEngine implements Switchable {
   child: ChildProcess | null = null;
   active: ModelName | null = null;
@@ -49,16 +62,7 @@ export class ManagedEngine implements Switchable {
     const env = cleanEnvironment(this.temp, process.platform);
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
-    let templateArgs: string[] = [];
-    try {
-      const templates: unknown = JSON.parse(await readFile(join(this.root, "app/model-templates.json"), "utf8"));
-      if (!templates || typeof templates !== "object" || Array.isArray(templates)) { throw new Error("Invalid model template configuration"); }
-      const name = (templates as Record<string, unknown>)[model];
-      if (name !== undefined) {
-        if (name !== "mistral-v1") { throw new Error("Unsupported release chat template"); }
-        templateArgs = ["--chat-template", name];
-      }
-    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; } }
+    const templateArgs = await modelTemplateArgs(this.root, model);
     let lastActivity = Date.now();
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(this.contextSize),

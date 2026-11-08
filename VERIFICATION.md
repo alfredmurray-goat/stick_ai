@@ -23,3 +23,7 @@ Release checks still needed on actual machines:
 - Actual Stellan GGUF/template/protocol compatibility, authenticated health/slot behavior and local-only listeners.
 - Cold and warm first-reply times, total memory pressure and swap times on 8 GB and 16 GB machines using the actual USB storage and weights.
 - Complete resolved Rust and supplied native-runtime redistribution notices, signed asset provenance and final manifest verification after packaging.
+
+## Intel Lite compatibility update
+
+Local strict checks and all 124 tests pass after adding Mamba2 server compatibility, target-specific manifests, Lite-only packaging and a template-selection regression suite. The supplied Lite metadata was read from its pinned public GGUF revision: mamba2, 7.3B, llama tokenizer with [INST]/[/INST], no embedded chat template. llama.cpp v0.9.0 at cd959bae99ff4bed22bef2604f45241c09bbb8c8 supports mamba2; b5046 does not. Mistral-v1 is an explicit compatibility fallback, not verified training provenance. The Intel Mac CI build includes a real-model streaming protocol gate before releasing the package. Check the actual workflow outcome before describing native compilation or live inference as passed.
