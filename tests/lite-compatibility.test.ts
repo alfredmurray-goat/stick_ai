@@ -44,6 +44,6 @@ it("builds a Lite-only Intel package with its own template and complete target-s
 
 it("bounds Lite recurrent-state memory without reducing its configured context window", () => {
   const args = modelRuntimeArgs("stellan-1-lite");
-  expect(args).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"]);
+  expect(args).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "64", "--ubatch-size", "32", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"]);
   expect(args).not.toContain("--ctx-size"); expect(modelRuntimeArgs("stellan-1-max")).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"]);
 });
