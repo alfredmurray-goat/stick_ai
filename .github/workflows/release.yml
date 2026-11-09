@@ -1,0 +1,35 @@
+name: Publish desktop release
+on:
+  workflow_run:
+    workflows: [Desktop Lite builds]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful Desktop Lite builds run ID
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: desktop-release-${{ github.event.workflow_run.id || inputs.build_run }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - name: Publish all four checked desktop downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ github.event.workflow_run.id || inputs.build_run }}
+        run: node scripts/publish-release.mjs
