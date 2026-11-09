@@ -6,7 +6,7 @@ Older copies cannot gain an updater remotely: download a complete package once a
 
 ## Private GitHub access
 
-This repository and its releases are private. On the welcome screen, open **Private GitHub access**, save a fine-grained GitHub token with **Contents: Read-only** access to `alfredmurray-goat/stick_ai`, and check again. Organization approval or repository access may also be required by GitHub. Expired or revoked tokens can be replaced there. **Remove saved access** deletes the saved token. Public release feeds do not require a token.
+This repository is now public: normal update checks and downloads need no GitHub token. For a private deployment, on the welcome screen open **Private GitHub access** and save a fine-grained GitHub token with **Contents: Read-only** access to `alfredmurray-goat/stick_ai`, and check again. Organization approval or repository access may also be required by GitHub. Expired or revoked tokens can be replaced there. **Remove saved access** deletes the saved token. Public release feeds do not require a token.
 
 The token is saved in `updates.json` in Tauri's per-user application configuration directory, outside the stick and its project. It is stored as plaintext with the user's normal filesystem protection (mode 0600 on Unix), not in an OS credential vault. It never goes into model requests, project context, command-line arguments or logs. Updater processes receive it through stdin. The token is sent only to `api.github.com`, and is stripped from redirects to GitHub's download CDN. An optional `STICK_UPDATE_TOKEN` environment variable overrides saved access for managed deployments.
 
@@ -26,7 +26,7 @@ The old app files remain in a sibling `.FOLDER.update-XXXXXX/previous` folder; t
 
 1. Add the private Ed25519 PEM key corresponding to `src/portable/update-key.ts` as the GitHub Actions repository secret **STICK_UPDATE_SIGNING_KEY**. Never commit the private key. Keep a secure backup; existing installed copies trust the matching public key.
 2. Merge and let **Desktop Lite builds** complete on all four platforms. Each build uploads its complete package and a separate `stick_ai-update-PLATFORM.gz` artifact, with the GitHub run ID and source commit in `app/update-config.json`.
-3. **Publish desktop release** publishes the four app payloads and a signed `stick_ai-updates.json` alongside the existing full packages. Release publication happens only after every asset is present. The updater considers prereleases as well as normal releases, because current desktop test builds are prereleases.
+3. **Publish desktop release** first publishes the four app payloads and signed `stick_ai-updates.json` in a small `app-RUN_ID` release. The file-picker update is then available immediately through Check for updates. It subsequently downloads the pinned Max file once and assembles/publishes the complete two-model packages in a separate `desktop-RUN_ID` release. Release publication happens only after every asset is present. The updater considers prereleases as well as normal releases, because current desktop test builds are prereleases.
 
 Without the signing secret, complete packages continue to publish, but no app update feed is published. A mismatched signing key fails publication rather than signing an update that installed apps cannot verify. Release signing is separate from Apple Developer ID and Windows Authenticode signing; these remain unsigned test builds at the operating-system level.
 
