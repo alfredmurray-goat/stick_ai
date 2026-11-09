@@ -135,6 +135,8 @@ jobs:
       - name: Assemble the complete Lite desktop folder
         run: |
           node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}" --node release-assets/node-v24.22.1-${{ matrix.node }}/${{ matrix.executable }} --node-license release-assets/node-v24.22.1-${{ matrix.node }}/LICENSE --server release-assets/llama-build/${{ matrix.server }} --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses
+      - name: Remove copied inputs before archiving
+        run: rm -f release-assets/stellan-1-lite-q4_k_m.gguf release-assets/node-*.tar.gz release-assets/node-*.zip
       - name: Verify native startup and real Lite tool exchange
         run: node scripts/smoke-platform.mjs "dist/Stick AI"
       - name: Archive the complete folder with permissions
