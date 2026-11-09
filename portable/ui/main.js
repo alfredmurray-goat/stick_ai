@@ -13,6 +13,7 @@ let errorAction = "Retry";
 let polling = false;
 let nativeStarting = false;
 let installingUpdate = false;
+let lastUpdateFailed = false;
 async function api(path, data) {
   const response = await fetch(path, { method: data ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}), cache: "no-store" });
   if (!response.ok) { throw new Error("unavailable"); }
@@ -127,7 +128,7 @@ async function checkAppUpdates() {
   try {
     const result = await native.invoke("check_app_updates");
     const size = result.bytes ? ` Download: ${(result.bytes / 1024 / 1024).toFixed(1)} MB.` : "";
-    byId("update-message").textContent = result.message + size;
+    byId("update-message").textContent = (lastUpdateFailed ? "The last update could not finish; your previous app was kept. " : "") + result.message + size;
     byId("install-update").hidden = result.state !== "available";
     if (result.state === "authentication") { byId("update-access").open = true; }
   } catch { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; }
@@ -138,6 +139,7 @@ async function saveUpdateAccess(clearToken = false) {
   try {
     const settings = await native.invoke("save_app_update_settings", { enabled: byId("auto-updates").checked, token: tokenInput.value || null, clearToken });
     tokenInput.value = "";
+    tokenInput.placeholder = settings.hasToken ? "Access saved on this computer" : "GitHub token";
     byId("update-message").textContent = settings.hasToken ? "GitHub access saved on this computer." : "Update preferences saved.";
     if (!clearToken && byId("auto-updates").checked) { await checkAppUpdates(); }
   } catch { tokenInput.value = ""; byId("update-message").textContent = "Update preferences could not be saved."; }
@@ -155,6 +157,7 @@ if (native) {
     catch { installingUpdate = false; byId("start").disabled = false; byId("install-update").disabled = false; byId("check-update").disabled = false; byId("update-message").textContent = "The update could not finish. Your current app is still available. Try again when you are online and the app folder is writable."; }
   };
   native.invoke("app_update_settings").then((settings) => {
+    lastUpdateFailed = Boolean(settings.lastUpdateFailed);
     byId("auto-updates").checked = settings.enabled;
     byId("update-token").placeholder = settings.hasToken ? "Access saved on this computer" : "GitHub token";
     if (settings.enabled) { void checkAppUpdates(); }

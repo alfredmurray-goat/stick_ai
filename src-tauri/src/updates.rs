@@ -25,7 +25,7 @@ fn preferences(state: &Desktop) -> Result<Preferences, String> {
 pub fn app_update_settings(window: WebviewWindow, state: State<'_, Desktop>) -> Result<Value, String> {
     local(&window)?;
     let settings = preferences(&state)?;
-    Ok(json!({"enabled": settings.enabled, "hasToken": !settings.token.is_empty()}))
+    Ok(json!({"enabled": settings.enabled, "hasToken": !settings.token.is_empty(), "lastUpdateFailed": std::env::args().any(|argument| argument == "--update-failed")}))
 }
 #[tauri::command]
 pub fn save_app_update_settings(window: WebviewWindow, state: State<'_, Desktop>, enabled: bool, token: Option<String>, clear_token: bool) -> Result<Value, String> {

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { assets } from "./portable-fixtures.js";
 import { buildPlatform } from "../src/portable/package.js";
+import { buildUpdateBundle, extractUpdateBundle } from "../src/portable/update-package.js";
 import { verifyStick } from "../src/portable/integrity.js";
 
 it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the updated Lite desktop and target-specific runtime for %s", async (target) => {
@@ -24,6 +25,15 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     expect(JSON.parse(await readFile(join(output, "app/model-templates.json"), "utf8"))).toEqual({ "stellan-1-lite": "mistral-v1" });
     const launcher = mac ? "Start.command" : target === "windows-x64" ? "Start.bat" : "start.sh";
     expect(await readFile(join(output, launcher), "utf8")).toContain("launcher.cjs");
+    expect(manifest.files.some((file) => file.path === "app/stick-update.cjs")).toBe(true);
+    const config = JSON.parse(await readFile(join(output, "app/update-config.json"), "utf8"));
+    expect(config.target).toBe(target);
+    const bundle = join(root, "app-update.gz"); await buildUpdateBundle(output, target, bundle);
+    const extracted = join(root, "extracted"); await mkdir(extracted);
+    const update = await extractUpdateBundle(bundle, extracted, target, new AbortController().signal);
+    expect(update).toEqual(manifest);
+    expect(await readFile(join(extracted, desktop))).toEqual(await readFile(join(output, desktop)));
+    await expect(readFile(join(extracted, "models/stellan-1-lite-q4_k_m.gguf"))).rejects.toThrow();
     await writeFile(join(output, desktop), "tampered"); await expect(verifyStick(output)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

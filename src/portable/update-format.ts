@@ -9,10 +9,7 @@ export interface UpdateAsset { target: Target; name: string; sha256: string; siz
 export interface UpdateFeed { format: 1; repository: string; sequence: number; source: string; assets: UpdateAsset[] }
 export interface SignedFeed { payload: string; signature: string }
 export function safeUpdatePath(path: unknown): path is string {
-  return typeof path === "string" && path.length > 0 && path.length < 1024 && !/[\\:\x00-\x1f\x7f]/.test(path) && path.split("/").every((part) => Boolean(part) && part !== "." && part !== ".." && !/[. ]$/.test(part) && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part));
-}
-export function mutableUpdatePath(path: string): boolean {
-  return ["models", "logs", "app/project", ".stick"].some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+  return typeof path === "string" && path.length > 0 && path.length < 1024 && !/[\\:<>"|?*\x00-\x1f\x7f]/.test(path) && path.split("/").every((part) => Boolean(part) && part !== "." && part !== ".." && !/[. ]$/.test(part) && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part));
 }
 export function validateConfig(value: unknown): UpdateConfig {
   const config = value as UpdateConfig;
@@ -43,8 +40,8 @@ export function validateUpdateManifest(value: unknown, target: Target): Manifest
     if (!record.path.startsWith("models/")) { size += record.size; if (record.size > maxUpdateBytes || size > 2 * 1024 ** 3) { throw new Error("Update is too large"); } }
   }
   const desktop = target.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-ai" : target === "windows-x64" ? "Stick AI.exe" : "stick-ai";
-  for (const path of [desktop, `bin/${target}/node${target === "windows-x64" ? ".exe" : ""}`, `bin/${target}/llama-server${target === "windows-x64" ? ".exe" : ""}`, "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]) {
-    if (!seen.has(path)) { throw new Error("Incomplete update"); }
+  for (const path of [desktop, "README.txt", target.startsWith("macos-") ? "Start.command" : target === "windows-x64" ? "Start.bat" : "start.sh", `bin/${target}/node${target === "windows-x64" ? ".exe" : ""}`, `bin/${target}/llama-server${target === "windows-x64" ? ".exe" : ""}`, "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]) {
+    if (!seen.has(path.toLowerCase())) { throw new Error("Incomplete update"); }
   }
   return manifest;
 }
