@@ -1,19 +1,18 @@
 # stick_ai
 
-## Download the desktop Lite app
+## Download
 
-[Download the complete Intel Mac Lite build (4.15 GB)](https://github.com/alfredmurray-goat/stick_ai/actions/runs/42517759406/artifacts/13632203606).
+[Download stick_ai from GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases).
 
-Extract the download, then extract the ZIP inside it. Open the resulting folder, double-click **Stick AI.app** and click **Start**. Keep the folder together. No Node.js or Ollama installation is required. Requires **Intel macOS 13.5+** and **8 GiB RAM**. Lite is included; Max is not included.
+Choose Apple Silicon Mac, Intel Mac, Windows x64 or Linux x64. The release page links complete Lite packages and provides permanent split assets with checksum-verifying join helpers. Complete Actions links last 14 days; permanent release parts remain available. See [BUILDS.md](BUILDS.md) for extraction, prerequisites, verification and rebuilding.
 
-This is an unsigned test build. Gatekeeper and clean first launch on the user's own Mac remain unverified. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for measured checks and limitations. Download before **11 November 2026**; the artifact is retained for three days.
-
+The app and Lite model are included; no Node.js or Ollama installation is required. These are unsigned test builds. Macs require macOS 13.5+; Windows needs an existing WebView2 runtime, and Linux needs GTK 3/WebKitGTK 4.1. All need at least 8 GiB reported RAM. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for checks and limitations.
 
 An offline desktop and terminal coding assistant by localilabs. It streams responses from Stellan-1 Lite or Stellan-1 Max through Ollama or the portable llama.cpp server, plans work, calls tools, reads results and continues until finished or the configured step limit is reached. It is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
 
 ## Builds for every supported desktop
 
-The [Desktop Lite builds workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds complete, separate packages for all four platforms on every source push to main. Open the latest successful run and download the artifact matching your computer. Each includes the actual Lite model, portable Node, the native app, pinned Mamba2-compatible llama.cpp server and complete notices. Build outputs are attached to GitHub Actions rather than committed as multi-gigabyte Git files; downloads are retained for 14 days and can be rebuilt with Run workflow.
+The [Desktop Lite builds workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds complete, separate packages for all four platforms on every source push to main. Open the latest successful run and download the artifact matching your computer. Each includes the actual Lite model, portable Node, the native app, pinned Mamba2-compatible llama.cpp server and complete notices. Build outputs are published in GitHub Releases rather than committed as multi-gigabyte Git files. The release publisher keeps permanent split copies under GitHub's per-file size limit, with double-click join helpers and full archive/part SHA256 checksums. Complete single-download Actions packages last 14 days and can be rebuilt with Run workflow.
 
 | Download artifact | Computer | Open after extracting | Desktop requirements |
 | --- | --- | --- | --- |
