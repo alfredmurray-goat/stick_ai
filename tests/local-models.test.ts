@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, writeFile, rename, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, rename, rm, stat, realpath, symlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { inspectMaxFile, linkMaxFile, localModelStatus, resolveLocalMax, unlinkMaxFile } from "../src/portable/local-models.js";
@@ -24,7 +24,7 @@ it("keeps the selected file portable when the whole stick folder moves", async (
   const f = await fixture(); await linkMaxFile(f.root, f.model);
   expect(JSON.parse(await readFile(join(f.root, "logs/max-model.json"), "utf8")).relative).toBe(true);
   const moved = f.drive + "-moved"; await rename(f.drive, moved); roots.push(moved);
-  const model = await resolveLocalMax(join(moved, "Stick AI")); expect(model?.path).toBe(resolve(moved, "My Stellan Max.gguf"));
+  const model = await resolveLocalMax(join(moved, "Stick AI")); expect(model?.path).toBe(await realpath(join(moved, "My Stellan Max.gguf")));
 });
 it("refuses an incomplete or wrong-format file without losing the prior choice", async () => {
   const f = await fixture(); await linkMaxFile(f.root, f.model);
@@ -53,4 +53,11 @@ it("falls back to included Max when an external selection is removed, keeping bo
 it("refuses an unlisted file placed inside the verified app package", async () => {
   const f = await fixture(); const inside = join(f.root, "extra.gguf"); await writeFile(inside, f.bytes);
   await expect(linkMaxFile(f.root, inside)).rejects.toThrow("outside the app folder");
+});
+
+it("normalizes OS alias paths when the app and model are selected through a directory alias", async () => {
+  const f = await fixture(); const alias = f.drive + "-alias"; roots.push(alias);
+  await symlink(f.drive, alias, process.platform === "win32" ? "junction" : "dir");
+  await linkMaxFile(join(alias, "Stick AI"), join(alias, "My Stellan Max.gguf"));
+  expect((await resolveLocalMax(join(alias, "Stick AI")))?.path).toBe(await realpath(f.model));
 });
