@@ -43,12 +43,14 @@ it("restores Lite even if Max fails", async () => {
   await expect(codeWithSwap(engine, async () => { throw new Error("coder failed"); }, new AbortController().signal, vi.fn())).rejects.toThrow("coder failed");
   expect(sequence.at(-1)).toBe("stellan-1-lite");
 });
-it("caps real coding requests at five and reports the cap", async () => {
+it("continues delegating beyond five calls and still requires delegation for later writes", async () => {
   const code = vi.fn(async () => "code"); const report = vi.fn();
   const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: false, available: true, code }, report);
   for (let i = 0; i < 7; i++) { await delegate(request, new AbortController().signal); }
-  expect(code).toHaveBeenCalledTimes(5);
-  expect(report.mock.calls.flat().join(" ")).toContain("5 calls per task");
+  expect(code).toHaveBeenCalledTimes(7);
+  expect(report.mock.calls.flat().join(" ")).toContain("Code specialist call 7.");
+  delegate.applied();
+  expect(delegate.requiresDelegation({ ...request, function: { name: "write_file", arguments: "{}" } })).toBe(true);
 });
 it.each([8, 15.9])("falls back below 16 GB (%s GB)", async (amount) => {
   const code = vi.fn(async () => "code"); const delegate = createDelegate({ totalBytes: amount * GiB, noSwap: false, available: true, code }, vi.fn());
@@ -71,4 +73,13 @@ it("requires delegation before a new file and a larger or function edit", async 
   await delegate(request, new AbortController().signal);
   expect(delegate.requiresDelegation(file)).toBe(false);
   delegate.applied(); expect(delegate.requiresDelegation(file)).toBe(true);
+});
+
+it("does not reload Lite after a cancelled delegation", async () => {
+  const controller = new AbortController();
+  const engine = { stop: vi.fn(async () => {}), start: vi.fn(async (_model: string) => {}) };
+  const reason = new Error("Cancelled");
+  await expect(codeWithSwap(engine, async () => { controller.abort(reason); throw reason; }, controller.signal, vi.fn())).rejects.toBe(reason);
+  expect(engine.start.mock.calls.map(([model]) => model)).toEqual(["stellan-1-max"]);
+  expect(engine.stop).toHaveBeenCalledTimes(2);
 });

@@ -24,9 +24,9 @@ export function dryRunActions(root: string, platform: string = process.platform,
     "Choose an unused model port between 8080 and 8099; never reuse an existing listener.",
     "Open the authenticated browser start screen on a free 127.0.0.1 port.",
     "After Start chatting, launch Lite on 127.0.0.1 with context 8192 and a random authentication key.",
-    "Poll health and authenticated model identity for up to 120 seconds; refuse an unexpected server.",
-    "For delegate_code, stop Lite, load Max on the same port, request code, stop Max and reload Lite; allow 30 seconds per load and at most five calls per task.",
-    "Keep the status window open and monitor its connection; log technical details only on the stick.",
+    "Poll health and authenticated model identity until ready or cancelled; refuse an unexpected server.",
+    "For delegate_code, stop Lite, load Max on the same port, request code, stop Max and reload Lite; wait until ready or cancelled, with no delegation call limit.",
+    "Use Stop to end the session; log technical details only on the stick.",
     "On exit, cancel work, stop the owned model process, close the UI and delete the private temporary folder."
   ];
 }
@@ -77,7 +77,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       temp = await mkdtemp(join(tmpdir(), "stick-ai-"));
       const port = await reservePort(); await port.release();
       engine = new ManagedEngine(root, targetFor(process.platform, process.arch), port.port, temp, fd, log);
-      engine.patient = desktop; engine.contextSize = faster ? 4096 : 8192;
+      engine.contextSize = faster ? 4096 : 8192;
       engine.onProcess = (pid) => notify({ kind: "model_pid", pid });
       app = await webApp({ root, engine, bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
     };
@@ -108,7 +108,7 @@ export async function launcherMain(args = process.argv.slice(2)): Promise<void> 
   if (args.includes("--service")) { await service(root, noSwap); return; }
   const box = await Sandbox.create(root); await mkdir(await box.path("logs", true), { recursive: true });
   const logPath = await box.path("logs/launcher.log", true); const fd = openSync(logPath, "a", 0o600);
-  const child = spawn(process.execPath, [process.argv[1]!, "--root", root, "--service", ...(noSwap ? ["--no-swap"] : [])], { cwd: root, detached: true, windowsHide: true, stdio: ["ignore", fd, fd, "ipc"], env: { ...(process.env.STICK_IDLE_TIMEOUT_SECONDS ? { STICK_IDLE_TIMEOUT_SECONDS: process.env.STICK_IDLE_TIMEOUT_SECONDS } : {}), ...(process.env.STICK_CONTEXT_MAX_BYTES ? { STICK_CONTEXT_MAX_BYTES: process.env.STICK_CONTEXT_MAX_BYTES } : {}), TMPDIR: tmpdir(), TEMP: tmpdir(), TMP: tmpdir(), PATH: process.env.PATH ?? process.env.Path ?? "", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}), ...(process.env.ComSpec ? { ComSpec: process.env.ComSpec } : {}) } });
+  const child = spawn(process.execPath, [process.argv[1]!, "--root", root, "--service", ...(noSwap ? ["--no-swap"] : [])], { cwd: root, detached: true, windowsHide: true, stdio: ["ignore", fd, fd, "ipc"], env: { ...(process.env.STICK_CONTEXT_MAX_BYTES ? { STICK_CONTEXT_MAX_BYTES: process.env.STICK_CONTEXT_MAX_BYTES } : {}), TMPDIR: tmpdir(), TEMP: tmpdir(), TMP: tmpdir(), PATH: process.env.PATH ?? process.env.Path ?? "", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}), ...(process.env.ComSpec ? { ComSpec: process.env.ComSpec } : {}) } });
   let status = "Starting your private assistant..."; let tick = 0;
   const show = (): void => { process.stdout.write(`\r${status}${status.startsWith("Starting") ? " "+["◐", "◓", "◑", "◒"][tick++ % 4] : ""}   `); };
   const timer = setInterval(show, 350); show();

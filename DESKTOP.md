@@ -12,11 +12,11 @@ Health and optional slot information select “Reading your project...” or “
 
 ## Inactivity and context settings
 
-Model requests have no fixed overall deadline. `STICK_IDLE_TIMEOUT_SECONDS` defaults to 300 and accepts positive seconds up to 86400. Every non-empty incoming byte chunk resets the timer, including SSE heartbeats and partial events; no-byte periods abort with a recoverable error. A user cancellation is separate. Bounded health probes and shell execution deadlines are unchanged. Desktop model loading uses activity rather than the legacy launcher's absolute readiness deadline; health bytes and server log output count as startup activity. A server that keeps answering “loading” can therefore keep loading until cancelled.
+Model requests, shell commands and model loading have no application execution or inactivity deadline. `STICK_IDLE_TIMEOUT_SECONDS` is no longer used. Cancel stops a request or model load; quitting stops the owned service and model processes. Health probes retain short retry deadlines, and shutdown cleanup remains bounded. Delegation has no call cap, while the configured agent step limit still applies. A silent or loading model waits until it responds, fails or is cancelled.
 
 `STICK_CONTEXT_MAX_BYTES` defaults to 16384, with a range of 256 through 1048576. Automatic context includes a bounded file list and contents of files explicitly named in the task, including unique basenames; ambiguous basenames do not trigger content reads. File tools can fetch further relevant files deliberately. Tool history sent to the model is also bounded; the application's retained conversation is not overwritten. The setting limits automatic context, not the total system prompt, typed task or model tokenizer's token count.
 
-After two consecutive inactivity errors, Switch to a faster setting selects Lite, disables Max swaps and reduces the server context to 4096 and automatic context to 4096 bytes. It reloads Lite as necessary and explains the tradeoff. Success resets the failure count. This does not guarantee a particular first-token time.
+The optional faster setting selects Lite, disables Max swaps and reduces the server context to 4096 and automatic context to 4096 bytes. It reloads Lite as necessary. Silent requests no longer trigger automatic inactivity errors or faster-setting suggestions. This does not guarantee a particular first-token time.
 
 ## Build for release
 

@@ -27,7 +27,7 @@ it("dry-run describes every action without launching a process or creating files
   const root = await temp(); const before = await staticFiles(root);
   for (const [os, arch] of [["darwin", "arm64"], ["win32", "x64"], ["linux", "x64"]]) {
     const actions = dryRunActions(root, os as NodeJS.Platform, arch, 16 * GiB);
-    expect(actions.join(" ")).toContain("127.0.0.1"); expect(actions.join(" ")).toContain("120 seconds"); expect(actions.join(" ")).toContain("stop Lite");
+    expect(actions.join(" ")).toContain("127.0.0.1"); expect(actions.join(" ")).toContain("until ready or cancelled"); expect(actions.join(" ")).toContain("stop Lite");
   }
   expect(await staticFiles(root)).toEqual(before);
 });

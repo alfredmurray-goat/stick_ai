@@ -1,5 +1,4 @@
 import { writeSync } from "node:fs";
-import { ModelIdleError, idleSeconds } from "../model/idle.js";
 import { type ServerStatus } from "./progress.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
@@ -16,15 +15,15 @@ import { executableName, modelFile, UserError, type Target } from "./platform.js
 
 export interface Switchable {
   stop(): Promise<void>;
-  start(model: ModelName, signal: AbortSignal, timeout: number): Promise<void>;
+  start(model: ModelName, signal: AbortSignal): Promise<void>;
 }
 export async function codeWithSwap(engine: Switchable, code: () => Promise<string>, signal: AbortSignal, report: (text: string) => void): Promise<string> {
   report("Switching to the coding model...");
   await engine.stop();
-  try { await engine.start("stellan-1-max", signal, 30000); return await code(); }
+  try { await engine.start("stellan-1-max", signal); return await code(); }
   finally {
     await engine.stop();
-    await engine.start("stellan-1-lite", new AbortController().signal, 30000);
+    if (!signal.aborted) { await engine.start("stellan-1-lite", signal); }
   }
 }
 export function modelRuntimeArgs(model: ModelName): string[] {
@@ -47,7 +46,6 @@ export class ManagedEngine implements Switchable {
   child: ChildProcess | null = null;
   active: ModelName | null = null;
   disposing = false;
-  patient = false;
   contextSize = 8192;
   activeContextSize = 0;
   onOutput?: (text: string, thinking: boolean) => void;
@@ -56,7 +54,7 @@ export class ManagedEngine implements Switchable {
   readonly key = randomBytes(32).toString("hex");
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
-  async start(model: ModelName, signal: AbortSignal, timeout = 120000): Promise<void> {
+  async start(model: ModelName, signal: AbortSignal): Promise<void> {
     if (this.disposing) { throw new UserError("general"); }
     if (this.child) { throw new Error("A model process is already active"); }
     signal.throwIfAborted();
@@ -66,7 +64,6 @@ export class ManagedEngine implements Switchable {
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
     const templateArgs = await modelTemplateArgs(this.root, model);
-    let lastActivity = Date.now();
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(this.contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
@@ -74,22 +71,19 @@ export class ManagedEngine implements Switchable {
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
     this.onProcess?.(child.pid ?? null);
-    for (const stream of [child.stdout, child.stderr]) { stream?.on("data", (data: Buffer) => { if (data.length) { lastActivity = Date.now(); } try { writeSync(this.logFd, data); } catch {} }); }
+    for (const stream of [child.stdout, child.stderr]) { stream?.on("data", (data: Buffer) => { try { writeSync(this.logFd, data); } catch {} }); }
     let failed = false;
     child.once("error", (error) => { failed = true; this.log(error); });
-    const deadline = Date.now() + timeout;
     try {
-      while (this.patient || Date.now() < deadline) {
-        if (this.patient && Date.now() - lastActivity >= idleSeconds() * 1000) { throw new ModelIdleError(); }
+      while (true) {
         signal.throwIfAborted();
         if (failed || child.exitCode !== null || child.signalCode !== null) { throw new UserError("loading"); }
         try {
-          const health = await fetch(`${this.baseUrl}/health`, { redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(this.patient ? 1000 : Math.min(1000, Math.max(1, deadline - Date.now())))]) });
-          lastActivity = Date.now();
+          const health = await fetch(`${this.baseUrl}/health`, { redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]) });
           const status = await health.json() as { status?: string };
           if (health.ok && status.status === "ok") {
-            const valid = await fetch(`${this.baseUrl}/v1/models`, { redirect: "error", headers: { Authorization: `Bearer ${this.key}` }, signal: AbortSignal.timeout(1000) });
-            const invalid = await fetch(`${this.baseUrl}/v1/models`, { redirect: "error", headers: { Authorization: "Bearer invalid-startup-probe" }, signal: AbortSignal.timeout(1000) });
+            const valid = await fetch(`${this.baseUrl}/v1/models`, { redirect: "error", headers: { Authorization: `Bearer ${this.key}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]) });
+            const invalid = await fetch(`${this.baseUrl}/v1/models`, { redirect: "error", headers: { Authorization: "Bearer invalid-startup-probe" }, signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]) });
             const data = await valid.json() as { data?: { id: string }[] }; await invalid.body?.cancel();
             if (!valid.ok || invalid.status !== 401 || !data.data?.some((item) => item.id === model) || child.exitCode !== null) { throw new UserError("busy"); }
             this.active = model; this.activeContextSize = this.contextSize; return;
@@ -97,7 +91,6 @@ export class ManagedEngine implements Switchable {
         } catch (error) { if (error instanceof UserError) { throw error; } }
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
-      throw new UserError("loading");
     } catch (error) { await this.stop(); throw error; }
   }
   async stop(): Promise<void> {

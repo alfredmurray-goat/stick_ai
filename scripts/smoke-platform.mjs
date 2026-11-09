@@ -19,7 +19,7 @@ const native = target.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-
 const root = resolve(process.argv[2]); const temporary = await mkdtemp(join(tmpdir(), "stick-smoke-"));
 await mkdir("release-assets", { recursive: true });
 const fd = openSync("release-assets/smoke.log", "a", 0o600); const reservation = await reservePort(); await reservation.release();
-const engine = new ManagedEngine(root, target, reservation.port, temporary, fd, console.error); engine.patient = true;
+const engine = new ManagedEngine(root, target, reservation.port, temporary, fd, console.error);
 const signal = AbortSignal.timeout(10 * 60 * 1000);
 try {
   await promisify(execFile)(join(root, native), ["--dry-run"]);

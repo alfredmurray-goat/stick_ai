@@ -27,7 +27,7 @@ export function desktopDryRun(root: string, platform = process.platform, arch = 
     "Verify SHA256 hashes of the runtime, app, model and server before execution.",
     "Create private temporary storage and use the desktop app log folder.",
     "Reserve an unused 127.0.0.1 port from 8080 through 8099; refuse an occupied listener.",
-    "Start the hidden Lite server; poll health and authenticated identity with an inactivity limit.",
+    "Start the hidden Lite server; poll health and authenticated identity until ready or cancelled.",
     "Open the local chat inside the desktop window without a terminal or browser address bar.",
     "On Cancel, abort only the current step; on quit, stop owned processes and delete temporary files."
   ];
