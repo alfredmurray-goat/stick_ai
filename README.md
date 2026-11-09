@@ -1,18 +1,22 @@
 # stick_ai
 
+## One app, Lite + Max
+
+Current complete releases bundle both models in **Stick AI — Lite + Max**. On the welcome screen choose paired Lite + Max, Lite only, or Max directly (code only). Max needs at least 16 GiB RAM. You can also link an existing Max GGUF elsewhere on your stick without copying it. The original Stellan-1.0 GGUF is the confirmed Max file. See [DESKTOP.md](DESKTOP.md) and [BUILDS.md](BUILDS.md) for the current unified release and package requirements.
+
 ## Download
 
 [Download stick_ai from GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases).
 
 Choose Apple Silicon Mac, Intel Mac, Windows x64 or Linux x64. The release page links complete Lite packages and provides permanent split assets with checksum-verifying join helpers. Complete Actions links last 14 days; permanent release parts remain available. See [BUILDS.md](BUILDS.md) for extraction, prerequisites, verification and rebuilding.
 
-The app and Lite model are included; no Node.js or Ollama installation is required. These are unsigned test builds. Macs require macOS 13.5+; Windows needs an existing WebView2 runtime, and Linux needs GTK 3/WebKitGTK 4.1. All need at least 8 GiB reported RAM. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for checks and limitations.
+The app and both Lite and Max models are included; no Node.js or Ollama installation is required. These are unsigned test builds. Macs require macOS 13.5+; Windows needs an existing WebView2 runtime, and Linux needs GTK 3/WebKitGTK 4.1. All need at least 8 GiB reported RAM. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for checks and limitations.
 
 An offline desktop and terminal coding assistant by localilabs. It streams responses from Stellan-1 Lite or Stellan-1 Max through Ollama or the portable llama.cpp server, plans work, calls tools, reads results and continues until finished or the configured step limit is reached. It is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
 
 ## Builds for every supported desktop
 
-The [Desktop Lite builds workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds complete, separate packages for all four platforms on every source push to main. Open the latest successful run and download the artifact matching your computer. Each includes the actual Lite model, portable Node, the native app, pinned Mamba2-compatible llama.cpp server and complete notices. Build outputs are published in GitHub Releases rather than committed as multi-gigabyte Git files. The release publisher keeps permanent split copies under GitHub's per-file size limit, with double-click join helpers and full archive/part SHA256 checksums. Complete single-download Actions packages last 14 days and can be rebuilt with Run workflow.
+The [Desktop builds — Lite + Max workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds and tests the app for all four platforms. The release publisher adds the pinned Max model and publishes complete packages containing both GGUFs. Download from GitHub Releases, using all parts and the Join helper for your platform. Temporary Actions base artifacts are internal build inputs, not the complete two-model downloads. App-only signed updates omit model bytes and keep your existing weights.
 
 | Download artifact | Computer | Open after extracting | Desktop requirements |
 | --- | --- | --- | --- |
@@ -21,7 +25,7 @@ The [Desktop Lite builds workflow](https://github.com/alfredmurray-goat/stick_ai
 | stick_ai-windows-x64 | Windows Intel/AMD 64-bit | Stick AI.exe | Windows 10+, 8 GiB RAM, existing Edge WebView2 |
 | stick_ai-linux-x64 | Linux Intel/AMD 64-bit | stick-ai | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GiB RAM |
 
-Extract the Actions ZIP, then its inner archive, and keep the resulting folder together. Linux uses an inner tar.gz to preserve executable permissions. Windows and Linux desktop webviews are system prerequisites, so these are not universal no-install packages on computers lacking those components. Technical browser fallbacks use the bundled Node and the computer's existing browser. All packages use the same low-memory Lite settings, explicit Mistral-v1 compatibility formatter and validated tagged tool protocol. Max weights are not included. The old Intel-only workflow remains a manual compatibility workflow.
+Join the release parts, extract the finished archive, and keep the resulting folder together. Linux uses an inner tar.gz to preserve executable permissions. Windows and Linux desktop webviews are system prerequisites, so these are not universal no-install packages on computers lacking those components. Technical browser fallbacks use the bundled Node and the computer's existing browser. All packages use the same low-memory Lite settings, explicit Mistral-v1 compatibility formatter and validated tagged tool protocol. Complete unified releases include Max; older Lite-only packages do not. The old Intel-only workflow remains a manual compatibility workflow.
 
 These are unsigned builds. Gatekeeper, SmartScreen and interactive first launch on clean user machines require manual qualification. The build runs native dry-run, checksum verification and a real Lite read_file/tool_result/done exchange before uploading a complete artifact; a successful CI run does not prove general model accuracy.
 

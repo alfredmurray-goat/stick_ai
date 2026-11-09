@@ -127,6 +127,7 @@ export async function buildStick(project: string, output: string, inputs: StickI
     await mkdir(join(staging, "app", "project"), { recursive: true }); await mkdir(join(staging, "models")); await mkdir(join(staging, "LICENSES")); await mkdir(join(staging, "logs"));
     await build({ entryPoints: [join(project, "src/portable/entry.ts")], outfile: join(staging, "app/launcher.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     await build({ entryPoints: [join(project, "src/portable/verify.ts")], outfile: join(staging, "app/stick-verify.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
+    await build({ entryPoints: [join(project, "src/portable/models-entry.ts")], outfile: join(staging, "app/stick-models.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await writeFile(join(staging, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }) + "\n");
     const hashes = {} as Record<Target, string>;

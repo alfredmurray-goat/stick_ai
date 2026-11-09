@@ -69,3 +69,32 @@ it("serves a private browser session, swaps models, preserves history and applie
     expect(bodies[2]!.messages.some((message: any) => message.content === "Add greet")).toBe(true);
   } finally { await app.close(); inference.closeAllConnections(); await new Promise<void>((resolve) => inference.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 }, 15000);
+
+it("starts Max directly in the same app and preserves its conversation without executing tools", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-direct-max-")); await cp(resolve("portable/ui"), join(root, "app/ui"), { recursive: true });
+  const bodies: any[] = [];
+  const inference = createServer(async (request, response) => {
+    let body = ""; for await (const bytes of request) { body += bytes; } bodies.push(JSON.parse(body));
+    response.writeHead(200, { "Content-Type": "text/event-stream" });
+    response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: "export function greet() { return 1; }" }, finish_reason: "stop" }] })}\n\n`);
+  });
+  const port = await listenLocal(inference);
+  const engine = { active: null as string | null, baseUrl: `http://127.0.0.1:${port}`, key: "test-key", async start(model: string) { this.active = model; }, async stop() { this.active = null; } };
+  const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 16 * GiB, choices: ["stellan-1-lite", "stellan-1-max"], noSwap: false, report: vi.fn(), log: vi.fn(), stop: async () => {} });
+  const url = new URL(app.url);
+  async function api(path: string, data?: object): Promise<any> {
+    return (await fetch(url.origin + path, { method: data ? "POST" : "GET", headers: { Authorization: `Bearer ${url.hash.slice(1)}`, Origin: url.origin, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) })).json();
+  }
+  try {
+    await app.start("stellan-1-max");
+    expect((await api("/api/state")).activeModel).toBe("stellan-1-max"); expect((await api("/api/state")).paired).toBe(false);
+    for (const text of ["Write greet", "Now explain greet"]) {
+      await api("/api/task", { text });
+      for (let attempt = 0; attempt < 150 && (await api("/api/state")).phase === "working"; attempt++) { await new Promise((resolve) => setTimeout(resolve, 20)); }
+    }
+    expect(bodies).toHaveLength(2); expect(bodies.every((body) => body.model === "stellan-1-max")).toBe(true);
+    expect(bodies[1].messages).toContainEqual({ role: "user", content: "Write greet" });
+    expect(bodies[1].messages).toContainEqual({ role: "assistant", content: "export function greet() { return 1; }" });
+    await expect((await import("node:fs/promises")).readdir(join(root, "app/project"))).resolves.toEqual([]);
+  } finally { await app.close(); inference.closeAllConnections(); await new Promise<void>((resolve) => inference.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
+}, 15000);

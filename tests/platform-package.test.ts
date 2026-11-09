@@ -37,3 +37,19 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     await writeFile(join(output, desktop), "tampered"); await expect(verifyStick(output)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+it("packages a supplied Max GGUF without treating model weights as an executable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-package-max-"));
+  try {
+    const fixture = await assets(root); const notices = join(root, "notices"); await mkdir(notices); await writeFile(join(notices, "NOTICE.txt"), "Fixture");
+    const target = "linux-x64"; const output = join(root, "release");
+    const manifest = await buildPlatform(resolve("."), output, target, { app: fixture.servers[target], node: fixture.nodes[target], server: fixture.servers[target], lite: fixture.lite, max: fixture.max, nodeLicense: fixture.nodeLicenses[target], serverLicense: fixture.nodeLicenses[target], desktopLicenses: notices });
+    expect(manifest.files.find((file) => file.path === "models/stellan-1-max-q4_k_m.gguf")?.optional).toBe(true);
+    await verifyStick(output);
+    const bundle = join(root, "app.gz"); await buildUpdateBundle(output, target, bundle, true);
+    const extracted = join(root, "extracted"); await mkdir(extracted);
+    const compatible = await extractUpdateBundle(bundle, extracted, target, new AbortController().signal);
+    expect(compatible.files.some((file) => file.path === "models/stellan-1-max-q4_k_m.gguf")).toBe(false);
+    expect(compatible.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256).toBe(manifest.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

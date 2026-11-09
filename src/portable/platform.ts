@@ -14,7 +14,7 @@ export function userMessage(error: unknown): string {
     memory: "Your computer needs at least 8 GB of memory; try a computer with more memory.",
     damaged: "This stick may be damaged; ask for a fresh copy.",
     busy: "Another app is using the connection; close other apps and try again.",
-    loading: "The assistant could not get ready in time; close other apps and try again.",
+    loading: "The model could not start. Check the selected GGUF and available memory, or use Lite.",
     browser: "A browser could not open; choose a default browser and try again.",
     storage: "The stick cannot save its files; unlock the stick and try again.",
     general: "The assistant could not start; unplug the stick and plug it into a different port."

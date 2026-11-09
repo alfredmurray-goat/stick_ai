@@ -11,8 +11,9 @@ import { hashFile, staticFiles, type Manifest } from "./integrity.js";
 import { updateMagic, validateUpdateManifest } from "./update-format.js";
 import type { Target } from "./platform.js";
 
-export async function buildUpdateBundle(root: string, target: Target, output: string): Promise<void> {
+export async function buildUpdateBundle(root: string, target: Target, output: string, liteCompatible = false): Promise<void> {
   const manifest = validateUpdateManifest(JSON.parse(await readFile(join(root, "manifest.json"), "utf8")), target);
+  if (liteCompatible) { manifest.files = manifest.files.filter((record) => record.path !== "models/stellan-1-max-q4_k_m.gguf"); }
   const index = Buffer.from(JSON.stringify(manifest)); const length = Buffer.alloc(4); length.writeUInt32LE(index.length);
   async function* contents() {
     yield updateMagic; yield length; yield index;

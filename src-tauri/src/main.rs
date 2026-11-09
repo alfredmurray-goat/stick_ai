@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod updates;
+mod models;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -137,13 +138,13 @@ async fn cancel_start(window: WebviewWindow, state: State<'_, Desktop>) -> Resul
 }
 
 #[tauri::command]
-async fn start_assistant(window: WebviewWindow, state: State<'_, Desktop>, faster: bool) -> Result<String, String> {
+async fn start_assistant(window: WebviewWindow, state: State<'_, Desktop>, faster: bool, mode: Option<String>) -> Result<String, String> {
     local(&window)?;
     let owned = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || start(&owned, faster)).await.map_err(|_| "unavailable")?
+    tauri::async_runtime::spawn_blocking(move || start(&owned, faster, mode.as_deref().unwrap_or("auto"))).await.map_err(|_| "unavailable")?
 }
 
-fn start(state: &Desktop, faster: bool) -> Result<String, String> {
+fn start(state: &Desktop, faster: bool, mode: &str) -> Result<String, String> {
     {
         let mut runtime = state.runtime.lock().unwrap();
         if runtime.starting || runtime.updating { return Err("unavailable".into()); }
@@ -156,7 +157,7 @@ fn start(state: &Desktop, faster: bool) -> Result<String, String> {
         runtime.url = None;
         runtime.status = json!({"running": true, "message": "Starting your private assistant..."});
     }
-    let result = spawn_service(state, faster);
+    let result = if ["auto", "lite", "max"].contains(&mode) { spawn_service(state, faster, mode) } else { Err("Invalid assistant mode".into()) };
     if let Err(detail) = &result {
         log(state, detail);
         let mut runtime = state.runtime.lock().unwrap();
@@ -168,7 +169,7 @@ fn start(state: &Desktop, faster: bool) -> Result<String, String> {
     result
 }
 
-fn spawn_service(state: &Desktop, faster: bool) -> Result<String, String> {
+fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, String> {
     let (platform, executable) = target()?;
     let relative = format!("bin/{platform}/{executable}");
     for file in [relative.as_str(), "app/launcher.cjs"] {
@@ -178,6 +179,8 @@ fn spawn_service(state: &Desktop, faster: bool) -> Result<String, String> {
     let mut command = Command::new(state.root.join(relative));
     command.arg(state.root.join("app/launcher.cjs")).arg("--root").arg(&state.root).arg("--desktop").arg("--log-dir").arg(&state.logs);
     if faster { command.arg("--faster"); }
+    if mode == "lite" { command.arg("--no-swap"); }
+    if mode == "max" { command.args(["--model", "stellan-1-max"]); }
     command.current_dir(&state.root).env_clear();
     for name in ["PATH", "Path", "SystemRoot", "ComSpec", "STICK_CONTEXT_MAX_BYTES"] {
         if let Some(value) = std::env::var_os(name) { command.env(name, value); }
@@ -272,7 +275,7 @@ fn main() {
             let handle = window.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || { stop(&desktop); handle.exit(0); });
         }
-    }).invoke_handler(tauri::generate_handler![start_assistant, desktop_status, cancel_start, updates::app_update_settings, updates::save_app_update_settings, updates::check_app_updates, updates::install_app_update]).build(tauri::generate_context!()).expect("Desktop app unavailable");
+    }).invoke_handler(tauri::generate_handler![start_assistant, desktop_status, cancel_start, updates::app_update_settings, updates::save_app_update_settings, updates::check_app_updates, updates::install_app_update, models::local_model_status, models::link_max_model, models::unlink_max_model, models::choose_max_model]).build(tauri::generate_context!()).expect("Desktop app unavailable");
     app.run(|handle, event| {
         if let tauri::RunEvent::Exit = event { stop(&handle.state::<Desktop>()); }
     });

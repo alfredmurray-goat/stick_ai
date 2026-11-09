@@ -8,6 +8,7 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(async () => {}),
   readFile: vi.fn(async () => { throw Object.assign(new Error("absent"), { code: "ENOENT" }); })
 }));
+vi.mock("../src/portable/local-models.js", () => ({ resolveLocalMax: vi.fn(async () => ({ path: "/external/Max.gguf", name: "Max.gguf", source: "linked" })) }));
 vi.mock("../src/portable/ports.js", () => ({ reservePort: vi.fn(async () => ({ release: async () => {} })) }));
 import { ManagedEngine } from "../src/portable/engine.js";
 import { runProcess } from "../src/sandbox/process.js";
@@ -29,7 +30,11 @@ it("keeps loading past the former startup and inactivity deadlines, then accepts
   await vi.advanceTimersByTimeAsync(600000);
   expect(engine.child).toBe(process); expect(engine.active).toBeNull();
   ready = true; await vi.advanceTimersByTimeAsync(200); await loading;
-  expect(engine.active).toBe("stellan-1-max"); await engine.stop();
+  expect(engine.active).toBe("stellan-1-max");
+  const args = mocks.spawn.mock.calls[0]![1] as string[];
+  expect(args[args.indexOf("--model") + 1]).toBe("/external/Max.gguf");
+  expect(args[args.indexOf("--ctx-size") + 1]).toBe("4096");
+  await engine.stop();
 });
 it("cancels a model that remains loading without waiting for a readiness deadline", async () => {
   vi.useFakeTimers(); mocks.spawn.mockReturnValue(child());
