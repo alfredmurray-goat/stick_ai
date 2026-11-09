@@ -18,7 +18,6 @@ struct Runtime {
     url: Option<String>,
     starting: bool,
     cancelled: bool,
-    idle_failures: u32,
     generation: u64,
     model_pid: Option<u32>,
     closing: bool,
@@ -176,7 +175,7 @@ fn spawn_service(state: &Desktop, faster: bool) -> Result<String, String> {
     command.arg(state.root.join("app/launcher.cjs")).arg("--root").arg(&state.root).arg("--desktop").arg("--log-dir").arg(&state.logs);
     if faster { command.arg("--faster"); }
     command.current_dir(&state.root).env_clear();
-    for name in ["PATH", "Path", "SystemRoot", "ComSpec", "STICK_IDLE_TIMEOUT_SECONDS", "STICK_CONTEXT_MAX_BYTES"] {
+    for name in ["PATH", "Path", "SystemRoot", "ComSpec", "STICK_CONTEXT_MAX_BYTES"] {
         if let Some(value) = std::env::var_os(name) { command.env(name, value); }
     }
     for name in ["HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME"] { command.env(name, &state.temporary); }
@@ -207,17 +206,9 @@ fn spawn_service(state: &Desktop, faster: bool) -> Result<String, String> {
             match event.get("kind").and_then(Value::as_str) {
                 Some("progress") => { runtime.status["message"] = event["text"].clone(); }
                 Some("model_pid") => { runtime.model_pid = event["pid"].as_u64().map(|value| value as u32); }
-                Some("ready") => { runtime.url = event["url"].as_str().map(String::from); runtime.idle_failures = 0; }
+                Some("ready") => { runtime.url = event["url"].as_str().map(String::from); }
                 Some("error") => {
-                    let mut error = event["error"].clone();
-                    if error["kind"] == "idle" {
-                        runtime.idle_failures += 1;
-                        if runtime.idle_failures >= 2 {
-                            error["action"] = json!("Switch to a faster setting");
-                            error["explanation"] = json!("Use Lite with a shorter memory of the conversation, without switching to the larger coding model.");
-                        }
-                    }
-                    if error["kind"] != "idle" { runtime.idle_failures = 0; }
+                    let error = event["error"].clone();
                     runtime.status = json!({"running": false, "error": error});
                 }
                 Some("stopped") => { runtime.status["running"] = json!(false); }

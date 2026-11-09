@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   const execute = async (task: string): Promise<void> => {
     active = new AbortController(); channel = undefined;
     try {
+      if (managed && managed.engine.active !== config.model) { await managed.engine.start(config.model, active.signal); }
       if (config.model === "stellan-1-max") {
         const reply = await model.complete([{ role: "system", content: coderSystem }, { role: "user", content: task }], active.signal, () => {});
         const batch = [{ role: "user" as const, content: task }, { role: "assistant" as const, content: reply.content }];
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
     } finally { active = undefined; stdout.write("\n"); }
   };
   try {
-    if (command === "run") { if (managed) { await managed.engine.start(config.model, new AbortController().signal); } await execute(args[1]!); return; }
+    if (command === "run") { await execute(args[1]!); return; }
     if (!stdin.isTTY) { throw new Error("Chat requires a terminal; use stick run <task>"); }
     stdout.write(renderModelPicker(ram, Boolean(stdout.isTTY)) + "\n");
     while (true) {
@@ -103,7 +104,6 @@ async function main(): Promise<void> {
         stdout.write(clean(errorText(error)) + "\n");
       }
     }
-    if (managed) { await managed.engine.start(config.model, new AbortController().signal); }
     stdout.write(`stick_ai · ${clean(config.model)} · /exit /clear /history\n`);
     while (true) {
       let input: string;

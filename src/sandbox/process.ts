@@ -27,7 +27,7 @@ export async function killProcessTree(pid: number, platform: NodeJS.Platform): P
     });
   });
 }
-export async function runProcess(spec: ProcessSpec, signal: AbortSignal, timeout = 60000): Promise<string> {
+export async function runProcess(spec: ProcessSpec, signal: AbortSignal, timeout?: number): Promise<string> {
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
     const child = spawn(spec.file, spec.args, {
@@ -54,7 +54,7 @@ export async function runProcess(spec: ProcessSpec, signal: AbortSignal, timeout
       return stopping;
     };
     const cancel = (): void => { void stop(new Error("Shell cancelled")); };
-    const timer = setTimeout(() => { void stop(new Error(`Shell exceeded ${timeout / 1000} seconds`)); }, timeout);
+    const timer = timeout === undefined ? undefined : setTimeout(() => { void stop(new Error(`Shell exceeded ${timeout / 1000} seconds`)); }, timeout);
     const collect = (data: Buffer): void => {
       output += data.toString("utf8");
       if (output.length > 65536) { output = output.slice(0, 65536); void stop(new Error("Shell output exceeds 64 KiB")); }

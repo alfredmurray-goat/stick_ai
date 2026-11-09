@@ -3,7 +3,6 @@ import { readFile, mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { projectContext } from "../agent/context.js";
-import { ModelIdleError } from "../model/idle.js";
 import { friendlyError, type FriendlyError } from "./errors.js";
 import { ProgressTracker } from "./progress.js";
 import { coderSystem } from "../agent/delegate.js";
@@ -26,18 +25,16 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   let loading: AbortController | undefined;
   let problem: FriendlyError | undefined;
   let lastError: unknown;
-  let idleFailures = 0;
   let faster = options.faster ?? false;
   const progress = new ProgressTracker();
   let progressView = progress.view();
   const fail = (error: unknown): void => {
-    if (error instanceof ModelIdleError) { idleFailures++; } else { idleFailures = 0; }
-    lastError = error; problem = friendlyError(error, idleFailures); failure = problem.message;
+    lastError = error; problem = friendlyError(error); failure = problem.message;
     publish("problem", undefined, problem);
   };
   engine.onOutput = (text, thinking) => { progress.output(); publish(thinking ? "thinking" : "coding", text); };
   engine.onModelStart = () => progress.begin("thinking");
-  let lastSeen = Date.now(); let seen = false; let boot = Date.now(); let origin = "";
+  let origin = "";
   const history: Message[] = [];
   const approvals = new Map<string, (allow: boolean) => void>();
   const publish = (kind: string, text?: string, data?: unknown): void => {
@@ -56,7 +53,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   const launch = async (model: string): Promise<void> => {
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
     progress.begin("loading"); report("Starting your private assistant...");
-    try { await engine.start(model as "stellan-1-lite" | "stellan-1-max", loading.signal); phase = "ready"; report("Running privately on this computer. Close this window to stop."); }
+    try { await engine.start(model as "stellan-1-lite" | "stellan-1-max", loading.signal); phase = "ready"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); }
     catch (error) { log(error); fail(error); phase = "error"; }
     finally { loading = undefined; }
   };
@@ -66,7 +63,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     try {
       if (selected === "stellan-1-max") {
         const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true }).complete([{ role: "system", content: coderSystem }, { role: "user", content: text }], active.signal, (value, thinking) => { progress.output(); publish(thinking ? "thinking" : "answer", value); });
-        if (!result.content) { throw new UserError("general"); } idleFailures = 0; return;
+        if (!result.content) { throw new UserError("general"); } return;
       }
       await runAgent({
         task: text, messages: history, context: { source: projectContext(box), ...(faster ? { maxBytes: 4096 } : {}) },
@@ -75,15 +72,14 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
           if (call.function.name === "run_shell") { return Promise.resolve("Running programs is disabled in the private browser app. Make file changes instead."); }
           return tools.execute(call, signal);
         } },
-        specialist: { totalBytes: options.bytes, noSwap: options.noSwap || faster, available: selected === "stellan-1-lite" && options.choices.includes("stellan-1-max"), code: async (task, context, signal) => { try { return await engine.code(task, context, signal, (message) => { publish("status", message); report(message); }); } catch (error) { if (error instanceof ModelIdleError) { fail(error); } throw error; } } },
+        specialist: { totalBytes: options.bytes, noSwap: options.noSwap || faster, available: selected === "stellan-1-lite" && options.choices.includes("stellan-1-max"), code: (task, context, signal) => engine.code(task, context, signal, (message) => { publish("status", message); report(message); }) },
         maxSteps: 20, signal: active.signal,
         emit: (value, thinking) => { progress.output(); publish(thinking ? "thinking" : "answer", value); },
         log: (value) => { log(value); if (value.startsWith("Code specialist") || value === "Switching to the coding model...") { publish("status", value); } },
         save: async () => {}
       });
-      idleFailures = 0;
     } catch (error) { log(error); fail(error); }
-    finally { active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Close this window to stop."); }
+    finally { active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); }
   };
   const send = (response: ServerResponse, code: number, data: unknown): void => { response.writeHead(code, { "Content-Type": "application/json" }); response.end(JSON.stringify(data)); };
   const server = createServer(async (request, response) => {
@@ -98,7 +94,6 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
         const asset = assets[url.pathname]!; response.writeHead(200, { "Content-Type": asset[1] }); response.end(await readFile(join(root, "app", "ui", asset[0]))); return;
       }
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
-      lastSeen = Date.now(); seen = true;
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
         send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, progress: progressView, models: options.choices, paired: !options.noSwap && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
@@ -123,12 +118,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000;
   const port = await listenLocal(server); origin = `http://127.0.0.1:${port}`;
-  const timer = setInterval(() => { if (seen && Date.now() - lastSeen > 90000 || !seen && Date.now() - boot > 180000) { void options.stop(); } }, 3000);
   let polling = false;
   const progressTimer = setInterval(() => {
     if (polling || !["working", "starting"].includes(phase)) { return; }
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { async start() { await launch("stellan-1-lite"); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(timer); clearInterval(progressTimer); active?.abort(); loading?.abort(); await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { async start() { await launch("stellan-1-lite"); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

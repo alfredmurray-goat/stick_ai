@@ -36,7 +36,7 @@ These hashes refer to the outer GitHub artifact ZIPs. RELEASE_CHECKSUMS.json sep
 - Real archive assembly and artifact uploads passed on every platform. CI removes the copied model input before archiving to bound disk use.
 - The release splitter and join helpers passed tests, including a tampered part and actual Windows/Unix helper execution. The publisher also passed a mocked end-to-end draft/upload/publish sequence.
 - Lite retains one slot, disabled CPU weight repacking and RAM prompt caching, smaller processing batches and its configured 8192 context. Model requests use the tagged grammar and explicit Mistral-v1 compatibility formatter.
-- The 300-second configurable inactivity timer, live thinking/progress, reduced context and cancellation behavior remain covered by tests.
+- Silent model requests have no application inactivity deadline. Live thinking/progress, reduced context and cancellation behavior remain covered by tests.
 - Authored stick_ai code remains MIT. No new npm dependencies were added. The native notices include required covered source and the pinned llama.cpp source archive.
 
 ## Model accuracy and performance limits

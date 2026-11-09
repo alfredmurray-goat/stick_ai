@@ -16,7 +16,7 @@ import { parseStep } from "../dist/model/protocol.js";
 const root = resolve(process.argv[2]); const temporary = await mkdtemp(join(tmpdir(), "stick-smoke-"));
 await mkdir("release-assets", { recursive: true });
 const fd = openSync("release-assets/smoke.log", "a", 0o600); const reservation = await reservePort(); await reservation.release();
-const engine = new ManagedEngine(root, "macos-x64", reservation.port, temporary, fd, console.error); engine.patient = true;
+const engine = new ManagedEngine(root, "macos-x64", reservation.port, temporary, fd, console.error);
 const signal = AbortSignal.timeout(10 * 60 * 1000);
 try {
   await promisify(execFile)(join(root, "Stick AI.app/Contents/MacOS/stick-ai"), ["--dry-run"]);
