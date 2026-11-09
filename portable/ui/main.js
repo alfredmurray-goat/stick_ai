@@ -12,6 +12,7 @@ let nativeStarted = 0;
 let errorAction = "Retry";
 let polling = false;
 let nativeStarting = false;
+let installingUpdate = false;
 async function api(path, data) {
   const response = await fetch(path, { method: data ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}), cache: "no-store" });
   if (!response.ok) { throw new Error("unavailable"); }
@@ -39,6 +40,8 @@ function message(text, kind = "answer") {
   streaming.textContent += text;
 }
 async function start(faster = false) {
+  if (installingUpdate) { return; }
+  byId("app-updates").hidden = true;
   retryStart = true; byId("error").hidden = true; byId("start").disabled = true;
   if (native) {
     nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true;
@@ -115,3 +118,46 @@ async function update() {
 }
 setInterval(update, 500);
 if (!native) { void update(); }
+
+async function checkAppUpdates() {
+  if (!native || installingUpdate) { return; }
+  byId("check-update").disabled = true;
+  byId("update-message").textContent = "Checking for app updates...";
+  byId("install-update").hidden = true;
+  try {
+    const result = await native.invoke("check_app_updates");
+    const size = result.bytes ? ` Download: ${(result.bytes / 1024 / 1024).toFixed(1)} MB.` : "";
+    byId("update-message").textContent = result.message + size;
+    byId("install-update").hidden = result.state !== "available";
+    if (result.state === "authentication") { byId("update-access").open = true; }
+  } catch { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; }
+  finally { byId("check-update").disabled = false; }
+}
+async function saveUpdateAccess(clearToken = false) {
+  const tokenInput = byId("update-token");
+  try {
+    const settings = await native.invoke("save_app_update_settings", { enabled: byId("auto-updates").checked, token: tokenInput.value || null, clearToken });
+    tokenInput.value = "";
+    byId("update-message").textContent = settings.hasToken ? "GitHub access saved on this computer." : "Update preferences saved.";
+    if (!clearToken && byId("auto-updates").checked) { await checkAppUpdates(); }
+  } catch { tokenInput.value = ""; byId("update-message").textContent = "Update preferences could not be saved."; }
+}
+if (native) {
+  byId("app-updates").hidden = false;
+  byId("check-update").onclick = () => checkAppUpdates();
+  byId("auto-updates").onchange = () => saveUpdateAccess();
+  byId("save-update-access").onclick = () => saveUpdateAccess();
+  byId("clear-update-access").onclick = () => saveUpdateAccess(true);
+  byId("install-update").onclick = async () => {
+    installingUpdate = true; byId("start").disabled = true; byId("install-update").disabled = true; byId("check-update").disabled = true;
+    byId("update-message").textContent = "Downloading and verifying the app update. Your models stay here. The app will close and reopen when installation finishes.";
+    try { await native.invoke("install_app_update"); }
+    catch { installingUpdate = false; byId("start").disabled = false; byId("install-update").disabled = false; byId("check-update").disabled = false; byId("update-message").textContent = "The update could not finish. Your current app is still available. Try again when you are online and the app folder is writable."; }
+  };
+  native.invoke("app_update_settings").then((settings) => {
+    byId("auto-updates").checked = settings.enabled;
+    byId("update-token").placeholder = settings.hasToken ? "Access saved on this computer" : "GitHub token";
+    if (settings.enabled) { void checkAppUpdates(); }
+    else { byId("update-message").textContent = "Automatic checks are off. You can check for app updates here."; }
+  }).catch(() => { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; });
+}

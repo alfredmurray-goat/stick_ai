@@ -24,9 +24,10 @@ export async function buildPlatform(project: string, output: string, target: Tar
   const staging = `${output}.building-${randomUUID()}`;
   try {
     for (const path of ["app/project", `bin/${target}`, "models", "LICENSES", "logs"]) { await mkdir(join(staging, path), { recursive: true }); }
-    for (const name of ["launcher", "stick-verify"]) {
-      await build({ entryPoints: [join(project, name === "launcher" ? "src/portable/entry.ts" : "src/portable/verify.ts")], outfile: join(staging, `app/${name}.cjs`), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
+    for (const name of ["launcher", "stick-verify", "stick-update"]) {
+      await build({ entryPoints: [join(project, name === "launcher" ? "src/portable/entry.ts" : name === "stick-update" ? "src/portable/update-entry.ts" : "src/portable/verify.ts")], outfile: join(staging, `app/${name}.cjs`), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     }
+    await writeFile(join(staging, "app/update-config.json"), JSON.stringify({ format: 1, repository: "alfredmurray-goat/stick_ai", target, sequence: Number(process.env.GITHUB_RUN_ID ?? 0), source: process.env.GITHUB_SHA ?? "development" }) + "\n");
     await writeFile(join(staging, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }) + "\n");
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await cp(input.app, join(staging, desktop), { recursive: true, preserveTimestamps: true });

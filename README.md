@@ -25,6 +25,10 @@ Extract the Actions ZIP, then its inner archive, and keep the resulting folder t
 
 These are unsigned builds. Gatekeeper, SmartScreen and interactive first launch on clean user machines require manual qualification. The build runs native dry-run, checksum verification and a real Lite read_file/tool_result/done exchange before uploading a complete artifact; a successful CI run does not prove general model accuracy.
 
+## App updates
+
+New platform-specific desktop builds check for signed app updates when opened. Click **Update and restart** to download the app and runtimes while retaining your existing models, projects and logs. Private releases require read-only GitHub access configured once on each device. Offline use still works, and automatic checks can be turned off. Older installed copies need one final complete download to gain the updater. See [UPDATES.md](UPDATES.md) for setup, signing and recovery.
+
 ## Desktop app
 
 The desktop app is the main buyer entry point: open the app and click Start. No terminal, typed setup or installed Node/Ollama is needed when using a complete prepared stick on a supported computer with its system webview available. This repository is source plus release tooling, not a ready-to-run model distribution. See [DESKTOP.md](DESKTOP.md) for native builds, privacy limits, cancellation and hardware qualification. Start.command, Start.bat and start.sh remain technical browser fallbacks.
@@ -40,7 +44,7 @@ npm test
 npm link
 ```
 
-Installation downloads development tooling; the installed assistant has zero npm runtime dependencies and requires no network apart from its configured model endpoint. There are no analytics, telemetry, update checks or cloud fallbacks in the assistant itself. Approved shell commands in restricted mode can access the network. Download dependencies and weights before working offline. This repository contains no model weights or claimed trained adapter.
+Installation downloads development tooling; the installed assistant has zero npm runtime dependencies and requires no network apart from its configured model endpoint. There are no analytics, telemetry or cloud fallbacks in the assistant itself. The desktop updater separately checks GitHub for signed app updates unless checks are disabled; it does not send prompts or source files. Approved shell commands in restricted mode can access the network. Download dependencies and weights before working offline. This repository contains no model weights or claimed trained adapter.
 
 ## Prepare Stellan
 

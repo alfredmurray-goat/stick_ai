@@ -28,8 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.22.1
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run build
       - name: Publish all four checked desktop downloads
         env:
           GH_TOKEN: ${{ github.token }}
+          STICK_UPDATE_SIGNING_KEY: ${{ secrets.STICK_UPDATE_SIGNING_KEY }}
           BUILD_RUN: ${{ github.event.workflow_run.id || inputs.build_run }}
         run: node scripts/publish-release.mjs
