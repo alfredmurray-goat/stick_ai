@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { mkdir, rm, rename } from "node:fs/promises";
-import { Readable, Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { createReadStream } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdir, rm, rename, open } from "node:fs/promises";
 import { resolve, join } from "node:path";
+const execute = promisify(execFile);
 const directory = resolve(process.argv[2] ?? "release-assets"); await mkdir(directory, { recursive: true });
 const runtimes = {
   "darwin-arm64": ["darwin-arm64.tar.gz", "89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7"],
@@ -20,12 +21,14 @@ const assets = [
 ];
 for (const asset of assets) {
   const output = join(directory, asset.name); const temporary = output + ".part";
+  let owned = false;
   try {
+    const file = await open(temporary, "wx", 0o600); owned = true; await file.close();
     console.log(`Downloading verified release input: ${asset.name}`);
-    const response = await fetch(asset.url); if (!response.ok || !response.body) { throw new Error(`Download failed: HTTP ${response.status}`); }
+    await execute("curl", ["--fail", "--location", "--silent", "--show-error", "--retry", "3", "--retry-all-errors", "--connect-timeout", "30", "--speed-limit", "1024", "--speed-time", "120", "--max-time", "1200", "--output", temporary, "--", asset.url], { timeout: 85 * 60 * 1000, maxBuffer: 1000000, windowsHide: true });
     let size = 0; const hash = createHash("sha256");
-    await pipeline(Readable.fromWeb(response.body), new Transform({ transform(chunk, _encoding, callback) { size += chunk.length; hash.update(chunk); callback(null, chunk); } }), createWriteStream(temporary, { flags: "wx" }));
+    for await (const chunk of createReadStream(temporary)) { size += chunk.length; hash.update(chunk); }
     if (hash.digest("hex") !== asset.sha256 || asset.size && asset.size !== size) { throw new Error(`Release input integrity mismatch: ${asset.name}`); }
     await rename(temporary, output); console.log(`Verified ${asset.name}`);
-  } catch (error) { await rm(temporary, { force: true }); throw error; }
+  } catch (error) { if (owned) { await rm(temporary, { force: true }); } throw error; }
 }
