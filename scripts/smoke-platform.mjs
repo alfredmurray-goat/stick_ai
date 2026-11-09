@@ -5,8 +5,8 @@ import { Tools } from "../dist/tools/index.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { openSync, closeSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { openSync, closeSync, writeSync } from "node:fs";
+import { tmpdir, totalmem, freemem } from "node:os";
 import { join, resolve } from "node:path";
 import { ManagedEngine } from "../dist/portable/engine.js";
 import { reservePort } from "../dist/portable/ports.js";
@@ -23,6 +23,21 @@ const engine = new ManagedEngine(root, target, reservation.port, temporary, fd, 
 // Public Apple Silicon runners have fewer cores and less memory than private runners.
 // Keep the complete real-tool check, with a CI-only deadline that allows CPU inference.
 const signal = AbortSignal.timeout(30 * 60 * 1000);
+const started = Date.now(); let reporting = false;
+async function reportMemory() {
+  if (reporting) { return; } reporting = true;
+  try {
+    let detail = `smoke elapsed=${Math.round((Date.now() - started) / 1000)}s total=${totalmem()} free=${freemem()} model=${engine.active ?? "loading"}`;
+    if (process.platform === "darwin") {
+      for (const [file, args] of [["/usr/bin/vm_stat", []], ...(engine.child?.pid ? [["/bin/ps", ["-o", "pid,rss,vsz,%cpu,stat", "-p", String(engine.child.pid)]]] : [])]) {
+        try { detail += "\n" + (await promisify(execFile)(file, args, { timeout: 5000 })).stdout; } catch {}
+      }
+    }
+    console.error(detail); writeSync(fd, "\n" + detail + "\n");
+  } finally { reporting = false; }
+}
+await reportMemory();
+const heartbeat = setInterval(() => { void reportMemory().catch(console.error); }, 30000);
 try {
   await promisify(execFile)(join(root, native), ["--dry-run"]);
   if (process.platform === "darwin") {
@@ -61,4 +76,4 @@ try {
   await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", response: result.content, agent: { outcome, read, summary, messages } }, null, 2));
   if (outcome !== "finished" || !read || !summary.includes(expected)) { throw new Error("Lite did not complete a real read_file/tool_result/done exchange; do not ship this package"); }
   console.log(`${target} Lite passed native execution, portable library checks, authenticated readiness, streaming and a real read_file/tool_result/done exchange.`);
-} finally { engine.disposing = true; await engine.stop(); closeSync(fd); await rm(temporary, { recursive: true, force: true }); }
+} finally { clearInterval(heartbeat); engine.disposing = true; await engine.stop(); closeSync(fd); await rm(temporary, { recursive: true, force: true }); }

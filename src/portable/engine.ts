@@ -27,8 +27,10 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
     if (!signal.aborted) { await engine.start("stellan-1-lite", signal); }
   }
 }
+// Bound Mamba2 scratch buffers on 8 GB machines as well as hosted ARM runners.
+// Smaller batches preserve the model and context while reducing peak working memory.
 export function modelRuntimeArgs(model: ModelName): string[] {
-  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"] : ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"];
+  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "64", "--ubatch-size", "32", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"] : ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"];
 }
 export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
   let templateArgs: string[] = [];
