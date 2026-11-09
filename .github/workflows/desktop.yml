@@ -98,7 +98,12 @@ jobs:
       - name: Download verified Lite and portable Node
         run: node scripts/fetch-platform-assets.mjs release-assets
       - name: Extract portable Node
-        run: tar -xf release-assets/node-v24.22.1-${{ matrix.node }}.${{ matrix.archive }} -C release-assets
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z x release-assets/node-v24.22.1-${{ matrix.node }}.${{ matrix.archive }} -orelease-assets -y
+          else
+            tar -xf release-assets/node-v24.22.1-${{ matrix.node }}.${{ matrix.archive }} -C release-assets
+          fi
       - uses: actions/cache/restore@v4
         id: server-cache
         with:

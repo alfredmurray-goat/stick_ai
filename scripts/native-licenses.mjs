@@ -14,7 +14,9 @@ if (!rootPackage || !nodes.has(rootPackage)) { throw new Error("Missing native r
 visit(rootPackage);
 async function upstreamNotices(pkg, root) {
   const source = JSON.parse(await readFile(join(root, ".cargo_vcs_info.json"), "utf8"));
-  const commit = source.git?.sha1; const repository = new URL(pkg.repository);
+  const commit = source.git?.sha1;
+  const reviewedRepository = pkg.name === "libappindicator-sys" && pkg.version === "0.9.0" && commit === "eafd1e3682a1247f595410266091e9684021cb6f" && pkg.license === "Apache-2.0 OR MIT" ? "https://github.com/tauri-apps/libappindicator-rs" : undefined;
+  const repository = new URL(pkg.repository ?? reviewedRepository);
   const parts = repository.pathname.replace(/\.git$/, "").split("/").filter(Boolean);
   if (repository.protocol !== "https:" || repository.hostname !== "github.com" || !/^[a-f0-9]{40}$/.test(commit) || parts.length !== 2 || parts.some((part) => !/^[a-zA-Z0-9_.-]+$/.test(part))) { throw new Error("No supported immutable upstream source"); }
   const names = ["LICENSE", "LICENSE.txt", "LICENSE.md", "LICENSE-MIT", "LICENSE-APACHE", "COPYING", "NOTICE"];
