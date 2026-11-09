@@ -3,7 +3,8 @@ import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 const output = resolve(process.argv[2] ?? "dist/desktop-licenses");
 const args = ["metadata", "--manifest-path", "src-tauri/Cargo.toml", "--format-version", "1", "--locked"];
-if (process.platform === "darwin") { args.push("--filter-platform", process.arch === "x64" ? "x86_64-apple-darwin" : "aarch64-apple-darwin"); }
+const target = process.platform === "darwin" ? (process.arch === "x64" ? "x86_64-apple-darwin" : "aarch64-apple-darwin") : process.platform === "win32" ? "x86_64-pc-windows-msvc" : "x86_64-unknown-linux-gnu";
+args.push("--filter-platform", target);
 const metadata = JSON.parse(execFileSync("cargo", args, { encoding: "utf8", maxBuffer: 20000000 }));
 const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
 const used = new Set();

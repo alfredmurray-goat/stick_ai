@@ -1,25 +1,60 @@
-name: Desktop
+name: Desktop Lite builds
 on:
-  pull_request:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', '**.txt']
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: desktop-lite-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  native:
+  package:
     strategy:
       fail-fast: false
       matrix:
         include:
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            name: macos-x64
+            node: darwin-x64
+            archive: tar.gz
+            app: bundle/macos/Stick AI.app
+            server: bin/llama-server
+            executable: bin/node
+          - os: macos-15
+            target: aarch64-apple-darwin
+            name: macos-arm64
+            node: darwin-arm64
+            archive: tar.gz
+            app: bundle/macos/Stick AI.app
+            server: bin/llama-server
+            executable: bin/node
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            name: windows-x64
+            node: win-x64
+            archive: zip
+            app: stick-ai.exe
+            server: bin/Release/llama-server.exe
+            executable: node.exe
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: macos-latest
-            target: x86_64-apple-darwin
+            name: linux-x64
+            node: linux-x64
+            archive: tar.gz
+            app: stick-ai
+            server: bin/llama-server
+            executable: bin/node
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.5'
+      LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,24 +63,99 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Install Linux webview build libraries
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install Linux desktop build libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - run: npm run build
+      - run: npm run licenses
       - run: npm run desktop:dry-run
-      - run: cargo install tauri-cli --version 2.12.2 --locked
-      - run: cargo tauri build --target ${{ matrix.target }} --bundles app
-        if: runner.os == 'macOS'
-      - run: cargo tauri build --target ${{ matrix.target }} --no-bundle
-        if: runner.os != 'macOS'
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }} --no-default-features
-        if: runner.os != 'macOS' || matrix.target == 'aarch64-apple-darwin'
+      - uses: actions/cache/restore@v4
+        id: native-cache
+        with:
+          path: src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}
+          key: desktop-native-${{ matrix.name }}-${{ hashFiles('src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'src-tauri/src/**', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json', 'src-tauri/capabilities/**', 'src-tauri/icons/**', 'portable/ui/**') }}
+      - name: Build the native desktop app
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            npx --yes @tauri-apps/cli@2.12.2 build --target ${{ matrix.target }} --bundles app
+          else
+            npx --yes @tauri-apps/cli@2.12.2 build --target ${{ matrix.target }} --no-bundle
+          fi
+      - uses: actions/cache/save@v4
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - name: Download verified Lite and portable Node
+        run: node scripts/fetch-platform-assets.mjs release-assets
+      - name: Extract portable Node
+        run: tar -xf release-assets/node-v24.22.1-${{ matrix.node }}.${{ matrix.archive }} -C release-assets
+      - uses: actions/cache/restore@v4
+        id: server-cache
+        with:
+          path: |
+            release-assets/llama-build/${{ matrix.server }}
+            release-assets/llama.cpp/LICENSE
+          key: desktop-server-${{ matrix.name }}-v0.9.0-static-crt-no-openmp-no-tls
+      - name: Build the pinned Mamba2-compatible server
+        if: steps.server-cache.outputs.cache-hit != 'true'
+        run: |
+          git init release-assets/llama.cpp
+          git -C release-assets/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp.git
+          git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
+          git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
+          test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
+          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake --build release-assets/llama-build --config Release --target llama-server -j 3
+      - uses: actions/cache/save@v4
+        if: steps.server-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            release-assets/llama-build/${{ matrix.server }}
+            release-assets/llama.cpp/LICENSE
+          key: ${{ steps.server-cache.outputs.cache-primary-key }}
+      - name: Collect native redistribution notices
+        run: |
+          node scripts/native-licenses.mjs release-assets/desktop-licenses
+          curl --fail --location --retry 3 "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/$LLAMA_COMMIT" --output release-assets/desktop-licenses/llama.cpp-source.tar.gz
+      - name: Assemble the complete Lite desktop folder
+        run: |
+          node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}" --node release-assets/node-v24.22.1-${{ matrix.node }}/${{ matrix.executable }} --node-license release-assets/node-v24.22.1-${{ matrix.node }}/LICENSE --server release-assets/llama-build/${{ matrix.server }} --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses
+      - name: Verify native startup and real Lite tool exchange
+        run: node scripts/smoke-platform.mjs "dist/Stick AI"
+      - name: Archive the complete folder with permissions
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            ditto -c -k --sequesterRsrc --keepParent "dist/Stick AI" dist/stick_ai-${{ matrix.name }}.zip
+          elif [ "$RUNNER_OS" = Windows ]; then
+            7z a -tzip -mx=0 dist/stick_ai-${{ matrix.name }}.zip "./dist/Stick AI"
+          else
+            tar -czf dist/stick_ai-${{ matrix.name }}.tar.gz -C dist "Stick AI"
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.target }}
+          name: stick_ai-${{ matrix.name }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/stick-ai*
-            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+            dist/stick_ai-${{ matrix.name }}.zip
+            dist/stick_ai-${{ matrix.name }}.tar.gz
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnostics-${{ matrix.name }}
+          path: |
             src-tauri/Cargo.lock
+            release-assets/smoke.log
+            release-assets/model-smoke.json
+          if-no-files-found: ignore
+          retention-days: 14

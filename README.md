@@ -1,6 +1,6 @@
 # stick_ai
 
-## Download the Intel Mac Lite app
+## Download the desktop Lite app
 
 [Download the complete Intel Mac Lite build (4.15 GB)](https://github.com/alfredmurray-goat/stick_ai/actions/runs/42517759406/artifacts/13632203606).
 
@@ -10,6 +10,21 @@ This is an unsigned test build. Gatekeeper and clean first launch on the user's 
 
 
 An offline desktop and terminal coding assistant by localilabs. It streams responses from Stellan-1 Lite or Stellan-1 Max through Ollama or the portable llama.cpp server, plans work, calls tools, reads results and continues until finished or the configured step limit is reached. It is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
+
+## Builds for every supported desktop
+
+The [Desktop Lite builds workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds complete, separate packages for all four platforms on every source push to main. Open the latest successful run and download the artifact matching your computer. Each includes the actual Lite model, portable Node, the native app, pinned Mamba2-compatible llama.cpp server and complete notices. Build outputs are attached to GitHub Actions rather than committed as multi-gigabyte Git files; downloads are retained for 14 days and can be rebuilt with Run workflow.
+
+| Download artifact | Computer | Open after extracting | Desktop requirements |
+| --- | --- | --- | --- |
+| stick_ai-macos-arm64 | Apple Silicon Mac | Stick AI.app | macOS 13.5+, 8 GiB RAM |
+| stick_ai-macos-x64 | Intel Mac | Stick AI.app | macOS 13.5+, 8 GiB RAM |
+| stick_ai-windows-x64 | Windows Intel/AMD 64-bit | Stick AI.exe | Windows 10+, 8 GiB RAM, existing Edge WebView2 |
+| stick_ai-linux-x64 | Linux Intel/AMD 64-bit | stick-ai | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GiB RAM |
+
+Extract the Actions ZIP, then its inner archive, and keep the resulting folder together. Linux uses an inner tar.gz to preserve executable permissions. Windows and Linux desktop webviews are system prerequisites, so these are not universal no-install packages on computers lacking those components. Technical browser fallbacks use the bundled Node and the computer's existing browser. All packages use the same low-memory Lite settings, explicit Mistral-v1 compatibility formatter and validated tagged tool protocol. Max weights are not included. The old Intel-only workflow remains a manual compatibility workflow.
+
+These are unsigned builds. Gatekeeper, SmartScreen and interactive first launch on clean user machines require manual qualification. The build runs native dry-run, checksum verification and a real Lite read_file/tool_result/done exchange before uploading a complete artifact; a successful CI run does not prove general model accuracy.
 
 ## Desktop app
 
@@ -161,7 +176,7 @@ On eligible managed sessions, Lite orchestrates while Max codes through `delegat
 
 The prepared desktop release asks the buyer to click Start; the technical scripts open a terminal and browser. See DESKTOP.md for system-webview requirements. A normal browser and the operating system can still write their own caches, history and swap files; this app cannot promise a completely write-free host or deletion after power loss. Real weight compatibility, memory use, Gatekeeper, SmartScreen and USB swap performance remain release-qualification tasks.
 
-## Intel Mac personal build
+## All-platform Lite builds
 
 The Intel Mac app workflow assembles a macOS 13.5+ folder with Lite, portable Node and a CPU-only llama.cpp v0.9.0 server pinned to commit cd959bae99ff4bed22bef2604f45241c09bbb8c8. The old b5046 server cannot load the supplied Lite mamba2 architecture. Downloads are pinned to a model revision and SHA256. The supplied Lite GGUF lacks a chat template; this personal test build uses the Mistral-v1 formatter matching its [INST] tokenizer markers and refuses to publish a package unless the real model returns a tagged completion. The original training template remains unverified. Max is not bundled in this Lite-only Intel package. Unsigned apps remain subject to Gatekeeper.
 

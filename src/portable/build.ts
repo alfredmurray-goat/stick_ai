@@ -30,7 +30,7 @@ async function gguf(path: string): Promise<void> {
   if (header.toString("ascii", 0, 4) !== "GGUF" || ![2, 3].includes(header.readUInt32LE(4))) { throw new Error(`Input is not a GGUF model: ${path}`); }
 }
 const damaged = "This stick may be damaged; ask for a fresh copy.";
-function posixStart(mac: boolean, hashes: Record<Target, string>, appHash: string): string {
+export function posixStart(mac: boolean, hashes: Record<Target, string>, appHash: string): string {
   return `#!/bin/sh
 ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd) || exit 1
 if [ -L "$ROOT/logs" ] || [ -L "$ROOT/logs/launcher.log" ]; then printf '%s\\n' 'This stick may be damaged; ask for a fresh copy.'; exit 1; fi
@@ -54,7 +54,7 @@ RESULT=$?
 exit "$RESULT"
 `;
 }
-function windowsStart(nodeHash: string, appHash: string): string {
+export function windowsStart(nodeHash: string, appHash: string): string {
   return `@echo off\r
 setlocal DisableDelayedExpansion\r
 set "ROOT=%~dp0"\r
@@ -128,6 +128,7 @@ export async function buildStick(project: string, output: string, inputs: StickI
     await build({ entryPoints: [join(project, "src/portable/entry.ts")], outfile: join(staging, "app/launcher.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     await build({ entryPoints: [join(project, "src/portable/verify.ts")], outfile: join(staging, "app/stick-verify.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
+    await writeFile(join(staging, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }) + "\n");
     const hashes = {} as Record<Target, string>;
     for (const target of targets) {
       const dir = join(staging, "bin", target); await mkdir(dir, { recursive: true });
