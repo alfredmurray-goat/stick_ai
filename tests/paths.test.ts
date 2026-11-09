@@ -52,10 +52,10 @@ for (const platform of ["linux", "darwin", "win32"] as const) {
   });
 }
 it("handles UNC roots, cross-drive targets and Windows device aliases", async () => {
-  const root = "\\server\\share\\Project";
+  const root = "\\\\server\\share\\Project";
   const io = filesystem("win32", root, true);
   expect(await resolveProjectPath(root, "src/new.txt", false, { platform: "win32", io })).toBe(win32.join(root, "src/new.txt"));
-  expect(isInside(root, "\\server\\different\\Project", "win32")).toBe(false);
+  expect(isInside(root, "\\\\server\\different\\Project", "win32")).toBe(false);
   expect(isInside("C:\\Project", "D:\\Project", "win32")).toBe(false);
   for (const path of ["NUL", "con.txt", "a:stream", "name.", "name "]) {
     await expect(resolveProjectPath(root, path, false, { platform: "win32", io })).rejects.toThrow();

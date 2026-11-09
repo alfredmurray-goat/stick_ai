@@ -54,6 +54,7 @@ jobs:
         shell: bash
     env:
       MACOSX_DEPLOYMENT_TARGET: '13.5'
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
       LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +81,7 @@ jobs:
         id: native-cache
         with:
           path: src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}
-          key: desktop-native-${{ matrix.name }}-${{ hashFiles('src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'src-tauri/src/**', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json', 'src-tauri/capabilities/**', 'src-tauri/icons/**', 'portable/ui/**') }}
+          key: desktop-native-${{ matrix.name }}-${{ matrix.name == 'windows-x64' && 'static-crt-' || '' }}${{ hashFiles('src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'src-tauri/src/**', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json', 'src-tauri/capabilities/**', 'src-tauri/icons/**', 'portable/ui/**') }}
       - name: Build the native desktop app
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
