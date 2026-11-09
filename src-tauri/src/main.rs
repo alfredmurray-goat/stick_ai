@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod updates;
+
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -21,6 +23,7 @@ struct Runtime {
     generation: u64,
     model_pid: Option<u32>,
     closing: bool,
+    updating: bool,
 }
 
 #[derive(Clone)]
@@ -29,6 +32,7 @@ struct Desktop {
     root: PathBuf,
     logs: PathBuf,
     temporary: PathBuf,
+    settings: PathBuf,
 }
 
 fn local(window: &WebviewWindow) -> Result<(), String> {
@@ -142,7 +146,7 @@ async fn start_assistant(window: WebviewWindow, state: State<'_, Desktop>, faste
 fn start(state: &Desktop, faster: bool) -> Result<String, String> {
     {
         let mut runtime = state.runtime.lock().unwrap();
-        if runtime.starting { return Err("unavailable".into()); }
+        if runtime.starting || runtime.updating { return Err("unavailable".into()); }
         runtime.starting = true; runtime.generation += 1;
     }
     stop(state);
@@ -236,6 +240,7 @@ fn spawn_service(state: &Desktop, faster: bool) -> Result<String, String> {
 }
 
 fn main() {
+    updates::cleanup_runtime();
     if std::env::args().any(|argument| argument == "--dry-run") {
         println!("Show welcome; verify hashes; check RAM; start hidden Lite on loopback; wait for health; show chat; stop owned processes and remove temporary storage on quit.");
         return;
@@ -247,7 +252,7 @@ fn main() {
         let root = executable.ancestors().find(|directory| directory.join("manifest.json").is_file()).unwrap_or(executable.parent().unwrap()).to_path_buf();
         let logs = app.path().app_log_dir()?;
         fs::create_dir_all(&logs)?;
-        app.manage(Desktop { runtime: Arc::new(Mutex::new(Runtime::default())), root, logs, temporary: data_path.clone() });
+        app.manage(Desktop { runtime: Arc::new(Mutex::new(Runtime::default())), root, logs, temporary: data_path.clone(), settings: app.path().app_config_dir()?.join("updates.json") });
         tauri::WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
             .title("stick_ai").inner_size(920.0, 740.0).data_directory(data_path).incognito(true)
             .on_navigation({ let runtime = app.state::<Desktop>().runtime.clone(); move |url| {
@@ -267,7 +272,7 @@ fn main() {
             let handle = window.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || { stop(&desktop); handle.exit(0); });
         }
-    }).invoke_handler(tauri::generate_handler![start_assistant, desktop_status, cancel_start]).build(tauri::generate_context!()).expect("Desktop app unavailable");
+    }).invoke_handler(tauri::generate_handler![start_assistant, desktop_status, cancel_start, updates::app_update_settings, updates::save_app_update_settings, updates::check_app_updates, updates::install_app_update]).build(tauri::generate_context!()).expect("Desktop app unavailable");
     app.run(|handle, event| {
         if let tauri::RunEvent::Exit = event { stop(&handle.state::<Desktop>()); }
     });

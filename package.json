@@ -31,7 +31,8 @@
     "licenses",
     "PORTABLE.md",
     "src-tauri",
-    "DESKTOP.md"
+    "DESKTOP.md",
+    "UPDATES.md"
   ],
   "scripts": {
     "build": "tsc",
