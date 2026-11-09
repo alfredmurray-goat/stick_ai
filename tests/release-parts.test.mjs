@@ -30,3 +30,15 @@ it("refuses oversized parts and unsafe release names", async () => {
   await expect(splitArchive("stick_ai-test.zip", "unused", 2 * 1024 ** 3)).rejects.toThrow("Invalid");
   await expect(splitArchive("untrusted$.zip", "unused", 100)).rejects.toThrow("Unsafe");
 });
+
+it("uploads and removes each finished part before writing the next, bounding publishing disk use", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-release-stream-"));
+  try {
+    const input = join(root, "stick_ai-full.zip"); const content = Buffer.from("weights ".repeat(1000)); await writeFile(input, content);
+    const uploaded = [];
+    const record = await splitArchive(input, join(root, "parts"), 1000, async (part, path) => {
+      const bytes = await readFile(path); expect(bytes.length).toBe(part.size); uploaded.push(bytes); await rm(path);
+    });
+    expect(uploaded).toHaveLength(record.parts.length); expect(Buffer.concat(uploaded)).toEqual(content);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

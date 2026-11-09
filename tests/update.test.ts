@@ -31,10 +31,17 @@ async function packageFixture(root: string, sequence: number, model = "saved mod
 function signed(feed: UpdateFeed): SignedFeed {
   const payload = Buffer.from(JSON.stringify(feed)); return { payload: payload.toString("base64"), signature: sign(null, payload, key.privateKey).toString("base64") };
 }
-async function fixture(model?: string) {
+async function fixture(model?: string, addOptionalMax = false, installedMax = false) {
   const parent = await mkdtemp(join(tmpdir(), "stick-update-test-")); roots.push(parent);
   const root = join(parent, "Stick AI"); const next = join(parent, "new-package");
-  await packageFixture(root, 1); const manifest = await packageFixture(next, 2, model);
+  const current = await packageFixture(root, 1);
+  if (installedMax) {
+    const path = "models/stellan-1-max-q4_k_m.gguf"; await writeFile(join(root, path), "existing Max weights");
+    current.files.push({ path, ...await hashFile(join(root, path)), executable: false, optional: true });
+    await writeFile(join(root, "manifest.json"), JSON.stringify(current));
+  }
+  const manifest = await packageFixture(next, 2, model);
+  if (addOptionalMax) { manifest.files.push({ path: "models/stellan-1-max-q4_k_m.gguf", sha256: "a".repeat(64), size: 12345678, executable: false, optional: true }); await writeFile(join(next, "manifest.json"), JSON.stringify(manifest)); }
   await writeFile(join(root, "app/project/keep.txt"), "my project"); await writeFile(join(root, "logs/keep.log"), "my logs");
   const bundle = join(parent, "update.gz"); await buildUpdateBundle(next, "linux-x64", bundle);
   const bytes = await readFile(bundle); const hash = await hashFile(bundle);
@@ -114,4 +121,23 @@ it("fails offline and private authentication checks without blocking app startup
   expect((await checkForUpdate(f.root, "", new AbortController().signal)).state).toBe("offline");
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
   expect((await checkForUpdate(f.root, "", new AbortController().signal)).state).toBe("authentication");
+});
+
+it("upgrades Lite-only installations to the unified app without demanding a Max weight download", async () => {
+  const f = await fixture(undefined, true);
+  const work = await prepareUpdate(f.root, "private-token", new AbortController().signal, publicKey);
+  await applyPreparedUpdate(f.root, work, publicKey);
+  expect(await readFile(join(f.root, "app/launcher.cjs"), "utf8")).toBe("app version 2");
+  expect(await readFile(join(f.root, "models/stellan-1-lite-q4_k_m.gguf"), "utf8")).toBe("saved model bytes");
+  await expect(lstat(join(f.root, "models/stellan-1-max-q4_k_m.gguf"))).rejects.toThrow();
+});
+
+it("preserves included Max when installing a Lite-compatible app update", async () => {
+  const f = await fixture(undefined, false, true);
+  const path = join(f.root, "models/stellan-1-max-q4_k_m.gguf"); const inode = (await lstat(path)).ino;
+  const work = await prepareUpdate(f.root, "private-token", new AbortController().signal, publicKey);
+  await applyPreparedUpdate(f.root, work, publicKey);
+  expect(await readFile(path, "utf8")).toBe("existing Max weights"); expect((await lstat(path)).ino).toBe(inode);
+  const manifest = JSON.parse(await readFile(join(f.root, "manifest.json"), "utf8"));
+  expect(manifest.files.some((record: { path: string }) => record.path === "models/stellan-1-max-q4_k_m.gguf")).toBe(true);
 });

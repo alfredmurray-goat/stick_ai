@@ -23,7 +23,7 @@ export async function staticFiles(root: string, prefix = ""): Promise<string[]> 
   }
   return result.sort();
 }
-export async function verifyStick(root: string, optionalMax = false, signal?: AbortSignal): Promise<Manifest> {
+export async function verifyStick(root: string, optionalMax = false, signal?: AbortSignal, allowBuildModelLinks = false): Promise<Manifest> {
   try {
     const canonical = await realpath(root);
     const box = await Sandbox.create(root);
@@ -49,7 +49,7 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       }
       const resolved = await realpath(path);
       const rel = relative(canonical, resolved);
-      if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) { throw new UserError("damaged"); }
+      if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 && !(allowBuildModelLinks && record.path === "models/stellan-1-max-q4_k_m.gguf")) { throw new UserError("damaged"); }
       const actual = await hashFile(path, signal);
       if (actual.sha256 !== record.sha256 || actual.size !== record.size || process.platform !== "win32" && record.executable && !(info.mode & 0o111)) { issues.push(`Changed file: ${record.path}`); }
       } catch (error) { if (signal?.aborted) { throw error; } issues.push(`Missing or unsafe file: ${record.path}: ${String(error)}`); }

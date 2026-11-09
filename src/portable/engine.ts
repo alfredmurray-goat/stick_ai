@@ -1,3 +1,4 @@
+import { resolveLocalMax } from "./local-models.js";
 import { writeSync } from "node:fs";
 import { type ServerStatus } from "./progress.js";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -27,7 +28,7 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
   }
 }
 export function modelRuntimeArgs(model: ModelName): string[] {
-  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"] : ["--parallel", "1"];
+  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "256", "--ubatch-size", "128", "--cache-ram", "0", "--no-cache-prompt", "--ctx-checkpoints", "0"] : ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"];
 }
 export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
   let templateArgs: string[] = [];
@@ -64,8 +65,11 @@ export class ManagedEngine implements Switchable {
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
     const templateArgs = await modelTemplateArgs(this.root, model);
+    const max = model === "stellan-1-max" ? await resolveLocalMax(this.root) : undefined;
+    if (model === "stellan-1-max" && !max) { throw new Error("Choose your Max GGUF before starting Max."); }
+    const contextSize = model === "stellan-1-max" ? Math.min(this.contextSize, 4096) : this.contextSize;
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
-      "--model", join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(this.contextSize),
+      "--model", max?.path ?? join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
       "--no-webui", "--no-warmup", "--gpu-layers", "0", ...modelRuntimeArgs(model), ...templateArgs
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -86,7 +90,7 @@ export class ManagedEngine implements Switchable {
             const invalid = await fetch(`${this.baseUrl}/v1/models`, { redirect: "error", headers: { Authorization: "Bearer invalid-startup-probe" }, signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]) });
             const data = await valid.json() as { data?: { id: string }[] }; await invalid.body?.cancel();
             if (!valid.ok || invalid.status !== 401 || !data.data?.some((item) => item.id === model) || child.exitCode !== null) { throw new UserError("busy"); }
-            this.active = model; this.activeContextSize = this.contextSize; return;
+            this.active = model; this.activeContextSize = contextSize; return;
           }
         } catch (error) { if (error instanceof UserError) { throw error; } }
         await new Promise((resolve) => setTimeout(resolve, 200));

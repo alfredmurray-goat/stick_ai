@@ -83,3 +83,13 @@ it("does not reload Lite after a cancelled delegation", async () => {
   expect(engine.start.mock.calls.map(([model]) => model)).toEqual(["stellan-1-max"]);
   expect(engine.stop).toHaveBeenCalledTimes(2);
 });
+
+it("lets Lite continue a task when Max fails to load instead of forcing repeated failed delegations", async () => {
+  const code = vi.fn(async () => { throw new Error("model failed to load"); });
+  const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: false, available: true, code }, vi.fn());
+  const write: Call = { ...request, function: { name: "write_file", arguments: "{}" } };
+  expect(delegate.requiresDelegation(write)).toBe(true);
+  expect(await delegate(request, new AbortController().signal)).toContain("write the remaining code here with Lite");
+  expect(delegate.requiresDelegation(write)).toBe(false);
+  await delegate(request, new AbortController().signal); expect(code).toHaveBeenCalledOnce();
+});

@@ -1,13 +1,14 @@
 import { spawn } from "node:child_process";
 import { openSync, appendFileSync, closeSync } from "node:fs";
-import { access, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir, totalmem } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { Sandbox } from "../sandbox/paths.js";
 import { verifyStick } from "./integrity.js";
 import { ManagedEngine } from "./engine.js";
 import { reservePort } from "./ports.js";
-import { modelFile, nodeRelease, portableModels, targetFor, userMessage, UserError } from "./platform.js";
+import { localModelStatus } from "./local-models.js";
+import { nodeRelease, portableModels, targetFor, userMessage, UserError } from "./platform.js";
 import { createInterface } from "node:readline";
 import { friendlyError } from "./errors.js";
 import { desktopDryRun, launchDesktop } from "./desktop.js";
@@ -40,7 +41,7 @@ async function openBrowser(url: string): Promise<void> {
     child.once("exit", (code) => { clearTimeout(timer); if (code === 0) { resolve(); } else { reject(new UserError("browser")); } });
   });
 }
-async function service(root: string, noSwap: boolean, desktopLog?: string, faster = false): Promise<void> {
+async function service(root: string, noSwap: boolean, desktopLog?: string, faster = false, initialModel: "stellan-1-lite" | "stellan-1-max" = "stellan-1-lite"): Promise<void> {
   if (desktopLog) { await mkdir(desktopLog, { recursive: true }); }
   const logPath = desktopLog ? join(desktopLog, "launcher.log") : await (await Sandbox.create(root)).path("logs/launcher.log", true);
   const desktop = Boolean(desktopLog);
@@ -72,7 +73,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
     report("Starting your private assistant...");
     targetFor(process.platform, process.arch); portableModels(totalmem(), true);
     const prepare = async (): Promise<void> => {
-      let maxPresent = true; try { await access(join(root, modelFile("stellan-1-max"))); } catch { maxPresent = false; }
+      const maxPresent = (await localModelStatus(root)).available;
       const choices = portableModels(totalmem(), maxPresent);
       temp = await mkdtemp(join(tmpdir(), "stick-ai-"));
       const port = await reservePort(); await port.release();
@@ -85,8 +86,8 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       await launchDesktop({
         verify: async () => { await verifyStick(root, true, lifetime.signal); },
         prepare,
-        startLite: async () => { await app!.start(); },
-        waitHealthy: async () => { if (engine?.active !== "stellan-1-lite") { throw new UserError("loading"); } },
+        startLite: async () => { await app!.start(initialModel); },
+        waitHealthy: async () => { if (engine?.active !== initialModel) { throw new UserError("loading"); } },
         openChat: async () => { notify({ kind: "ready", url: app!.url }); },
         stop: async () => { await engine?.stop(); },
         cleanup: async () => {}
@@ -103,7 +104,7 @@ export async function launcherMain(args = process.argv.slice(2)): Promise<void> 
   const root = await realpath(resolve(index >= 0 ? args[index + 1] ?? "." : dirname(process.argv[1] ?? ".")));
   const noSwap = args.includes("--no-swap");
   if (args.includes("--desktop") && args.includes("--dry-run")) { for (const action of desktopDryRun(root)) { console.log(action); } return; }
-  if (args.includes("--desktop")) { const at = args.indexOf("--log-dir"); if (at < 0 || !args[at + 1]) { throw new UserError("storage"); } await service(root, noSwap, resolve(args[at + 1]!), args.includes("--faster")); return; }
+  if (args.includes("--desktop")) { const at = args.indexOf("--log-dir"); if (at < 0 || !args[at + 1]) { throw new UserError("storage"); } const modeAt = args.indexOf("--model"); const selected = modeAt < 0 ? "stellan-1-lite" : args[modeAt + 1]; if (selected !== "stellan-1-lite" && selected !== "stellan-1-max") { throw new UserError("unsupported"); } await service(root, noSwap, resolve(args[at + 1]!), args.includes("--faster"), selected); return; }
   if (args.includes("--dry-run")) { for (const action of dryRunActions(root, process.platform, process.arch, totalmem(), noSwap)) { console.log(action); } return; }
   if (args.includes("--service")) { await service(root, noSwap); return; }
   const box = await Sandbox.create(root); await mkdir(await box.path("logs", true), { recursive: true });

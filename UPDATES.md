@@ -35,3 +35,7 @@ The publisher validates that its build came from a successful trusted main-branc
 ## Validation
 
 Run `npm run check`, `npm test` and `npm run build`. Update tests cover signature tampering, replay/downgrade, path/platform validation, CDN credential stripping, offline/private checks, model-changing updates, corrupted staging, project/log/model preservation and rollback after partial data transfer. Model inode preservation verifies that models are moved rather than duplicated. Native commands are compiled by the CI matrix on macOS, Windows and Linux. Clean-machine GUI restart, physical USB removal and OS permission behavior still need platform qualification.
+
+## Lite-only to unified app
+
+New complete releases include both Lite and Max. Existing Lite-only installations can receive the unified app/UI through the app-only updater: the new Max record is optional, so no weight download is forced. Link an existing compatible Max GGUF on the welcome screen, or obtain the complete Lite + Max package if you need both weight files. Full releases use the same pinned Max record as the app update. An external Max selection lives in the preserved logs directory and survives app updates. App updates never silently replace external weights.

@@ -48,9 +48,9 @@ async function start(faster = false) {
     nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true;
     progress({ message: "Starting your private assistant..." }, true);
     try {
-      const url = await native.invoke("start_assistant", { faster });
+      const url = await native.invoke("start_assistant", { faster, mode: byId("assistant-mode").value });
       location.replace(url);
-    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); }
+    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("welcome").hidden = false; }
     finally { nativeStarting = false; byId("start").disabled = false; }
   } else {
     try { await api(faster ? "/api/faster" : "/api/start", faster ? {} : { model: "stellan-1-lite" }); }
@@ -96,6 +96,7 @@ async function update() {
     byId("footer").hidden = byId("chat").hidden;
     byId("stop").hidden = state.desktop;
     byId("send").disabled = state.phase !== "ready";
+    byId("session-model").textContent = state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite";
     byId("start").disabled = false;
     progress(state.progress, ["starting", "working"].includes(state.phase));
     if (state.problem) { showError(state.problem); }
@@ -163,4 +164,30 @@ if (native) {
     if (settings.enabled) { void checkAppUpdates(); }
     else { byId("update-message").textContent = "Automatic checks are off. You can check for app updates here."; }
   }).catch(() => { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; });
+}
+
+function showLocalModels(status) {
+  byId("model-status").textContent = status.message;
+  byId("assistant-mode").querySelector('[value="max"]').disabled = !(status.available && status.eligible);
+  byId("assistant-mode").querySelector('[value="auto"]').textContent = status.available && status.eligible ? "Lite + Max (recommended)" : "Lite (Max unavailable on this computer)";
+  byId("unlink-max").hidden = status.source !== "linked";
+  if (status.path) { byId("max-path").value = status.path; }
+  if (!(status.available && status.eligible) && byId("assistant-mode").value === "max") { byId("assistant-mode").value = "auto"; }
+}
+async function setLocalMax(action, path) {
+  byId("start").disabled = true;
+  for (const id of ["browse-max", "link-max", "unlink-max"]) { byId(id).disabled = true; }
+  try { showLocalModels(await native.invoke(action, path === undefined ? {} : { path })); }
+  catch (error) { byId("model-status").textContent = typeof error === "string" ? error : "The Max file could not be linked. Check the file and try again."; }
+  finally { byId("start").disabled = false; for (const id of ["browse-max", "link-max", "unlink-max"]) { byId(id).disabled = false; } }
+}
+if (native) {
+  byId("model-settings").hidden = false;
+  native.invoke("local_model_status").then(showLocalModels).catch(() => { byId("model-status").textContent = "Max selection could not be read. Lite is still available."; });
+  byId("link-max").onclick = () => setLocalMax("link_max_model", byId("max-path").value);
+  byId("unlink-max").onclick = () => setLocalMax("unlink_max_model");
+  byId("browse-max").onclick = async () => {
+    try { const path = await native.invoke("choose_max_model"); if (path) { byId("max-path").value = path; await setLocalMax("link_max_model", path); } }
+    catch (error) { byId("model-status").textContent = typeof error === "string" ? error : "Paste the full GGUF path, then choose Use this file."; }
+  };
 }

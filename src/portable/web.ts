@@ -36,6 +36,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   engine.onModelStart = () => progress.begin("thinking");
   let origin = "";
   const history: Message[] = [];
+  const maxHistory: Message[] = [];
   const approvals = new Map<string, (allow: boolean) => void>();
   const publish = (kind: string, text?: string, data?: unknown): void => {
     events.push({ id: ++sequence, kind, ...(text !== undefined ? { text } : {}), ...(data !== undefined ? { data } : {}) });
@@ -62,8 +63,8 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     const selected = engine.active ?? "stellan-1-lite";
     try {
       if (selected === "stellan-1-max") {
-        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true }).complete([{ role: "system", content: coderSystem }, { role: "user", content: text }], active.signal, (value, thinking) => { progress.output(); publish(thinking ? "thinking" : "answer", value); });
-        if (!result.content) { throw new UserError("general"); } return;
+        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true }).complete([{ role: "system", content: coderSystem }, ...maxHistory, { role: "user", content: text }], active.signal, (value, thinking) => { progress.output(); publish(thinking ? "thinking" : "answer", value); });
+        if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: text }, { role: "assistant", content: result.content }); return;
       }
       await runAgent({
         task: text, messages: history, context: { source: projectContext(box), ...(faster ? { maxBytes: 4096 } : {}) },
@@ -96,7 +97,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, progress: progressView, models: options.choices, paired: !options.noSwap && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
+        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
       }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
       let body = "";
@@ -124,5 +125,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { async start() { await launch("stellan-1-lite"); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

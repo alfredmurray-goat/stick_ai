@@ -82,11 +82,17 @@ async function safeDirectory(path: string): Promise<boolean> {
   try { const info = await lstat(path); if (!info.isDirectory() || info.isSymbolicLink() || await realpath(path) !== path) { throw new Error("Unsafe application data directory"); } return true; }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { return false; } throw error; }
 }
+async function preserveInstalledMax(root: string, manifest: Manifest): Promise<Manifest> {
+  const current = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
+  const max = current.files.find((record) => record.path === "models/stellan-1-max-q4_k_m.gguf");
+  if (max && !manifest.files.some((record) => record.path === max.path)) { return { ...manifest, files: [...manifest.files, max] }; }
+  return manifest;
+}
 async function compatibleModels(root: string, manifest: Manifest): Promise<void> {
   const current = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
   const before = current.files.filter((record) => record.path.startsWith("models/"));
   const after = manifest.files.filter((record) => record.path.startsWith("models/"));
-  if (before.length !== after.length || !after.every((record) => before.some((old) => sameRecord(old, record)))) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
+  if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.path === "models/stellan-1-max-q4_k_m.gguf" && record.optional === true)) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
   if (!await safeDirectory(join(root, "models"))) { throw new Error("The installed models are missing"); }
 }
 export async function prepareUpdate(rootPath: string, token: string, signal: AbortSignal, publicKey = updatePublicKey): Promise<string> {
@@ -96,7 +102,8 @@ export async function prepareUpdate(rootPath: string, token: string, signal: Abo
   try {
     const next = join(work, "next"); await mkdir(next);
     await downloadBundle(config, update, token, join(work, "download.gz"), signal);
-    const manifest = await extractUpdateBundle(join(work, "download.gz"), next, config.target, signal);
+    const manifest = await preserveInstalledMax(root, await extractUpdateBundle(join(work, "download.gz"), next, config.target, signal));
+    await writeFile(join(next, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     const nextConfig = await readUpdateConfig(next);
     if (nextConfig.repository !== config.repository || nextConfig.sequence !== update.feed.sequence || nextConfig.source !== update.feed.source || nextConfig.target !== config.target) { throw new Error("App update identity mismatch"); }
     await compatibleModels(root, manifest);
@@ -130,7 +137,7 @@ export async function applyPreparedUpdate(rootPath: string, workPath: string, pu
     const asset = feed.assets.find((item) => item.target === config.target)!;
     const bundle = await hashFile(join(work, "download.gz")); if (bundle.sha256 !== asset.sha256 || bundle.size !== asset.size) { throw new Error("Changed update download"); }
     const inspection = join(work, "inspection"); await mkdir(inspection);
-    const manifest = await extractUpdateBundle(join(work, "download.gz"), inspection, config.target, new AbortController().signal);
+    const manifest = await preserveInstalledMax(root, await extractUpdateBundle(join(work, "download.gz"), inspection, config.target, new AbortController().signal));
     await rm(inspection, { recursive: true });
     await compatibleModels(root, manifest); await verifyTree(next, manifest, false);
     const nextConfig = await readUpdateConfig(next);

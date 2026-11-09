@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import { open, mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-export async function splitArchive(input, output, limit = 2000 * 1024 ** 2) {
+export async function splitArchive(input, output, limit = 2000 * 1024 ** 2, onPart) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit >= 2 * 1024 ** 3) { throw new Error("Invalid release part size"); }
   const name = basename(input);
   if (!/^stick_ai-[a-z0-9-]+\.(zip|tar\.gz)$/.test(name)) { throw new Error("Unsafe archive name"); }
@@ -12,7 +12,8 @@ export async function splitArchive(input, output, limit = 2000 * 1024 ** 2) {
   async function finish() {
     if (!handle) { return; }
     await handle.sync(); await handle.close(); handle = undefined;
-    parts.push({ name: partName, size: partSize, sha256: partHash.digest("hex") });
+    const record = { name: partName, size: partSize, sha256: partHash.digest("hex") }; parts.push(record);
+    if (onPart) { await onPart(record, join(output, partName)); }
   }
   try {
     for await (const chunk of createReadStream(input)) {

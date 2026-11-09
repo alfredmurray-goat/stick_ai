@@ -1,4 +1,4 @@
-name: Desktop Lite builds
+name: Desktop builds — Lite + Max
 on:
   push:
     branches: [main]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-lite-${{ github.ref }}
+  group: desktop-unified-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   package:
@@ -132,9 +132,9 @@ jobs:
         run: |
           node scripts/native-licenses.mjs release-assets/desktop-licenses
           curl --fail --location --retry 3 "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/$LLAMA_COMMIT" --output release-assets/desktop-licenses/llama.cpp-source.tar.gz
-      - name: Assemble the complete Lite desktop folder
+      - name: Assemble the app and Lite with the pinned Max manifest
         run: |
-          node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}" --node release-assets/node-v24.22.1-${{ matrix.node }}/${{ matrix.executable }} --node-license release-assets/node-v24.22.1-${{ matrix.node }}/LICENSE --server release-assets/llama-build/${{ matrix.server }} --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses
+          node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ matrix.target }}/release/${{ matrix.app }}" --node release-assets/node-v24.22.1-${{ matrix.node }}/${{ matrix.executable }} --node-license release-assets/node-v24.22.1-${{ matrix.node }}/LICENSE --server release-assets/llama-build/${{ matrix.server }} --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses --max-release
       - name: Remove copied inputs before archiving
         run: rm -f release-assets/stellan-1-lite-q4_k_m.gguf release-assets/node-*.tar.gz release-assets/node-*.zip
       - name: Verify native startup and real Lite tool exchange
@@ -146,25 +146,26 @@ jobs:
           name: stick_ai-update-${{ matrix.name }}
           path: dist/stick_ai-update-${{ matrix.name }}.gz
           compression-level: 0
-          retention-days: 14
+          retention-days: 1
           if-no-files-found: error
-      - name: Archive the complete folder with permissions
+      - name: Archive the internal base with permissions
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
-            ditto -c -k --sequesterRsrc --keepParent "dist/Stick AI" dist/stick_ai-${{ matrix.name }}.zip
+            cd dist
+            zip -q -0 -r stick_ai-${{ matrix.name }}.zip "Stick AI"
           elif [ "$RUNNER_OS" = Windows ]; then
             7z a -tzip -mx=0 dist/stick_ai-${{ matrix.name }}.zip "./dist/Stick AI"
           else
-            tar -czf dist/stick_ai-${{ matrix.name }}.tar.gz -C dist "Stick AI"
+            tar -cf - -C dist "Stick AI" | gzip -1 > dist/stick_ai-${{ matrix.name }}.tar.gz
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: stick_ai-${{ matrix.name }}
+          name: stick_ai-base-${{ matrix.name }}
           path: |
             dist/stick_ai-${{ matrix.name }}.zip
             dist/stick_ai-${{ matrix.name }}.tar.gz
           compression-level: 0
-          retention-days: 14
+          retention-days: 1
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
@@ -175,4 +176,4 @@ jobs:
             release-assets/smoke.log
             release-assets/model-smoke.json
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 1
