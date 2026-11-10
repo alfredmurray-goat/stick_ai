@@ -6,7 +6,7 @@ import { basename, join } from "node:path";
 export async function splitArchive(input, output, limit = 2000 * 1024 ** 2, onPart) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit >= 2 * 1024 ** 3) { throw new Error("Invalid release part size"); }
   const name = basename(input);
-  if (!/^stick_ai-[a-z0-9-]+\.(zip|tar\.gz)$/.test(name)) { throw new Error("Unsafe archive name"); }
+  if (!/^stick_ai-[a-z0-9-]+\.(zip|tar\.gz|dmg)$/.test(name)) { throw new Error("Unsafe archive name"); }
   await mkdir(output, { recursive: true });
   const whole = createHash("sha256"); const parts = []; let size = 0; let handle; let partHash; let partSize = 0; let partName;
   async function finish() {
@@ -37,7 +37,7 @@ export async function splitArchive(input, output, limit = 2000 * 1024 ** 2, onPa
 }
 export async function joinHelper(record, output, platform) {
   const check = (file, hash) => `check '${file}' '${hash}' || fail`;
-  const base = record.name.replace(/\.(zip|tar\.gz)$/, "");
+  const base = record.name.replace(/\.(zip|tar\.gz|dmg)$/, "");
   if (platform !== "windows-x64") {
     const name = `Join-${base}.${platform.startsWith("macos-") ? "command" : "sh"}`;
     const text = `#!/bin/sh
