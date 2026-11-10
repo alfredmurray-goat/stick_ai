@@ -1,0 +1,77 @@
+name: Build native Mac DMGs
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful main desktop build with the Max file picker
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  dmg:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            platform: macos-x64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Free disk for the native model-filled DMGs
+        run: |
+          dmg_xcode_app=$(python3 -c 'from pathlib import Path; import subprocess; print(Path(subprocess.check_output(["xcode-select","-p"],text=True).strip()).resolve().parents[1])')
+          for dmg_app in /Applications/Xcode*.app; do
+            [ -e "$dmg_app" ] || continue
+            dmg_real_app=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$dmg_app")
+            if [ "$dmg_real_app" != "$dmg_xcode_app" ]; then sudo rm -rf "$dmg_app"; fi
+          done
+          for dmg_sdk in "$dmg_xcode_app/Contents/Developer/Platforms/"*; do
+            [ -e "$dmg_sdk" ] || continue
+            if [ "$(basename "$dmg_sdk")" != MacOSX.platform ]; then sudo rm -rf "$dmg_sdk"; fi
+          done
+          sudo rm -rf /Users/runner/.rustup /Users/runner/.cargo /Users/runner/Library/Developer/CoreSimulator /Library/Developer/CoreSimulator/Profiles/Runtimes
+          df -h /
+      - name: Build extra Intel Lite DMG with the Max file picker
+        if: matrix.platform == 'macos-x64'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          DMG_VARIANT: lite-picker
+        run: node scripts/build-macos-dmg.mjs
+      - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'macos-x64'
+        with:
+          name: stick-ai-dmg-macos-x64-lite-picker
+          path: dmg-output/stick_ai-macos-x64-lite-picker.dmg*
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Reclaim the uploaded Lite image before building the full image
+        if: matrix.platform == 'macos-x64'
+        run: rm -f dmg-output/stick_ai-macos-x64-lite-picker.dmg
+      - name: Build the full Lite + Max DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          DMG_VARIANT: full
+        run: node scripts/build-macos-dmg.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stick-ai-dmg-${{ matrix.platform }}-full
+          path: dmg-output/stick_ai-${{ matrix.platform }}.dmg*
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
