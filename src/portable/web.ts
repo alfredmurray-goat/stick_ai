@@ -1,5 +1,5 @@
 import { createServer, type ServerResponse } from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
+import { readFile, mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { projectContext } from "../agent/context.js";
@@ -48,7 +48,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   let box = await Sandbox.create(join(root, "app", "project"));
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID(); const space = description.indexOf(" "); const args = JSON.parse(description.slice(space + 1)) as Record<string, string>;
-    const finish = (allow: boolean): void => { approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
+    const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
     const cancel = (): void => finish(false);
     approvals.set(id, finish); signal.addEventListener("abort", cancel, { once: true });
     publish("approval", undefined, { id, file: basename(args.path ?? "your file"), before: args.old ?? "", after: args.new ?? args.content ?? "" });
@@ -66,7 +66,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     finally { loading = undefined; }
   };
   const task = async (text: string): Promise<void> => {
-    active = new AbortController(); phase = "working"; problem = undefined; failure = ""; progress.begin("reading");
+    active = new AbortController(); publish("user", text); phase = "working"; problem = undefined; failure = ""; progress.begin("reading");
     const selected = engine.active ?? "stellan-1-lite";
     try {
       if (selected === "stellan-1-max") {
@@ -82,12 +82,13 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
         } },
         specialist: { totalBytes: options.bytes, noSwap: options.noSwap || faster, available: selected === "stellan-1-lite" && options.choices.includes("stellan-1-max"), code: (task, context, signal) => engine.code(task, context, signal, (message) => { publish("status", message); report(message); }) },
         maxSteps: 20, signal: active.signal,
+        activity: (event) => { progress.begin(event.phase === "start" && ["read_file", "list_dir", "search_files"].includes(event.tool) ? "reading" : "thinking"); publish("tool", undefined, event); },
         emit: (value, thinking) => { progress.output(); publish(thinking ? "thinking" : "answer", value); },
         log: (value) => { log(value); if (value.startsWith("Code specialist") || value === "Switching to the coding model...") { publish("status", value); } },
         save: async () => {}
       });
     } catch (error) { log(error); fail(error); }
-    finally { active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); }
+    finally { publish("task-complete"); active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); }
   };
   const send = (response: ServerResponse, code: number, data: unknown): void => { response.writeHead(code, { "Content-Type": "application/json" }); response.end(JSON.stringify(data)); };
   const server = createServer(async (request, response) => {
@@ -104,13 +105,33 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
+        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/files") {
+        const path = url.searchParams.get("path") ?? ".";
+        const entries = (await readdir(await box.path(path), { withFileTypes: true })).filter((entry) => ![".git", ".stick", "node_modules"].includes(entry.name) && !entry.isSymbolicLink() && (entry.isDirectory() || entry.isFile())).sort((a,b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+        send(response, 200, { path, entries: entries.slice(0, 1000).map((entry) => ({ name: entry.name, directory: entry.isDirectory() })), truncated: entries.length > 1000 }); return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/file") {
+        const path = url.searchParams.get("path") ?? "";
+        const content = await tools.execute({ id: randomUUID(), type: "function", function: { name: "read_file", arguments: JSON.stringify({ path }) } }, new AbortController().signal);
+        send(response, 200, { path, content }); return;
       }
       if (request.method === "GET" && url.pathname === "/api/github/workspaces") { send(response, 200, { workspaces: await github.list() }); return; }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
-      let body = "";
-      for await (const chunk of request) { body += chunk; if (body.length > 1000000) { throw new Error("UI body too large"); } }
-      const data = JSON.parse(body) as Record<string, unknown>;
+      const chunks: Buffer[] = []; let bodyBytes = 0;
+      for await (const chunk of request) { const bytes = Buffer.from(chunk); bodyBytes += bytes.length; if (bodyBytes > 2 * 1024 ** 2) { throw new Error("UI body too large"); } chunks.push(bytes); }
+      const data = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) { history.length = 0; maxHistory.length = 0; events.length = 0; publish("project", "New conversation. Your project files are kept."); send(response, 200, {}); return; }
+      if (url.pathname === "/api/file" && !active && !loading && !repositoryOperation && typeof data.path === "string" && typeof data.content === "string") {
+        const controller = new AbortController(); repositoryOperation = controller;
+        let finishEdit!: () => void; repositoryDone = new Promise<void>((resolve) => { finishEdit = resolve; });
+        try {
+          const editorTools = new Tools(box, async () => true);
+          const result = await editorTools.execute({ id: randomUUID(), type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: data.path, content: data.content }) } }, controller.signal);
+          publish("file-saved", data.path); send(response, 200, { result }); return;
+        } finally { repositoryOperation = undefined; finishEdit(); repositoryDone = undefined; }
+      }
       if (url.pathname.startsWith("/api/github/")) {
         if (active || loading || repositoryOperation) { send(response, 409, { error: "Wait for the current task or repository operation, or cancel it first." }); return; }
         const controller = new AbortController(); repositoryOperation = controller;
@@ -149,7 +170,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   const progressTimer = setInterval(() => {
     if (polling || !["working", "starting"].includes(phase)) { return; }
     polling = true;
-    void Promise.resolve(engine.status?.()).then((status) => { progressView = progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
+    void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
   return { async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

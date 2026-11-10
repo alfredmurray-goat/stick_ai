@@ -68,3 +68,12 @@ it("bounds sent tool context without mutating retained conversation history", ()
 it("hides technical errors", () => {
   expect(JSON.stringify(friendlyError(new Error("secret path /tmp/port:8080")))).not.toContain("8080");
 });
+it.each(['reasoning','reasoning_content','thinking'])('streams %s before the final answer arrives',async(field)=>{
+ let stream!:ReadableStreamDefaultController<Uint8Array>;vi.stubGlobal('fetch',vi.fn(async()=>new Response(new ReadableStream({start(controller){stream=controller;}}))));
+ const output:[string,boolean][]=[];const promise=new Ollama('stellan-1-lite','http://localhost:11434').complete([],new AbortController().signal,(text,thinking)=>output.push([text,thinking]));
+ await Promise.resolve();await Promise.resolve();
+ stream.enqueue(new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{reasoning:'',[field]:'Inspecting the project'}}]})+'\n\n'));
+ await vi.waitFor(()=>expect(output).toContainEqual(['Inspecting the project',true]));
+ stream.enqueue(new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:'<done>Finished</done>'},finish_reason:'stop'}]})+'\n\n'));stream.close();
+ expect((await promise).content).toBe('<done>Finished</done>');expect(output.filter(([,thinking])=>!thinking).map(([text])=>text).join('')).toBe('Finished');
+});

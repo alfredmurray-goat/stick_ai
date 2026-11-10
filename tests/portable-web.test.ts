@@ -62,6 +62,11 @@ it("serves a private browser session, swaps models, preserves history and applie
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     expect(approved).toBe(true); expect(state.phase).toBe("ready");
+    expect(state.events.some((event: any) => event.kind === "user" && event.text === "Add greet")).toBe(true);
+    expect(state.events.some((event: any) => event.kind === "approval-resolved" && event.data.allow)).toBe(true);
+    expect(state.events.some((event: any) => event.kind === "tool" && event.data.tool === "delegate_code" && event.data.phase === "start")).toBe(true);
+    expect(state.events.some((event: any) => event.kind === "tool" && event.data.tool === "write_file" && event.data.phase === "finish")).toBe(true);
+    expect(state.events.some((event: any) => event.kind === "task-complete")).toBe(true);
     expect(await readFile(join(root, "app/project/greet.ts"), "utf8")).toBe(code);
     expect(order).toEqual(["start stellan-1-lite", "stop stellan-1-lite", "start stellan-1-max", "stop stellan-1-max", "start stellan-1-lite"]);
     expect(bodies.map((body) => body.model)).toEqual(["stellan-1-lite", "stellan-1-max", "stellan-1-lite", "stellan-1-lite"]);

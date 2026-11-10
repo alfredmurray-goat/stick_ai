@@ -51,7 +51,8 @@ export class Ollama implements Model {
         }
         const delta = choice?.delta;
         if (!delta) { return; }
-        if (typeof delta.reasoning === "string") { emit(delta.reasoning, true); }
+        const reasoning = [delta.reasoning, delta.reasoning_content, delta.thinking].find((value) => typeof value === "string" && value.length > 0);
+        if (typeof reasoning === "string") { emit(reasoning, true); }
         if (delta.tool_calls?.length) { throw new Error("Native tool calls are unsupported; Stellan must write <tool_call> JSON in its text response"); }
         if (typeof delta.content === "string") {
           if (this.options.specialist) { code.push(delta.content); } else { parser.push(delta.content); }

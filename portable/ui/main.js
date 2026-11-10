@@ -28,56 +28,85 @@ function showError(problem = {}) {
 }
 function progress(view, busy) {
   working = busy; byId("progress").hidden = !busy;
+  byId("live-indicator").textContent = busy ? "● LIVE" : "○ IDLE";
+  document.body.classList.toggle("awaiting-approval", view?.message === "Waiting for your approval");
+  byId("ready-label").textContent = busy ? "Working" : native ? "Not started" : "Ready";
+  byId("ready-dot").classList.toggle("pulse", busy);
+  byId("thinking-state").textContent = busy ? byId("thinking").textContent ? "STREAMING" : "WAITING" : byId("thinking").textContent ? "COMPLETE" : "READY";
+  byId("new-session").disabled = busy || Boolean(native);
+  if (byId("file-editor")) byId("file-editor").readOnly = busy || repositoryBusy || savingFile;
+  if (typeof updateEditorState === "function") updateEditorState();
   byId("status").textContent = view?.message || "Thinking...";
   byId("elapsed").textContent = view?.elapsedSeconds == null ? "" : ` ${view.elapsedSeconds} seconds`;
   byId("reassurance").textContent = view?.reassurance || "";
 }
+function scrollConversation(force = false) {
+  const panel = byId("conversation-scroll");
+  if (force || panel.scrollHeight - panel.scrollTop - panel.clientHeight < 160) requestAnimationFrame(() => { panel.scrollTop = panel.scrollHeight; });
+}
 function message(text, kind = "answer") {
+  if (!text) return;
   if (kind === "thinking" || kind === "coding") {
     byId(kind === "thinking" ? "thoughts" : "code-preview").hidden = false;
-    byId(kind).textContent += text; return;
+    const target = byId(kind); const follow = target.scrollHeight - target.scrollTop - target.clientHeight < 60;
+    target.textContent += text;
+    if (kind === "thinking") { byId("thinking-empty").hidden = true; byId("thinking-state").textContent = working ? "STREAMING" : "COMPLETE"; }
+    if (follow) target.scrollTop = target.scrollHeight;
+    return;
   }
-  if (!streaming || streamKind !== kind) { streaming = document.createElement("pre"); streaming.className = kind; byId("messages").append(streaming); streamKind = kind; }
-  streaming.textContent += text;
+  byId("chat-empty").hidden = true; document.body.classList.add("has-conversation");
+  if (!streaming || streamKind !== kind) {
+    const card = document.createElement("article"); card.className = `message ${kind}`;
+    const label = document.createElement("div"); label.className = `message-label ${kind === "answer" ? "assistant-label" : ""}`; label.textContent = kind === "you" ? "YOU" : kind === "answer" ? "STELLAN" : "WORKSPACE";
+    streaming = document.createElement("pre"); card.append(label, streaming); byId("messages").append(card); streamKind = kind;
+  }
+  streaming.textContent += text; scrollConversation(kind === "you");
 }
 async function start(faster = false) {
   if (installingUpdate) { return; }
   byId("app-updates").hidden = true;
   retryStart = true; byId("error").hidden = true; byId("start").disabled = true;
   if (native) {
-    nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true;
+    nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true; byId("loading").hidden = false;
     progress({ message: "Starting your private assistant..." }, true);
     try {
       const url = await native.invoke("start_assistant", { faster, mode: byId("assistant-mode").value });
       location.replace(url);
-    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("welcome").hidden = false; }
+    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("loading").hidden = true; byId("welcome").hidden = false; }
     finally { nativeStarting = false; byId("start").disabled = false; }
   } else {
     try { await api(faster ? "/api/faster" : "/api/start", faster ? {} : { model: "stellan-1-lite" }); }
     catch { showError(); byId("start").disabled = false; }
   }
 }
-async function task(text) {
-  if (!text.trim()) { return; }
-  retryStart = false; lastTask = text; byId("error").hidden = true;
+function beginTurn(text) {
+  if (innerWidth > 620) inspectorTab(false);
+  if (byId("thinking").textContent) { const card = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); card.className = "message reasoning-history"; summary.textContent = "Previous turn · thinking"; content.textContent = byId("thinking").textContent; card.append(summary, content); byId("messages").append(card); }
   streaming = undefined; message(text, "you"); streaming = undefined;
+  toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0";
+  byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Waiting for the model’s reasoning stream. Tool activity appears below.";
   for (const id of ["thinking", "coding"]) { byId(id).textContent = ""; }
-  byId("thoughts").open = false; byId("thoughts").hidden = true; byId("code-preview").hidden = true;
+  byId("thoughts").open = true; byId("thoughts").hidden = false; byId("code-preview").hidden = true;
+}
+async function task(text) {
+  if (!text.trim() || working || repositoryBusy || native) { return; }
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before starting a task."); return; }
+  retryStart = false; lastTask = text; byId("error").hidden = true;
   byId("prompt").value = "";
-  try { await api("/api/task", { text }); } catch { showError(); }
+  try { byId("send").disabled = true; await api("/api/task", { text }); } catch (error) { showError({message:error.message}); }
 }
 byId("start").onclick = () => start();
 byId("question").onsubmit = (event) => { event.preventDefault(); void task(byId("prompt").value); };
-byId("thoughts").ontoggle = () => { byId("thoughts").querySelector("summary").textContent = byId("thoughts").open ? "Hide thinking" : "Show thinking"; };
+
 byId("cancel").onclick = () => { void (native ? native.invoke("cancel_start") : api("/api/cancel", {})).catch(() => {}); };
-document.addEventListener("keydown", (event) => { if (working && event.ctrlKey && event.key.toLowerCase() === "c") { event.preventDefault(); byId("cancel").click(); } });
+document.addEventListener("keydown", (event) => { if (working && !byId("settings-dialog").open && (event.key === "Escape" || event.ctrlKey && event.key.toLowerCase() === "c" && !window.getSelection()?.toString())) { event.preventDefault(); byId("cancel").click(); } });
 byId("error-action").onclick = async () => {
   byId("error").hidden = true;
   if (errorAction === "OK") { if (!native) { await api("/api/dismiss", {}).catch(() => {}); } else { byId("welcome").hidden = false; } return; }
   if (errorAction === "Switch to a faster setting") { await start(true); return; }
   if (retryStart) { await start(); } else { await task(lastTask); }
 };
-byId("stop").onclick = () => api("/api/stop", {}).catch(() => {});
+byId("stop").onclick = () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before closing."); return; } void api("/api/stop", {}).catch(() => {}); };
 async function update() {
   if (polling) { return; } polling = true;
   try {
@@ -94,27 +123,38 @@ async function update() {
     byId("loading").hidden = state.phase !== "starting";
     byId("chat").hidden = !["ready", "working"].includes(state.phase);
     byId("footer").hidden = byId("chat").hidden;
+    byId("composer-area").hidden = byId("chat").hidden;
+    byId("project-name").textContent = state.project?.name || "Local project";
+    byId("project-name").title = state.project?.location || "";
+    byId("workspace-title").textContent = state.repository?.repository || "Local project";
+    byId("branch-label").textContent = state.repository?.branch || "local";
+    if (!filesLoaded && state.phase === "ready") void refreshFiles();
     byId("stop").hidden = state.desktop;
     byId("send").disabled = state.phase !== "ready" || state.repositoryBusy;
     byId("session-model").textContent = state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite";
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
     progress(state.progress, ["starting", "working"].includes(state.phase));
-    if (state.problem) { showError(state.problem); }
+    if (state.problem) { showError(state.problem); byId("ready-label").textContent = "Needs attention"; }
     for (const event of state.events) {
       after = event.id;
+      if (event.kind === "user") { beginTurn(event.text); }
+      if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
-      if (event.kind === "project") { byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; message(event.text, "status"); }
+      if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
+      if (event.kind === "tool") { renderTool(event.data); }
+      if (event.kind === "task-complete") { byId("thinking-empty").textContent = byId("thinking").textContent ? "" : "This response did not emit separate reasoning. See the tool activity below."; void refreshFiles(); }
+      if (event.kind === "file-saved") { void refreshFiles(); }
       if (event.kind === "status") { byId("status").textContent = event.text; }
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
-        const card = document.createElement("article"); const title = document.createElement("h3"); title.textContent = `Save changes to ${event.data.file}?`;
-        const preview = document.createElement("pre"); preview.textContent = event.data.after; card.append(title, preview);
+        const card = document.createElement("article"); card.className = "approval-card"; card.dataset.approval = event.data.id; const title = document.createElement("h3"); title.textContent = `Save changes to ${event.data.file}?`;
+        const preview = document.createElement("pre"); preview.textContent = event.data.after; card.append(title, preview); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         for (const [label, allow] of [["Allow changes", true], ["Keep my file", false]]) {
-          const button = document.createElement("button"); button.textContent = label;
-          button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; card.append(button);
+          const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
+          button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
-        byId("approvals").append(card);
+        byId("approvals").append(card); if (innerWidth <= 620) document.body.classList.remove("inspector-open"); scrollConversation(true);
       }
     }
   } catch { if (!native) { showError({ message: "The assistant has stopped. Open the app again to continue.", action: "OK" }); } }
@@ -169,7 +209,7 @@ if (native) {
 }
 
 function showLocalModels(status) {
-  byId("model-status").textContent = status.message;
+  byId("model-status").textContent = status.message; byId("max-quick-status").textContent = status.message;
   byId("assistant-mode").querySelector('[value="max"]').disabled = !(status.available && status.eligible);
   byId("assistant-mode").querySelector('[value="auto"]').textContent = status.available && status.eligible ? "Lite + Max (recommended)" : "Lite (Max unavailable on this computer)";
   byId("unlink-max").hidden = status.source !== "linked";
@@ -220,14 +260,16 @@ async function savedRepositories() {
   } catch (error) { byId("github-result").textContent = error.message; }
 }
 byId("github-connect").onclick = async () => {
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; }
   const token = byId("github-token").value; byId("github-token").value = "";
   try { const result = await repositoryAction("connect", {repository:byId("github-repo").value, branch:byId("github-branch").value, token}); clearRepositoryReview(); renderRepository(result.workspace, false); byId("github-result").textContent = "Connected. Ask the assistant to work on this repository."; await savedRepositories(); } catch {}
 };
 byId("github-resume").onclick = async () => {
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; }
   const token = byId("github-token").value; byId("github-token").value = "";
   try { const result = await repositoryAction("resume", {id:byId("github-saved").value, token}); clearRepositoryReview(); renderRepository(result.workspace, false); byId("github-result").textContent = "Saved files restored. Start a new task; chat history is not saved."; } catch {}
 };
-byId("github-disconnect").onclick = async () => { try { await repositoryAction("disconnect", {}); clearRepositoryReview(); renderRepository(null, false); byId("github-result").textContent = "Using the local project. Repository changes remain in Saved workspaces."; } catch {} };
+byId("github-disconnect").onclick = async () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; } try { await repositoryAction("disconnect", {}); clearRepositoryReview(); renderRepository(null, false); byId("github-result").textContent = "Using the local project. Repository changes remain in Saved workspaces."; } catch {} };
 byId("github-refresh").onclick = savedRepositories;
 byId("github-cancel").onclick = () => api("/api/cancel", {}).catch(() => {});
 byId("github-review").onclick = async () => {
@@ -251,3 +293,109 @@ byId("github-publish").onclick = async () => {
   try { const result = await repositoryAction("publish", {digest:repositoryReview,title:byId("github-title").value,body:byId("github-body").value}); byId("github-result").textContent = `Draft pull request: ${result.url} — copy this URL into your browser.`; clearRepositoryReview(); } catch {}
 };
 if (!native) void savedRepositories();
+
+const toolCards = new Map();
+let filesLoaded = false;
+let filesLoading = false;
+let projectEpoch = 0;
+let fileRequest = 0;
+let currentFile = "";
+let originalFile = "";
+let savingFile = false;
+const expandedFolders = new Set();
+function toast(text) { byId("toast").textContent = text; byId("toast").hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { byId("toast").hidden = true; }, 3500); }
+function openSettings(tab = "models") {
+  for (const button of document.querySelectorAll("[data-settings]")) button.classList.toggle("active", button.dataset.settings === tab);
+  for (const name of ["models","github","updates"]) byId(`settings-${name}`).hidden = name !== tab;
+  byId("github-panel").open = true;
+  if (!byId("settings-dialog").open) byId("settings-dialog").showModal();
+}
+byId("open-settings").onclick = () => openSettings("models");
+byId("open-github").onclick = () => openSettings("github");
+byId("open-updates").onclick = () => openSettings("updates");
+byId("quick-max").onclick = () => { openSettings("models"); byId("max-selection").open = true; };
+byId("close-settings").onclick = () => byId("settings-dialog").close();
+for (const button of document.querySelectorAll("[data-settings]")) button.onclick = () => openSettings(button.dataset.settings);
+byId("theme-toggle").onclick = () => { document.documentElement.classList.toggle("light"); try { localStorage.setItem("stick-theme", document.documentElement.classList.contains("light") ? "light" : "dark"); } catch {} };
+try { document.documentElement.classList.toggle("light", localStorage.getItem("stick-theme") === "light"); } catch {}
+byId("sidebar-toggle").onclick = () => { if (innerWidth <= 860) document.body.classList.toggle("sidebar-open"); else document.body.classList.toggle("sidebar-hidden"); };
+byId("activity-toggle").onclick = () => { if (innerWidth <= 620) document.body.classList.toggle("inspector-open"); else document.body.classList.toggle("inspector-hidden"); };
+function inspectorTab(file) { byId("activity-panel").hidden = file; byId("file-panel").hidden = !file; byId("tab-file").classList.toggle("active", file); byId("tab-activity").classList.toggle("active", !file); document.body.classList.remove("inspector-hidden"); if (innerWidth <= 620) document.body.classList.add("inspector-open"); }
+byId("tab-file").onclick = () => inspectorTab(true); byId("tab-activity").onclick = () => inspectorTab(false);
+function renderTool(data) {
+  let card = toolCards.get(data.step);
+  if (!card) {
+    if (!toolCards.size) byId("tool-activity").textContent = "";
+    card = document.createElement("div"); card.className = "tool-card";
+    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request"})[data.tool] || data.tool;
+    const path = document.createElement("span"); path.className = "tool-path"; path.textContent = data.path || data.detail || "Project workspace";
+    card.append(title,path); byId("tool-activity").append(card); toolCards.set(data.step,card); byId("tool-count").textContent = String(toolCards.size);
+  }
+  if (data.phase === "finish") {
+    card.classList.add(data.result?.startsWith("Error:") || data.result === "Denied by user" ? "failed" : "complete");
+    const details = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); summary.textContent = "Result"; content.textContent = data.result || "Finished"; details.append(summary,content); card.append(details);
+    if (["write_file","edit_file"].includes(data.tool)) { void refreshFiles(); void reloadCurrentFile(data.path); }
+  }
+}
+async function fileEntries(parent,path) {
+  const result = await api(`/api/files?path=${encodeURIComponent(path || ".")}`);
+  for (const entry of result.entries) {
+    const relative = path ? `${path}/${entry.name}` : entry.name;
+    const button = document.createElement("button"), icon = document.createElement("span"), name = document.createElement("span"); button.className = "file-entry"; button.title = relative; icon.className = "file-icon"; icon.textContent = entry.directory ? "▸" : "·"; name.textContent = entry.name; button.append(icon,name); parent.append(button);
+    if (entry.directory) {
+      const children = document.createElement("div"); children.className = "file-children"; children.hidden = true; parent.append(children);
+      const expand = async () => { if (children.hidden) { children.textContent = ""; await fileEntries(children,relative); children.hidden = false; expandedFolders.add(relative); icon.textContent = "▾"; } else { children.hidden = true; expandedFolders.delete(relative); icon.textContent = "▸"; } };
+      button.onclick = () => expand().catch(error => toast(error.message));
+      if (expandedFolders.has(relative)) await expand();
+    } else button.onclick = () => openFile(relative);
+  }
+  if (!result.entries.length) { const empty = document.createElement("p"); empty.className = "empty-files"; empty.textContent = path ? "Empty folder" : "No files yet. Ask Stellan to create something."; parent.append(empty); }
+  if (result.truncated) { const note = document.createElement("p"); note.className = "empty-files"; note.textContent = "Showing the first 1,000 entries."; parent.append(note); }
+}
+async function refreshFiles() {
+  if (native || filesLoading) return; filesLoading = true; const epoch = projectEpoch;
+  try { const tree = document.createElement("div"); await fileEntries(tree,""); if (epoch === projectEpoch) { byId("file-tree").replaceChildren(tree); filesLoaded = true; } }
+  catch (error) { byId("file-tree").textContent = "Files are temporarily unavailable. Refresh to try again."; }
+  finally { filesLoading = false; if (epoch !== projectEpoch) void refreshFiles(); }
+}
+byId("refresh-files").onclick = refreshFiles;
+function hasUnsavedFile() { return Boolean(currentFile && byId("file-editor").value !== originalFile); }
+async function reloadCurrentFile(path) { if (!currentFile || path?.replace(/^\.\//, "") !== currentFile || hasUnsavedFile() || savingFile) return; const selected = currentFile, epoch = projectEpoch, requestId = fileRequest; try { const value = await api(`/api/file?path=${encodeURIComponent(selected)}`); if (currentFile === selected && epoch === projectEpoch && requestId === fileRequest && !hasUnsavedFile()) { originalFile = value.content; byId("file-editor").value = value.content; byId("file-status").textContent = "Updated by Stellan"; updateEditorState(); } } catch {} }
+function updateEditorState() { const dirty = currentFile && byId("file-editor").value !== originalFile; byId("save-file").disabled = !dirty || savingFile || working || repositoryBusy; byId("discard-file").disabled = !dirty || savingFile; if (dirty && !savingFile) byId("file-status").textContent = "Unsaved changes"; }
+function clearEditor() { fileRequest++; currentFile = ""; originalFile = ""; byId("file-title").textContent = "No file selected"; byId("file-editor").value = ""; byId("file-editor").disabled = true; byId("file-status").textContent = "Choose a project file."; updateEditorState(); }
+async function openFile(path) {
+  if (currentFile && byId("file-editor").value !== originalFile) { toast("Save or discard your file edits before opening another file."); return; }
+  const requestId = ++fileRequest, epoch = projectEpoch;
+  try { const result = await api(`/api/file?path=${encodeURIComponent(path)}`); if (requestId !== fileRequest || epoch !== projectEpoch) return; if (hasUnsavedFile()) { toast("Your unsaved edits were kept. Save or discard them before switching files."); return; } currentFile = result.path; originalFile = result.content; byId("file-title").textContent = path; byId("file-title").title = path; byId("file-editor").value = result.content; byId("file-editor").disabled = false; byId("file-editor").readOnly = working; byId("file-status").textContent = "Saved on this stick"; updateEditorState(); inspectorTab(true); document.body.classList.remove("sidebar-open"); }
+  catch (error) { toast("Could not open this file. Text files under 1 MiB are supported."); }
+}
+byId("file-editor").oninput = updateEditorState;
+byId("discard-file").onclick = () => { byId("file-editor").value = originalFile; byId("file-status").textContent = "Edits discarded"; updateEditorState(); };
+byId("save-file").onclick = async () => {
+  if (!currentFile || working || repositoryBusy || savingFile) return;
+  savingFile = true; updateEditorState(); const path = currentFile, content = byId("file-editor").value;
+  try { await api("/api/file", {path,content}); originalFile = content; byId("file-status").textContent = "Saved on this stick"; toast("File saved"); void refreshFiles(); }
+  catch (error) { toast("File could not be saved. Your edits are still in the editor."); }
+  finally { savingFile = false; updateEditorState(); }
+};
+byId("copy-file").onclick = async () => { if (!currentFile) return; try { await navigator.clipboard.writeText(byId("file-editor").value); toast("File copied"); } catch { toast("Select the file text and copy it with your keyboard."); } };
+byId("new-session").onclick = async () => {
+  if (native || working || repositoryBusy) return;
+  if (currentFile && byId("file-editor").value !== originalFile) { toast("Save or discard your file edits first."); return; }
+  try { await api("/api/session/reset",{}); byId("messages").textContent = ""; byId("chat-empty").hidden = false; byId("thinking").textContent = ""; byId("coding").textContent = ""; byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Model reasoning will stream here. Some responses do not emit separate reasoning."; byId("prompt").focus(); } catch (error) { toast(error.message); }
+};
+byId("local-project").onclick = () => { if (native) return; if (lastRepository) byId("github-disconnect").click(); else void refreshFiles(); };
+byId("prompt").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!byId("send").disabled) byId("question").requestSubmit(); } });
+byId("prompt").addEventListener("input", () => { byId("prompt").style.height = "auto"; byId("prompt").style.height = Math.min(230,byId("prompt").scrollHeight) + "px"; });
+document.addEventListener("keydown", event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") { event.preventDefault(); byId("new-session").click(); } });
+for (const button of document.querySelectorAll("[data-prompt]")) button.onclick = () => { byId("prompt").value = button.dataset.prompt; byId("prompt").focus(); };
+if (native) {
+  byId("new-session").disabled = true;
+  for (const id of ["github-connect","github-resume","github-review","github-disconnect","github-refresh","github-publish"]) byId(id).disabled = true;
+  byId("github-result").textContent = "Open the workspace first, then connect your repository here.";
+} else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; }
+
+const shortcutHint = document.querySelector("#new-session kbd"); if (shortcutHint) shortcutHint.textContent = /Mac/.test(navigator.platform) ? "⌘ N" : "Ctrl N";
+
+window.addEventListener("beforeunload", event => { if (hasUnsavedFile()) { event.preventDefault(); event.returnValue = ""; } });
+document.addEventListener("click", event => { if (document.body.classList.contains("sidebar-open") && !event.target.closest(".sidebar") && !event.target.closest("#sidebar-toggle")) document.body.classList.remove("sidebar-open"); });
