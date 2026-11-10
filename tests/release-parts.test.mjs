@@ -18,7 +18,7 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     const run = async () => {
       const result = process.platform === "win32" ? execute(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `\"\"${join(output, helper)}\"\"`], { windowsVerbatimArguments: true, timeout: 10000 }) : execute(join(output, helper), [], { timeout: 10000 });
       if (process.platform === "win32") { result.child.stdin.end("\r\n"); }
-      return result;
+      return result.catch(error => { console.error("Join diagnostic", error.stdout, error.stderr); throw error; });
     };
     await writeFile(join(output, record.parts[0].name), "tampered"); await expect(run()).rejects.toThrow();
     await expect(readFile(join(output, record.name))).rejects.toThrow();
