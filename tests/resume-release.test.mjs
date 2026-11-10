@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { archiveName, recordFromHelper, releasePlatforms } from "../scripts/resume-release.mjs";
 import { joinHelper } from "../scripts/release-parts.mjs";
 const a = "a".repeat(64), b = "b".repeat(64), whole = "f".repeat(64);
@@ -37,4 +38,25 @@ it.each([
   let calls = 0;
   await expect(completedReleasePlatforms("owner/repo", "desktop-123", "source", "/unused", async () => { calls++; return JSON.stringify(view); })).rejects.toThrow("Refusing to resume");
   expect(calls).toBe(1);
+});
+
+it("finds completed uploads from the dedicated asset endpoint when the release summary is stale", async () => {
+  const { completedReleasePlatforms, helperName } = await import("../scripts/resume-release.mjs");
+  const temporary = await mkdtemp(join(tmpdir(), "stick-fresh-assets-"));
+  try {
+    const record = fixture("windows-x64"), helper = await joinHelper(record, temporary, "windows-x64");
+    const helperBytes = await readFile(join(temporary, helper));
+    const metadata = [...assets(record), { id: 123, size: helperBytes.length, name: helperName("windows-x64"), state: "uploaded", digest: `sha256:${createHash("sha256").update(helperBytes).digest("hex")}` }];
+    const apiUrl = "https://api.github.com/repos/owner/repo/releases/123";
+    const gh = async (...args) => {
+      if (args[0] === "release" && args[1] === "view") { return JSON.stringify({ isDraft: true, targetCommitish: "source", apiUrl, assets: [] }); }
+      if (args[0] === "api" && args[1] === apiUrl + "/assets?per_page=100") { return JSON.stringify(metadata); }
+      if (args[0] === "release" && args[1] === "download") {
+        const output = args[args.indexOf("--dir") + 1]; await copyFile(join(temporary, helper), join(output, helper)); return "";
+      }
+      throw new Error(`Unexpected request: ${args.join(" ")}`);
+    };
+    const completed = await completedReleasePlatforms("owner/repo", "desktop-123", "source", temporary, gh, async (_repo, _asset, path) => copyFile(join(temporary, helper), path));
+    expect([...completed.keys()]).toEqual(["windows-x64"]); expect(completed.get("windows-x64")).toEqual(record);
+  } finally { await rm(temporary, { recursive: true, force: true }); }
 });
