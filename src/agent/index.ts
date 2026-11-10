@@ -16,6 +16,7 @@ export async function runAgent(options: {
   model: Model;
   tools: Pick<Tools, "execute">;
   maxSteps: number;
+  activity?: (event: { step: number; phase: "start" | "finish"; tool: string; path?: string; detail?: string; result?: string }) => void;
   specialist?: Specialist;
   context?: { source: ContextSource; maxBytes?: number };
   signal: AbortSignal;
@@ -44,6 +45,9 @@ export async function runAgent(options: {
     if (parsed.step.kind === "error") { result = `Error: ${parsed.step.error}`; log(result); }
     else {
       const call = parsed.step.call;
+      let argumentsView: Record<string, unknown> = {}; try { argumentsView = JSON.parse(call.function.arguments); } catch {}
+      const activity = { step, tool: call.function.name, ...(typeof argumentsView.path === "string" ? { path: argumentsView.path.slice(0, 2000) } : {}), ...(typeof argumentsView.query === "string" ? { detail: argumentsView.query.slice(0, 500) } : typeof argumentsView.task === "string" ? { detail: argumentsView.task.slice(0, 500) } : {}) };
+      options.activity?.({ ...activity, phase: "start" });
       log(`→ ${call.function.name} ${call.function.arguments}`);
       try {
         signal.throwIfAborted();
@@ -54,6 +58,7 @@ export async function runAgent(options: {
         }
       }
       catch (error) { result = `Error: ${errorText(error)}`; }
+      options.activity?.({ ...activity, phase: "finish", result: result.slice(0, 2000) });
     }
     if (result.length > 32768) { result = result.slice(0, 32720) + "\n[tool result truncated at 32 KiB]"; }
     log(`← ${result}`);
