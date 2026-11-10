@@ -1,0 +1,45 @@
+name: Qualify real Max runtime
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful main desktop build to qualify
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  max:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Prepare room for the real Max model
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/share/swift /usr/local/share/powershell /usr/lib/jvm /opt/hostedtoolcache/Python /opt/hostedtoolcache/PyPy /opt/hostedtoolcache/Ruby
+          sudo fallocate -l 4G /tmp/stick-max-ci.swap
+          sudo chmod 600 /tmp/stick-max-ci.swap
+          sudo mkswap /tmp/stick-max-ci.swap
+          if ! sudo swapon /tmp/stick-max-ci.swap; then sudo rm -f /tmp/stick-max-ci.swap; fi
+          free -h
+          df -h /
+      - name: Verify and run real Max through the app runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+        run: node scripts/qualify-max.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-max-qualification
+          path: release-assets/max-smoke.*
+          if-no-files-found: ignore
+          retention-days: 1
