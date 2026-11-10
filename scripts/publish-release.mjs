@@ -7,7 +7,8 @@ import { successfulDesktopBuild } from "./release-build.mjs";
 import { publishAppUpdate } from "./publish-app-update.mjs";
 import { fetchMaxForRelease, assembleFullRelease } from "./assemble-full-release.mjs";
 import { completedReleasePlatforms } from "./resume-release.mjs";
-import { splitArchive, joinHelper } from "./release-parts.mjs";
+import { joinHelper } from "./release-parts.mjs";
+import { uploadSplitArchive } from "./upload-release-parts.mjs";
 const exec = promisify(execFile);
 const repo = process.env.GITHUB_REPOSITORY; const runId = process.env.BUILD_RUN;
 if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo ?? "") || !/^\d+$/.test(runId ?? "")) { throw new Error("Missing release repository or run ID"); }
@@ -37,9 +38,8 @@ try {
       await gh("run", "download", runId, "--repo", repo, "--name", artifact.name, "--dir", folder);
       const files = await readdir(folder); if (files.length !== 1) { throw new Error("Unexpected package artifact contents"); }
       const input = await assembleFullRelease(join(folder, files[0]), folder, platform, maxPath); const partsFolder = join(folder, "parts");
-      const record = await splitArchive(input, partsFolder, 2000 * 1024 ** 2, async (_part, path) => {
-        await gh("release", "upload", tag, path, "--repo", repo, "--clobber");
-        await rm(path);
+      const record = await uploadSplitArchive(input, partsFolder, async (paths) => {
+        await gh("release", "upload", tag, ...paths, "--repo", repo, "--clobber");
       }); records.push(record);
       const helper = await joinHelper(record, partsFolder, platform);
       let helperAsset = helper;
