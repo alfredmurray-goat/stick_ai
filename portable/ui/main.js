@@ -141,7 +141,7 @@ async function update() {
       if (event.kind === "user") { beginTurn(event.text); }
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
-      if (event.kind === "project") { clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
+      if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
       if (event.kind === "tool") { renderTool(event.data); }
       if (event.kind === "task-complete") { byId("thinking-empty").textContent = byId("thinking").textContent ? "" : "This response did not emit separate reasoning. See the tool activity below."; void refreshFiles(); }
       if (event.kind === "file-saved") { void refreshFiles(); }
@@ -297,6 +297,8 @@ if (!native) void savedRepositories();
 const toolCards = new Map();
 let filesLoaded = false;
 let filesLoading = false;
+let projectEpoch = 0;
+let fileRequest = 0;
 let currentFile = "";
 let originalFile = "";
 let savingFile = false;
@@ -351,19 +353,20 @@ async function fileEntries(parent,path) {
   if (result.truncated) { const note = document.createElement("p"); note.className = "empty-files"; note.textContent = "Showing the first 1,000 entries."; parent.append(note); }
 }
 async function refreshFiles() {
-  if (native || filesLoading) return; filesLoading = true;
-  try { const tree = document.createElement("div"); await fileEntries(tree,""); byId("file-tree").replaceChildren(tree); filesLoaded = true; }
+  if (native || filesLoading) return; filesLoading = true; const epoch = projectEpoch;
+  try { const tree = document.createElement("div"); await fileEntries(tree,""); if (epoch === projectEpoch) { byId("file-tree").replaceChildren(tree); filesLoaded = true; } }
   catch (error) { byId("file-tree").textContent = "Files are temporarily unavailable. Refresh to try again."; }
-  finally { filesLoading = false; }
+  finally { filesLoading = false; if (epoch !== projectEpoch) void refreshFiles(); }
 }
 byId("refresh-files").onclick = refreshFiles;
 function hasUnsavedFile() { return Boolean(currentFile && byId("file-editor").value !== originalFile); }
 async function reloadCurrentFile(path) { if (!currentFile || path?.replace(/^\.\//, "") !== currentFile || hasUnsavedFile() || savingFile) return; const selected = currentFile; try { const value = await api(`/api/file?path=${encodeURIComponent(selected)}`); if (currentFile === selected && !hasUnsavedFile()) { originalFile = value.content; byId("file-editor").value = value.content; byId("file-status").textContent = "Updated by Stellan"; updateEditorState(); } } catch {} }
 function updateEditorState() { const dirty = currentFile && byId("file-editor").value !== originalFile; byId("save-file").disabled = !dirty || savingFile || working || repositoryBusy; byId("discard-file").disabled = !dirty || savingFile; if (dirty && !savingFile) byId("file-status").textContent = "Unsaved changes"; }
-function clearEditor() { currentFile = ""; originalFile = ""; byId("file-title").textContent = "No file selected"; byId("file-editor").value = ""; byId("file-editor").disabled = true; byId("file-status").textContent = "Choose a project file."; updateEditorState(); }
+function clearEditor() { fileRequest++; currentFile = ""; originalFile = ""; byId("file-title").textContent = "No file selected"; byId("file-editor").value = ""; byId("file-editor").disabled = true; byId("file-status").textContent = "Choose a project file."; updateEditorState(); }
 async function openFile(path) {
   if (currentFile && byId("file-editor").value !== originalFile) { toast("Save or discard your file edits before opening another file."); return; }
-  try { const result = await api(`/api/file?path=${encodeURIComponent(path)}`); currentFile = result.path; originalFile = result.content; byId("file-title").textContent = path; byId("file-title").title = path; byId("file-editor").value = result.content; byId("file-editor").disabled = false; byId("file-editor").readOnly = working; byId("file-status").textContent = "Saved on this stick"; updateEditorState(); inspectorTab(true); document.body.classList.remove("sidebar-open"); }
+  const requestId = ++fileRequest, epoch = projectEpoch;
+  try { const result = await api(`/api/file?path=${encodeURIComponent(path)}`); if (requestId !== fileRequest || epoch !== projectEpoch) return; if (hasUnsavedFile()) { toast("Your unsaved edits were kept. Save or discard them before switching files."); return; } currentFile = result.path; originalFile = result.content; byId("file-title").textContent = path; byId("file-title").title = path; byId("file-editor").value = result.content; byId("file-editor").disabled = false; byId("file-editor").readOnly = working; byId("file-status").textContent = "Saved on this stick"; updateEditorState(); inspectorTab(true); document.body.classList.remove("sidebar-open"); }
   catch (error) { toast("Could not open this file. Text files under 1 MiB are supported."); }
 }
 byId("file-editor").oninput = updateEditorState;
