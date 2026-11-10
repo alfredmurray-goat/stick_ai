@@ -12,6 +12,7 @@ on:
       - 'scripts/build-app-update.ts'
       - 'scripts/fetch-platform-assets.mjs'
       - 'scripts/smoke*.mjs'
+      - 'scripts/extension-smoke.mjs'
       - '.github/workflows/desktop*.yml'
   workflow_dispatch:
 permissions:

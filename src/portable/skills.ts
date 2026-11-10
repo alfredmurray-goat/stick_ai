@@ -59,6 +59,6 @@ export class Skills {
  async readSkill(name:string,resource:string,manual=new Set<string>()){
   await this.scan();const s=this.find(name);if(!this.enabled(s))throw new SkillError('The skill is disabled or changed. Review and enable it in settings.');if(!s.modelInvocable&&!manual.has(s.id))throw new SkillError('This skill requires an explicit /skill invocation by the user.');
   if(resource){if(!s.root)throw new SkillError('Built-in skills have no supporting files.');const box=await Sandbox.create(s.root);const path=await box.path(resource);const text=await this.read(path);return text.slice(0,16000)+(text.length>16000?'\n[Supporting file preview shortened.]':'');}
-  return `Skill: ${s.name}\n${s.body.slice(0,16000)}${s.body.length>16000?'\n[Instructions shortened; split large skills into smaller supporting files.]':''}${s.root?'\nRead supporting skill files with use_skill using the same name and a project-relative resource path.':''}`;
+  return `Skill: ${s.name}\n${s.body.slice(0,16000)}${s.body.length>16000?'\n[Instructions shortened; split large skills into smaller supporting files.]':''}${s.root?'\nRead supporting skill files with use_skill using the same name and a skill-relative resource path.':''}`;
  }
 }
