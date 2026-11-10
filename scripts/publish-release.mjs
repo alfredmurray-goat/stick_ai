@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { successfulDesktopBuild } from "./release-build.mjs";
 import { publishAppUpdate } from "./publish-app-update.mjs";
 import { fetchMaxForRelease, assembleFullRelease } from "./assemble-full-release.mjs";
+import { completedReleasePlatforms } from "./resume-release.mjs";
 import { splitArchive, joinHelper } from "./release-parts.mjs";
 const exec = promisify(execFile);
 const repo = process.env.GITHUB_REPOSITORY; const runId = process.env.BUILD_RUN;
@@ -26,9 +27,11 @@ try {
   else {
     await publishAppUpdate({ repo, runId, source: run.head_sha, artifacts, platforms, temporary, signingKey: process.env.STICK_UPDATE_SIGNING_KEY, gh });
     if (!existing) { await gh("release", "create", tag, "--repo", repo, "--target", run.head_sha, "--title", "Stick AI — Lite + Max, all desktops", "--draft", "--prerelease", "--notes-file", notes); }
-    const maxPath = await fetchMaxForRelease(join(temporary, "shared-models"));
+    const completed = existing ? await completedReleasePlatforms(repo, tag, run.head_sha, temporary, gh) : new Map();
+    const maxPath = selected.some(({ platform }) => !completed.has(platform)) ? await fetchMaxForRelease(join(temporary, "shared-models")) : undefined;
     const records = [];
     for (const { platform, artifact } of selected) {
+      if (completed.has(platform)) { records.push(completed.get(platform)); continue; }
       const folder = join(temporary, platform);
       console.log(`Preparing permanent release assets for ${platform}`);
       await gh("run", "download", runId, "--repo", repo, "--name", artifact.name, "--dir", folder);
