@@ -1,0 +1,37 @@
+name: Publish Mac DMGs
+on:
+  workflow_dispatch:
+    inputs:
+      packaging_run:
+        description: Successful native Mac DMG build run ID
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["Build native Mac DMGs"]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: macos-dmg-release-${{ github.event.workflow_run.id || inputs.packaging_run }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Publish the checked native disk images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGING_RUN: ${{ github.event.workflow_run.id || inputs.packaging_run }}
+        run: node scripts/publish-macos-dmg.mjs

@@ -42,3 +42,16 @@ it("uploads and removes each finished part before writing the next, bounding pub
     expect(uploaded).toHaveLength(record.parts.length); expect(Buffer.concat(uploaded)).toEqual(content);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+it('supports actual DMG images without wrapping them in a ZIP', async () => {
+  const root=await mkdtemp(join(tmpdir(),'stick-dmg-parts-'));
+  try {
+    const input=join(root,'stick_ai-macos-x64-lite-picker.dmg');
+    await writeFile(input,Buffer.from('native disk image fixture'));
+    const record=await splitArchive(input,join(root,'parts'),8);
+    expect(record.name).toBe('stick_ai-macos-x64-lite-picker.dmg');
+    expect(record.parts[0].name).toBe('stick_ai-macos-x64-lite-picker.dmg.part01');
+    const helper=await joinHelper(record,join(root,'parts'),'macos-x64');
+    expect(helper).toBe('Join-stick_ai-macos-x64-lite-picker.command');
+  } finally { await rm(root,{recursive:true,force:true}); }
+});
