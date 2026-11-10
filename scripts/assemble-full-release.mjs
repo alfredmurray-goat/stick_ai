@@ -11,7 +11,7 @@ export async function fetchMaxForRelease(directory) {
   const file = await open(temporary, "wx", 0o600); await file.close();
   try {
     console.log("Downloading the pinned Max GGUF once for all four complete packages");
-    await exec("curl", ["--fail", "--location", "--silent", "--show-error", "--retry", "3", "--retry-all-errors", "--connect-timeout", "30", "--speed-limit", "1024", "--speed-time", "120", "--max-time", "1200", "--output", temporary, "--", maxRelease.url], { maxBuffer: 1000000 });
+    await exec("curl", ["--fail", "--location", "--silent", "--show-error", "--retry", "3", "--retry-all-errors", "--connect-timeout", "30", "--speed-limit", "1024", "--speed-time", "120", "--output", temporary, "--", maxRelease.url], { maxBuffer: 1000000 });
     const hash = createHash("sha256"); let size = 0;
     for await (const bytes of createReadStream(temporary)) { hash.update(bytes); size += bytes.length; }
     if (size !== bundledMax.size || hash.digest("hex") !== bundledMax.sha256) { throw new Error("Max model integrity check failed"); }
