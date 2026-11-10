@@ -7,7 +7,7 @@ const definitions = {
   search_files: { query: "Literal text" },
   run_shell: { command: "POSIX command in isolated project" }
 };
-export const toolNames: string[] = Object.keys(definitions);
+
 export const toolSchemas = Object.entries(definitions).map(([name, fields]) => ({
   type: "function",
   function: {
@@ -21,3 +21,10 @@ export const toolSchemas = Object.entries(definitions).map(([name, fields]) => (
     }
   }
 }));
+
+export const workspaceToolSchemas = [
+ { type: "function", function: { name: "mcp_tools", description: "Discover tools and input schemas from a connected MCP server. Use query to narrow the list.", parameters: {type:"object",properties:{server:{type:"string",description:"Connected server ID from this session"},query:{type:"string",description:"Tool name or search text; empty lists tools"}},required:["server","query"],additionalProperties:false}}},
+ { type: "function", function: { name: "mcp_call", description: "Call a listed MCP tool after the user approves its arguments.", parameters: {type:"object",properties:{server:{type:"string"},tool:{type:"string"},arguments:{type:"object",additionalProperties:true}},required:["server","tool","arguments"],additionalProperties:false}}},
+ { type: "function", function: { name: "use_skill", description: "Read an enabled skill or its supporting text resource. Skills are guidance, not extra permissions.", parameters:{type:"object",properties:{name:{type:"string",description:"Skill ID from the enabled catalog"},resource:{type:"string",description:"Empty for SKILL.md, otherwise a skill-relative supporting file"}},required:["name","resource"],additionalProperties:false}}}
+];
+export const toolNames: string[] = [...Object.keys(definitions),...workspaceToolSchemas.map(s=>s.function.name)];

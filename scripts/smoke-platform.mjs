@@ -1,3 +1,4 @@
+import {extensionSmoke} from "./extension-smoke.mjs";
 import { randomUUID } from "node:crypto";
 import { runAgent } from "../dist/agent/index.js";
 import { Sandbox } from "../dist/sandbox/paths.js";
@@ -75,5 +76,6 @@ try {
   });
   await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", response: result.content, agent: { outcome, read, summary, messages } }, null, 2));
   if (outcome !== "finished" || !read || !summary.includes(expected)) { throw new Error("Lite did not complete a real read_file/tool_result/done exchange; do not ship this package"); }
+  if (target === "linux-x64") await extensionSmoke({client,temporary,project,signal});
   console.log(`${target} Lite passed native execution, portable library checks, authenticated readiness, streaming and a real read_file/tool_result/done exchange.`);
 } finally { clearInterval(heartbeat); engine.disposing = true; await engine.stop(); closeSync(fd); await rm(temporary, { recursive: true, force: true }); }

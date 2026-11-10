@@ -1,0 +1,44 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {mkdtemp,mkdir,writeFile,readFile,rm,copyFile,symlink} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {createServer} from 'node:http';
+import {build} from 'esbuild';
+import {Skills,parseSkill} from '../src/portable/skills.js';
+import {McpServers,mcpFetch} from '../src/portable/mcp.js';
+import {McpRpc} from '../src/portable/mcp-rpc.js';
+import {LATEST_PROTOCOL_VERSION,type JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
+import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+import {targetFor,executableName} from '../src/portable/platform.js';
+afterEach(()=>vi.useRealTimers());
+async function fixture(){const root=await mkdtemp(join(tmpdir(),'stick-extensions-'));const project=join(root,'app/project');await mkdir(project,{recursive:true});return {root,project,close:()=>rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100})};}
+it('reviews discovered skill packs, detects changes, preserves slash arguments and restricts supporting paths',async()=>{
+ const f=await fixture();try{
+  const folder=join(f.project,'.claude/skills/project-review');await mkdir(folder,{recursive:true});const path=join(folder,'SKILL.md');await writeFile(path,'---\nname: project-review\ndescription: Review our conventions\ndisable-model-invocation: true\n---\nRead references.md. Task: $ARGUMENTS');await writeFile(join(folder,'references.md'),'Use our naming conventions');
+  const skills=new Skills(f.root,f.project);await skills.load();const found=skills.view().find(s=>s.name==='project-review')!;expect(found.enabled).toBe(false);expect(skills.modelCatalog().some(s=>s.name===found.id)).toBe(false);await expect(skills.prepare('/project-review files')).rejects.toThrow(/enable/);
+  await skills.enable(found.id,true,found.digest);await expect(skills.readSkill(found.id,'')).rejects.toThrow(/explicit/);const prepared=await skills.prepare('/project-review $& $` $\'');expect(prepared.instructions).toContain("Task: $& $` $'");expect(await skills.readSkill(found.id,'references.md',new Set(prepared.active))).toContain('naming conventions');await expect(skills.readSkill(found.id,'../../outside',new Set(prepared.active))).rejects.toThrow();
+  if(process.platform!=='win32'){await symlink(join(f.root,'logs'),join(folder,'escape'));await expect(skills.readSkill(found.id,'escape/skills.json',new Set(prepared.active))).rejects.toThrow();}
+  await writeFile(path,'---\nname: project-review\ndescription: Changed\n---\nChanged guidance');await skills.scan();expect(skills.view().find(s=>s.id===found.id)).toMatchObject({enabled:false,changed:true});await expect(skills.enable(found.id,true,found.digest)).rejects.toThrow(/changed/);
+  const id=await skills.save('my-check','Check a task','Read the files and report evidence.');expect((await skills.prepare('/my-check inspect')).active).toEqual([id]);const reloaded=new Skills(f.root,f.project);await reloaded.load();expect(reloaded.view().find(s=>s.id===id)?.enabled).toBe(true);
+  expect(()=>parseSkill('---\nname: x\ndescription: &a hi\nx: *a\n---\nBody','x')).toThrow();
+ }finally{await f.close();}
+});
+it('does not impose a deadline on MCP requests and supports explicit cancellation',async()=>{
+ let sent:JSONRPCMessage|undefined;const transport:Transport={start:async()=>{},send:async message=>{sent=message;},close:vi.fn(async()=>{})};const rpc=new McpRpc(transport);const controller=new AbortController();vi.useFakeTimers();const promise=rpc.request('tools/call',{name:'long-job'},controller.signal);await vi.advanceTimersByTimeAsync(24*60*60*1000);expect(rpc.closed).toBe(false);expect(sent&&'id'in sent).toBe(true);controller.abort();await expect(promise).rejects.toThrow();expect(transport.close).toHaveBeenCalledOnce();vi.useRealTimers();
+});
+it('connects to Streamable HTTP, keeps credentials session-only, asks approval and redacts secret results',async()=>{
+ const f=await fixture();let calls=0;const requests:Record<string,unknown>[]=[];const server=createServer(async(req,res)=>{let body='';for await(const chunk of req)body+=chunk;expect(req.headers.authorization).toBe('Bearer fixture-secret');if(req.method==='GET'){res.writeHead(405);res.end();return;}if(req.method==='DELETE'){res.end();return;}const message=JSON.parse(body);requests.push(message);if(!('id'in message)){res.writeHead(202);res.end();return;}const result=message.method==='initialize'?{protocolVersion:LATEST_PROTOCOL_VERSION,capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}:message.method==='tools/list'?{tools:[{name:'echo',description:'Echo text',inputSchema:{type:'object',properties:{text:{type:'string'}}}}]}:(calls++,{content:[{type:'text',text:'fixture-secret '+message.params.arguments.text}]});res.writeHead(200,{'Content-Type':'application/json','Mcp-Session-Id':'fixture'});res.end(JSON.stringify({jsonrpc:'2.0',id:message.id,result}));});await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address() as {port:number};const mcp=new McpServers(f.root,f.project);
+ try{await mcp.load();const id=await mcp.add({name:'Fixture',transport:'http',url:`http://127.0.0.1:${address.port}/mcp`,headers:{Authorization:'Bearer fixture-secret'}});expect(await readFile(join(f.root,'logs/extensions/mcp.json'),'utf8')).not.toContain('secret');expect(mcp.catalog()).toEqual([]);const signal=new AbortController().signal;await mcp.connect(id,signal);expect(mcp.catalog()).toEqual([{id,name:'Fixture',tools:1}]);expect(await mcp.tools(id,'echo',signal)).toContain('inputSchema');expect(await mcp.call(id,'echo',{text:'hello'},signal,async()=>false)).toBe('Denied by user');expect(calls).toBe(0);const approve=vi.fn(async()=>true);expect(await mcp.call(id,'echo',{text:'hello'},signal,approve)).toBe('[redacted] hello');expect(approve).toHaveBeenCalledWith('Fixture · echo',{text:'hello'},signal);expect(calls).toBe(1);await expect(mcp.call(id,'invented',{},signal,approve)).rejects.toThrow(/listed/);const reloaded=new McpServers(f.root,f.project);await reloaded.load();expect(reloaded.view()[0]).toMatchObject({status:'disconnected',hasSessionSecrets:false});expect(requests.some(r=>r.method==='notifications/initialized')).toBe(true);
+ }finally{await mcp.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await f.close();}
+});
+it('runs a real stdio MCP program through the packaged bridge and disconnects on project changes',async()=>{
+ const f=await fixture();const mcp=new McpServers(f.root,f.project);try{
+  const target=targetFor(process.platform,process.arch),bin=join(f.root,'bin',target);await mkdir(bin,{recursive:true});await copyFile(process.execPath,join(bin,executableName(target,true)));
+  await build({entryPoints:[resolve('src/portable/mcp-stdio-entry.ts')],outfile:join(f.root,'app/stick-mcp.cjs'),bundle:true,platform:'node',format:'cjs',target:'node24',logLevel:'silent'});
+  const script=join(f.project,'server.cjs');await writeFile(script,`const rl=require('node:readline').createInterface({input:process.stdin});rl.on('line',line=>{const m=JSON.parse(line);if(!('id'in m))return;const result=m.method==='initialize'?{protocolVersion:'${LATEST_PROTOCOL_VERSION}',capabilities:{tools:{}},serverInfo:{name:'stdio',version:'1'}}:m.method==='tools/list'?{tools:[{name:'echo',inputSchema:{type:'object'}}]}:{content:[{type:'text',text:process.env.FIXTURE_SECRET+' '+m.params.arguments.text}]};console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));});`);
+  const id=await mcp.add({name:'Local fixture',transport:'stdio',command:'node',args:['${project}/server.cjs'],env:{FIXTURE_SECRET:'hidden-value'}});const signal=new AbortController().signal;await mcp.connect(id,signal);expect(await mcp.call(id,'echo',{text:'ok'},signal,async()=>true)).toBe('[redacted] ok');expect(mcp.view()[0].status).toBe('connected');await mcp.setProject(f.root);expect(mcp.view()[0].status).toBe('disconnected');expect(await readFile(join(f.root,'logs/extensions/mcp.json'),'utf8')).not.toContain('hidden-value');
+ }finally{await mcp.close();await f.close();}
+},30000);
+it('rejects cross-origin credential forwarding and bounds remote JSON and SSE messages',async()=>{
+ const fetcher=vi.fn(async()=>new Response('ok'));await expect(mcpFetch('https://example.com',fetcher)('https://elsewhere.test')).rejects.toThrow(/another origin/);expect(fetcher).not.toHaveBeenCalled();const wrapped=mcpFetch('https://example.com',vi.fn(async()=>new Response('x'.repeat(4*1024**2+1),{headers:{'Content-Type':'application/json'}})));const result=await wrapped('https://example.com');await expect(result.text()).rejects.toThrow(/4 MiB/);const small=await mcpFetch('https://example.com',vi.fn(async()=>new Response('data: hello\r\n\r\ndata: world\r\n\r\n',{headers:{'Content-Type':'text/event-stream'}})))('https://example.com');expect(await small.text()).toContain('world');
+});

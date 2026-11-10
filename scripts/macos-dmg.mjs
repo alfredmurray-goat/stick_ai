@@ -4,7 +4,7 @@ import { readFile, writeFile, rm, rename, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { bundledMax } from "../src/portable/max-release.ts";
 const exec = promisify(execFile);
-import { imageCommand } from "./macos-image-command.mjs";
+import { imageCommand, verifyMountedImage } from "./macos-image-command.mjs";
 export async function prepareDmgModels(root, variant, maxPath, expectedMax = bundledMax) {
   if (!["full", "lite-picker"].includes(variant)) { throw new Error("Unknown DMG variant"); }
   const path = join(root, "manifest.json"), manifest = JSON.parse(await readFile(path, "utf8"));
@@ -32,15 +32,7 @@ export async function createMacDiskImage({ staging, temporary, output, verifyMou
   await imageCommand(["convert", raw, "-format", "UDZO", "-imagekey", "zlib-level=1", "-ov", "-o", compressed]);
   await rm(raw);
   await exec("hdiutil", ["verify", compressed], { maxBuffer: 4000000 });
-  await mkdir(mount); let attached = false;
-  try {
-    await imageCommand(["attach", "-readonly", "-nobrowse", "-mountpoint", mount, compressed]); attached = true;
-    await verifyMounted(join(mount, "Stick AI"));
-  } finally {
-    if (attached) {
-      try { await exec("hdiutil", ["detach", mount]); }
-      catch { await exec("hdiutil", ["detach", "-force", mount]); }
-    }
-  }
+  await mkdir(mount);
+  await verifyMountedImage({image:compressed,mount,verifyMounted:()=>verifyMounted(join(mount,"Stick AI"))});
   await rename(compressed, output);
 }

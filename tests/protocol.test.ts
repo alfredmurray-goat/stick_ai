@@ -100,3 +100,9 @@ it("returns an error result and recovers when malformed JSON reaches a model tok
   expect(options.messages[2]?.content).toMatch(/^<tool_result>Error:/);
   expect(options.tools.execute).not.toHaveBeenCalled();
 });
+
+it('recovers when Lite mistakenly wraps a tool request in done without executing it',async()=>{
+ const options=setup(['<done>{"name":"read_file","arguments":{"path":"note.txt"}}</done>',tagged('read_file'),'<done>Read the file.</done>']);
+ expect(await runAgent(options)).toBe('finished');expect(options.tools.execute).toHaveBeenCalledOnce();expect(options.messages[2]?.content).toContain('did not execute');
+ expect(parseStep('<done>{"answer":42}</done>').step.kind).toBe('done');
+});
