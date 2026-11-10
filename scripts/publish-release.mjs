@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { successfulDesktopBuild } from "./release-build.mjs";
 import { publishAppUpdate } from "./publish-app-update.mjs";
 import { fetchMaxForRelease, assembleFullRelease } from "./assemble-full-release.mjs";
 import { splitArchive, joinHelper } from "./release-parts.mjs";
@@ -10,8 +11,7 @@ const exec = promisify(execFile);
 const repo = process.env.GITHUB_REPOSITORY; const runId = process.env.BUILD_RUN;
 if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo ?? "") || !/^\d+$/.test(runId ?? "")) { throw new Error("Missing release repository or run ID"); }
 async function gh(...args) { const result = await exec("gh", args, { maxBuffer: 4000000 }); return result.stdout; }
-const run = JSON.parse(await gh("api", `repos/${repo}/actions/runs/${runId}`));
-if (run.conclusion !== "success" || run.head_branch !== "main" || run.path !== ".github/workflows/desktop.yml" || run.head_repository.full_name !== repo || !["push", "workflow_dispatch"].includes(run.event)) { throw new Error("Only successful trusted main desktop builds can be released"); }
+const run = await successfulDesktopBuild(repo, runId, gh);
 const artifacts = JSON.parse(await gh("api", `repos/${repo}/actions/runs/${runId}/artifacts?per_page=100`)).artifacts;
 const platforms = ["macos-arm64", "macos-x64", "windows-x64", "linux-x64"];
 const selected = platforms.map((platform) => { const artifact = artifacts.find((item) => item.name === `stick_ai-base-${platform}` && !item.expired); if (!artifact) { throw new Error(`Missing complete ${platform} build`); } return { platform, artifact }; });
