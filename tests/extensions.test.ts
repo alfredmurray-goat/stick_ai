@@ -11,7 +11,7 @@ import {LATEST_PROTOCOL_VERSION,type JSONRPCMessage} from '@modelcontextprotocol
 import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 import {targetFor,executableName} from '../src/portable/platform.js';
 afterEach(()=>vi.useRealTimers());
-async function fixture(){const root=await mkdtemp(join(tmpdir(),'stick-extensions-'));const project=join(root,'app/project');await mkdir(project,{recursive:true});return {root,project,close:()=>rm(root,{recursive:true,force:true})};}
+async function fixture(){const root=await mkdtemp(join(tmpdir(),'stick-extensions-'));const project=join(root,'app/project');await mkdir(project,{recursive:true});return {root,project,close:()=>rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100})};}
 it('reviews discovered skill packs, detects changes, preserves slash arguments and restricts supporting paths',async()=>{
  const f=await fixture();try{
   const folder=join(f.project,'.claude/skills/project-review');await mkdir(folder,{recursive:true});const path=join(folder,'SKILL.md');await writeFile(path,'---\nname: project-review\ndescription: Review our conventions\ndisable-model-invocation: true\n---\nRead references.md. Task: $ARGUMENTS');await writeFile(join(folder,'references.md'),'Use our naming conventions');
