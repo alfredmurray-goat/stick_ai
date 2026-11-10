@@ -10,3 +10,11 @@ export function validateDmgMetadata(data, expected, repo, build) {
   if (data.format !== 1 || data.repository !== repo || data.run !== String(build.id) || data.source !== build.head_sha || data.platform !== expected.platform || data.variant !== expected.variant || data.name !== expected.name || !/^[a-f0-9]{64}$/.test(data.sha256 ?? '') || !Number.isSafeInteger(data.size) || data.size <= models.reduce((n,m)=>n+m.size,0) * .9 || data.size > 22 * 1024 ** 3 || !Array.isArray(data.models) || data.models.length !== models.length || models.some(m=> !data.models.some(v=>v.path===m.path && v.size===m.size && v.sha256===m.sha256)) || !['hdiutil verify','read-only mounted file hashes','native app dry-run','Max file picker helper'].every(check=>data.checks?.includes(check))) { throw new Error('DMG metadata does not match the trusted native build and pinned models'); }
   return data;
 }
+
+export async function dmgReleaseAssets(repo,tag,gh) {
+  // Drafts have no public tag lookup until publication; gh resolves their ID.
+  const info=JSON.parse(await gh('release','view',tag,'--repo',repo,'--json','apiUrl'));
+  const prefix=`https://api.github.com/repos/${repo}/releases/`;
+  if(!info.apiUrl.startsWith(prefix) || !/^\d+$/.test(info.apiUrl.slice(prefix.length)))throw new Error('Invalid draft release identity');
+  return JSON.parse(await gh('api',info.apiUrl+'/assets?per_page=100'));
+}

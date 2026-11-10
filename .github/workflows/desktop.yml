@@ -12,7 +12,7 @@ on:
       - 'scripts/build-app-update.ts'
       - 'scripts/fetch-platform-assets.mjs'
       - 'scripts/smoke*.mjs'
-      - '.github/workflows/desktop*.yml' 
+      - '.github/workflows/desktop*.yml'
   workflow_dispatch:
 permissions:
   contents: read
