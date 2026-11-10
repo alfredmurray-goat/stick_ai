@@ -158,5 +158,6 @@ jobs:
             src-tauri/Cargo.lock
             release-assets/smoke.log
             release-assets/model-smoke.json
+            release-assets/extension-smoke.json
           if-no-files-found: ignore
           retention-days: 1

@@ -26,6 +26,7 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     const launcher = mac ? "Start.command" : target === "windows-x64" ? "Start.bat" : "start.sh";
     expect(await readFile(join(output, launcher), "utf8")).toContain("launcher.cjs");
     expect(manifest.files.some((file) => file.path === "app/stick-update.cjs")).toBe(true);
+    expect(manifest.files.some((file) => file.path === "app/stick-mcp.cjs")).toBe(true);
     const config = JSON.parse(await readFile(join(output, "app/update-config.json"), "utf8"));
     expect(config.target).toBe(target);
     const bundle = join(root, "app-update.gz"); await buildUpdateBundle(output, target, bundle);

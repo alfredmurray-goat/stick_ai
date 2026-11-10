@@ -53,7 +53,18 @@ export function parseStep(content: string): { content: string; step: Step } {
     if (token && text.startsWith(token, index)) {
       index += token.length;
       if (mode === "think") { mode = resume; continue; }
-      if (mode === "done") { return { content: text, step: { kind: "done", summary } }; }
+      if (mode === "done") {
+        // A request accidentally wrapped in <done> has not executed. Feed back the
+        // format error so Lite can issue an actual tool call instead of stopping.
+        let candidate: unknown; try { candidate = JSON.parse(summary); } catch {}
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+          const request = candidate as Record<string, unknown>;
+          if (Object.keys(request).length === 2 && typeof request.name === "string" && toolNames.includes(request.name) && request.arguments && typeof request.arguments === "object" && !Array.isArray(request.arguments)) {
+            return { content: text, step: { kind: "error", error: "A tool request inside <done> did not execute. Send that JSON inside <tool_call>...</tool_call>, wait for <tool_result>, then write a plain-language <done> summary based on the result." } };
+          }
+        }
+        return { content: text, step: { kind: "done", summary } };
+      }
       try {
         const value: unknown = JSON.parse(tool);
         if (!value || typeof value !== "object" || Array.isArray(value)) { throw new Error("Tool call must be a JSON object"); }

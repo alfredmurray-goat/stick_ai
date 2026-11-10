@@ -33,7 +33,8 @@
     "src-tauri",
     "DESKTOP.md",
     "UPDATES.md",
-    "GITHUB_WORKSPACES.md"
+    "GITHUB_WORKSPACES.md",
+    "MCP_SKILLS.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -48,10 +49,14 @@
     "desktop:build": "cargo tauri build"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "cross-spawn": "7.0.6",
     "fflate": "0.8.2",
-    "ignore": "7.0.5"
+    "ignore": "7.0.5",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
     "@types/node": "24.10.1",
     "esbuild": "0.28.2",
     "typescript": "5.9.3",

@@ -14,3 +14,21 @@ export async function imageCommand(args, run=exec, pause=()=>delay(5000)) {
     }
   }
 }
+
+// Detach the device identity returned by attach, since mount paths may disappear
+// during an OS-initiated unmount. Never let cleanup replace a verification error.
+export async function verifyMountedImage({image,mount,verifyMounted,run=exec,attach=imageCommand}) {
+ const {stdout}=await attach(['attach','-readonly','-nobrowse','-mountpoint',mount,image]);
+ const device=stdout.split(/\r?\n/).map(line=>line.trim().split(/\s+/)[0]).find(value=>/^\/dev\/disk\d+$/.test(value));
+ if(!device)throw new Error('hdiutil attach did not report a disk device: '+stdout);
+ let failure;
+ try {await verifyMounted();} catch(error) {failure=error;}
+ try {
+  try {await run('hdiutil',['detach',device]);}
+  catch {await run('hdiutil',['detach','-force',device]);}
+ } catch(cleanupError) {
+  if(failure)console.error('Disk-image cleanup also failed:',cleanupError);
+  else throw cleanupError;
+ }
+ if(failure)throw failure;
+}

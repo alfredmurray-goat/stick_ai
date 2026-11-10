@@ -1,0 +1,20 @@
+import {expect,it,vi} from 'vitest';
+import {cp,mkdtemp,rm} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+import {tmpdir} from 'node:os';
+import {createServer} from 'node:http';
+import {LATEST_PROTOCOL_VERSION} from '@modelcontextprotocol/sdk/types.js';
+import {webApp} from '../src/portable/web.js';
+import {Ollama} from '../src/model/ollama.js';
+import type {ManagedEngine} from '../src/portable/engine.js';
+it('loads slash guidance, discovers MCP tools, waits for approval, and retains resolved events after reload',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'stick-extensions-web-'));await cp(resolve('portable/ui'),join(root,'app/ui'),{recursive:true});let calls=0;
+ const server=createServer(async(req,res)=>{if(req.method==='GET'){res.writeHead(405);res.end();return;}if(req.method==='DELETE'){res.end();return;}let body='';for await(const chunk of req)body+=chunk;const m=JSON.parse(body);if(!('id'in m)){res.writeHead(202);res.end();return;}const result=m.method==='initialize'?{protocolVersion:LATEST_PROTOCOL_VERSION,capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}:m.method==='tools/list'?{tools:[{name:'echo',inputSchema:{type:'object'}}]}:(calls++,{content:[{type:'text',text:'Actual fixture result'}]});res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));});await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
+ const engine={active:null as string|null,baseUrl:'http://127.0.0.1:1',key:'fixture',async start(model:string){this.active=model;}};const app=await webApp({root,engine:engine as unknown as ManagedEngine,bytes:8*1024**3,choices:['stellan-1-lite'],noSwap:false,report:()=>{},log:()=>{},stop:async()=>{}});const url=new URL(app.url);const headers={Authorization:'Bearer '+url.hash.slice(1),Origin:url.origin,'Content-Type':'application/json'};
+ const api=async(path:string,body?:object)=>{const r=await fetch(url.origin+path,{headers,method:body?'POST':'GET',...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};};let mock:ReturnType<typeof vi.spyOn>|undefined;
+ try{
+  expect((await fetch(url.origin+'/api/extensions')).status).toBe(403);const id=(await api('/api/mcp/add',{name:'Fixture',transport:'http',url:`http://127.0.0.1:${(server.address() as {port:number}).port}/mcp`})).data.id;expect((await api('/api/mcp/connect',{id})).status).toBe(200);await api('/api/skills/save',{name:'my-review',description:'Fixture guidance',instructions:'Inspect files before changes. Marker: approved-guidance.'});
+  let step=0;mock=vi.spyOn(Ollama.prototype,'complete').mockImplementation(async(messages)=>{expect(messages[0]?.content).toContain('approved-guidance');expect(messages[0]?.content).toContain('mcp_tools');const content=[`<tool_call>{"name":"mcp_tools","arguments":{"server":"${id}","query":"echo"}}</tool_call>`,`<tool_call>{"name":"mcp_call","arguments":{"server":"${id}","tool":"echo","arguments":{"text":"hello"}}}</tool_call>`,'<done>Used the actual result.</done>'][step++]!;return {content,calls:[]};});
+  await app.start();expect((await api('/api/task',{text:'/my-review inspect'})).status).toBe(202);let approval:{id:string}|undefined;await vi.waitFor(async()=>{approval=(await api('/api/state')).data.events.find((e:{kind:string})=>e.kind==='approval')?.data;expect(approval).toBeDefined();});expect(calls).toBe(0);expect((await api('/api/mcp/remove',{id})).status).toBe(409);await api('/api/approve',{id:approval!.id,allow:true});await vi.waitFor(async()=>expect((await api('/api/state')).data.phase).toBe('ready'));expect(calls).toBe(1);const events=(await api('/api/state')).data.events;expect(events.some((e:{kind:string})=>e.kind==='approval-resolved')).toBe(true);expect(events.some((e:{kind:string;data?:{tool:string;result:string}})=>e.kind==='tool'&&e.data?.tool==='mcp_call'&&e.data.result==='Actual fixture result')).toBe(true);expect(events.some((e:{kind:string})=>e.kind==='skill')).toBe(true);
+ }finally{mock?.mockRestore();await app.close();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
+});

@@ -96,6 +96,9 @@ function beginTurn(text) {
   byId("thoughts").open = true; byId("thoughts").hidden = false; byId("code-preview").hidden = true;
 }
 async function task(text) {
+  if (text.trim() === "/skills") { openSettings("skills"); return; }
+  if (text.trim() === "/mcp") { openSettings("mcp"); return; }
+  if (["/clear","/new"].includes(text.trim())) { byId("new-session").click(); return; }
   if (!text.trim() || working || repositoryBusy || native) { return; }
   if (hasUnsavedFile()) { toast("Save or discard your file edits before starting a task."); return; }
   retryStart = false; lastTask = text; byId("error").hidden = true;
@@ -126,6 +129,7 @@ async function update() {
       return;
     }
     const state = await api(`/api/state?after=${after}`);
+    availableSkills = state.skills || []; for (const server of state.mcp || []) mcpNames.set(server.id, server.name);
     byId("welcome").hidden = !(["choose", "error"].includes(state.phase) && !state.problem);
     byId("loading").hidden = state.phase !== "starting";
     byId("chat").hidden = !["ready", "working"].includes(state.phase);
@@ -149,15 +153,16 @@ async function update() {
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
+      if (event.kind === "skill") { toast("Skill loaded: " + event.data.names.join(", ")); }
       if (event.kind === "tool") { renderTool(event.data); }
       if (event.kind === "task-complete") { byId("thinking-empty").textContent = byId("thinking").textContent ? "" : "This response did not emit separate reasoning. See the tool activity below."; void refreshFiles(); }
       if (event.kind === "file-saved") { void refreshFiles(); }
       if (event.kind === "status") { byId("status").textContent = event.text; }
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
-        const card = document.createElement("article"); card.className = "approval-card"; card.dataset.approval = event.data.id; const title = document.createElement("h3"); title.textContent = `Save changes to ${event.data.file}?`;
+        const card = document.createElement("article"); card.className = "approval-card"; card.dataset.approval = event.data.id; const title = document.createElement("h3"); title.textContent = event.data.kind === "mcp" ? `Allow MCP call: ${event.data.title}?` : `Save changes to ${event.data.file}?`;
         const preview = document.createElement("pre"); preview.textContent = event.data.after; card.append(title, preview); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
-        for (const [label, allow] of [["Allow changes", true], ["Keep my file", false]]) {
+        for (const [label, allow] of [[event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true], [event.data.kind === "mcp" ? "Deny call" : "Keep my file", false]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
@@ -313,8 +318,9 @@ const expandedFolders = new Set();
 function toast(text) { byId("toast").textContent = text; byId("toast").hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { byId("toast").hidden = true; }, 3500); }
 function openSettings(tab = "models") {
   for (const button of document.querySelectorAll("[data-settings]")) button.classList.toggle("active", button.dataset.settings === tab);
-  for (const name of ["models","github","updates"]) byId(`settings-${name}`).hidden = name !== tab;
+  for (const name of ["models","github","mcp","skills","updates"]) byId(`settings-${name}`).hidden = name !== tab;
   byId("github-panel").open = true;
+  if (["mcp","skills"].includes(tab) && !native) void refreshExtensions();
   if (!byId("settings-dialog").open) byId("settings-dialog").showModal();
 }
 byId("open-settings").onclick = () => openSettings("models");
@@ -334,8 +340,8 @@ function renderTool(data) {
   if (!card) {
     if (!toolCards.size) byId("tool-activity").textContent = "";
     card = document.createElement("div"); card.className = "tool-card";
-    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request"})[data.tool] || data.tool;
-    const path = document.createElement("span"); path.className = "tool-path"; path.textContent = data.path || data.detail || "Project workspace";
+    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill"})[data.tool] || data.tool;
+    const path = document.createElement("span"); path.className = "tool-path"; path.textContent = data.path || data.detail || "Project workspace"; for (const [id,name] of mcpNames) path.textContent = path.textContent.replace(id,name);
     card.append(title,path); byId("tool-activity").append(card); toolCards.set(data.step,card); byId("tool-count").textContent = String(toolCards.size);
   }
   if (data.phase === "finish") {
@@ -392,8 +398,8 @@ byId("new-session").onclick = async () => {
   try { await api("/api/session/reset",{}); byId("messages").textContent = ""; byId("chat-empty").hidden = false; byId("thinking").textContent = ""; byId("coding").textContent = ""; byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Model reasoning will stream here. Some responses do not emit separate reasoning."; byId("prompt").focus(); } catch (error) { toast(error.message); }
 };
 byId("local-project").onclick = () => { if (native) return; if (lastRepository) byId("github-disconnect").click(); else void refreshFiles(); };
-byId("prompt").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!byId("send").disabled) byId("question").requestSubmit(); } });
-byId("prompt").addEventListener("input", () => { byId("prompt").style.height = "auto"; byId("prompt").style.height = Math.min(230,byId("prompt").scrollHeight) + "px"; });
+byId("prompt").addEventListener("keydown", event => { if (!byId("skill-menu").hidden && ["ArrowDown","ArrowUp","Enter","Escape"].includes(event.key)) { event.preventDefault(); if (event.key === "Escape") byId("skill-menu").hidden = true; else if (event.key === "Enter") chooseSkillMenu(); else { skillMenuIndex += event.key === "ArrowDown" ? 1 : -1; highlightSkillMenu(); } return; } if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!byId("send").disabled) byId("question").requestSubmit(); } });
+byId("prompt").addEventListener("input", () => { renderSkillMenu(); byId("prompt").style.height = "auto"; byId("prompt").style.height = Math.min(230,byId("prompt").scrollHeight) + "px"; });
 document.addEventListener("keydown", event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") { event.preventDefault(); byId("new-session").click(); } });
 for (const button of document.querySelectorAll("[data-prompt]")) button.onclick = () => { byId("prompt").value = button.dataset.prompt; byId("prompt").focus(); };
 if (native) {
@@ -406,3 +412,69 @@ const shortcutHint = document.querySelector("#new-session kbd"); if (shortcutHin
 
 window.addEventListener("beforeunload", event => { if (hasUnsavedFile()) { event.preventDefault(); event.returnValue = ""; } });
 document.addEventListener("click", event => { if (document.body.classList.contains("sidebar-open") && !event.target.closest(".sidebar") && !event.target.closest("#sidebar-toggle")) document.body.classList.remove("sidebar-open"); });
+
+let availableSkills = [];
+const mcpNames = new Map();
+let extensionBusy = false;
+let skillPreview;
+let skillMenuIndex = 0;
+let skillMenuItems = [];
+byId("open-mcp").onclick = () => openSettings("mcp");
+byId("open-skills").onclick = () => openSettings("skills");
+function jsonField(id, fallback) { const text = byId(id).value.trim(); try { return text ? JSON.parse(text) : fallback; } catch { throw new Error("Enter valid JSON for arguments, headers and environment fields."); } }
+function credentialFields(bearer,headers,env) { let h = headers.value.trim() ? JSON.parse(headers.value) : undefined; const token = bearer.value.trim(); if (token) h = {...(h||{}),Authorization:`Bearer ${token}`}; return {...(h ? {headers:h}:{}),...(env.value.trim()?{env:JSON.parse(env.value)}:{})}; }
+async function extensionAction(path,data,message) {
+  if (native) { byId(message).textContent = "Open the workspace first to manage MCP servers and skills."; return; }
+  extensionBusy = true; byId(message).textContent = "Working…"; byId("mcp-cancel").hidden = false;
+  try { return await api(path,data); } catch(error) { byId(message).textContent = error.message; throw error; }
+  finally { extensionBusy = false; byId("mcp-cancel").hidden = true; }
+}
+function element(tag,text,className) { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; }
+function actionButton(text,handler) { const button = element("button",text,"secondary"); button.type = "button"; button.onclick = handler; return button; }
+async function refreshExtensions() {
+  if (native) return;
+  try {
+    const data = await api("/api/extensions"); byId("mcp-server-list").textContent = ""; byId("skills-list").textContent = "";
+    if (!data.servers.length) byId("mcp-server-list").append(element("p","No servers yet. Add a URL or local program below."));
+    for (const server of data.servers) {
+      mcpNames.set(server.id,server.name);const card = element("article",undefined,"extension-card");card.append(element("h4",server.name),element("p",`${server.transport} · ${server.status} · ${server.tools} tools`,"extension-status"),element("pre",server.url || [server.command,...server.args].join(" ")));
+      const access = element("details"),summary = element("summary","Session access"),bearer = element("input"),headers = element("input"),env = element("input");
+      for (const input of [bearer,headers,env]) {input.type="password";input.autocomplete="off";}bearer.placeholder="Bearer token";headers.placeholder='Secret headers JSON';env.placeholder='Environment JSON';access.append(summary,bearer,headers,env);card.append(access);
+      const connect = actionButton(server.status === "connected" ? "Disconnect" : "Connect",async()=>{try {const fields=credentialFields(bearer,headers,env);await extensionAction(server.status === "connected"?"/api/mcp/disconnect":"/api/mcp/connect",{id:server.id,...fields},"mcp-message");for(const input of [bearer,headers,env])input.value="";byId("mcp-message").textContent=server.status === "connected"?"Server disconnected.":"Server connected. Lite can discover its tools.";await refreshExtensions();}catch(error){byId("mcp-message").textContent=error.message;}});
+      const remove = actionButton("Remove",async()=>{try{await extensionAction("/api/mcp/remove",{id:server.id},"mcp-message");await refreshExtensions();byId("mcp-message").textContent="Server removed.";}catch{}});connect.disabled=extensionBusy;remove.disabled=extensionBusy;card.append(connect,remove);if(server.error)card.append(element("p",server.error));if(server.diagnostic){const details=element("details");details.append(element("summary","Server diagnostics"),element("pre",server.diagnostic));card.append(details);}byId("mcp-server-list").append(card);
+    }
+    for (const skill of data.skills) {
+      const card=element("article",undefined,"extension-card");card.append(element("h4",`/${skill.name}`),element("p",skill.description),element("p",`${skill.source} · ${skill.changed?"changed—review again":skill.enabled?"enabled":"disabled"}`,"extension-status"));
+      card.append(actionButton("Review",async()=>{try {skillPreview=await api(`/api/skills/preview?id=${encodeURIComponent(skill.id)}`);byId("skill-preview-title").textContent=`/${skillPreview.name} · ${skillPreview.source}`;byId("skill-preview-text").textContent=skillPreview.instructions;byId("skill-enable").textContent=skillPreview.enabled?"Disable skill":"Enable reviewed skill";byId("skill-use").disabled=!skillPreview.enabled||!skillPreview.userInvocable;byId("skill-preview").hidden=false;byId("skill-preview").scrollIntoView({block:"nearest"});}catch(error){byId("skills-message").textContent=error.message;}}));byId("skills-list").append(card);
+    }
+    if(data.problem)byId("mcp-message").textContent=data.problem;
+  }catch(error){byId("mcp-message").textContent=error.message;}
+}
+byId("mcp-refresh").onclick = refreshExtensions;byId("skills-refresh").onclick=refreshExtensions;
+byId("mcp-cancel").onclick=()=>api("/api/cancel",{}).catch(()=>{});
+byId("mcp-transport").onchange=()=>{const local=byId("mcp-transport").value==="stdio";byId("mcp-local-fields").hidden=!local;byId("mcp-remote-fields").hidden=local;};
+async function addMcp(connect) {
+  if(extensionBusy)return;
+  try {
+    const fields=credentialFields(byId("mcp-bearer"),byId("mcp-headers"),byId("mcp-env"));const result=await extensionAction("/api/mcp/add",{name:byId("mcp-name").value,transport:byId("mcp-transport").value,url:byId("mcp-url").value,command:byId("mcp-command").value,args:jsonField("mcp-args",[]),...fields},"mcp-message");if(!result)return;
+    for(const id of ["mcp-bearer","mcp-headers","mcp-env"])byId(id).value="";
+    if(connect)await extensionAction("/api/mcp/connect",{id:result.id},"mcp-message");byId("mcp-message").textContent=connect?"Connected. MCP calls appear in live activity and require your approval.":"Server saved. Connect it when you are ready.";await refreshExtensions();
+  }catch(error){byId("mcp-message").textContent=error.message;await refreshExtensions();}
+}
+byId("mcp-add").onclick=()=>addMcp(true);byId("mcp-save").onclick=()=>addMcp(false);
+byId("mcp-import-project").onclick=async()=>{try{await extensionAction("/api/mcp/import",{},"mcp-message");byId("mcp-message").textContent="Project servers imported. Review and connect them individually.";await refreshExtensions();}catch{}};
+byId("mcp-import-json").onclick=async()=>{try{await extensionAction("/api/mcp/import",{text:byId("mcp-config-json").value},"mcp-message");byId("mcp-config-json").value="";byId("mcp-message").textContent="Servers imported and left disconnected.";await refreshExtensions();}catch{}};
+byId("skill-enable").onclick=async()=>{if(!skillPreview)return;try{await extensionAction("/api/skills/enable",{id:skillPreview.id,digest:skillPreview.digest,enabled:!skillPreview.enabled},"skills-message");byId("skill-preview").hidden=true;byId("skills-message").textContent="Skill preference saved.";await refreshExtensions();}catch{}};
+byId("skill-use").onclick=()=>{if(!skillPreview)return;byId("prompt").value=`/${skillPreview.name} `;byId("settings-dialog").close();byId("prompt").focus();};
+byId("skill-copy").onclick=()=>{if(!skillPreview)return;byId("skill-name").value=skillPreview.name;byId("skill-description").value=skillPreview.description;byId("skill-instructions").value=skillPreview.instructions;byId("skill-model-invocable").checked=skillPreview.modelInvocable;byId("skill-user-invocable").checked=skillPreview.userInvocable;byId("skill-instructions").closest("details").open=true;byId("skill-instructions").focus();};
+byId("skill-save").onclick=async()=>{try{await extensionAction("/api/skills/save",{name:byId("skill-name").value,description:byId("skill-description").value,instructions:byId("skill-instructions").value,modelInvocable:byId("skill-model-invocable").checked,userInvocable:byId("skill-user-invocable").checked},"skills-message");byId("skills-message").textContent="Skill saved and enabled. Use its /command in a message.";await refreshExtensions();}catch{}};
+byId("skill-import-file").onchange=async()=>{const file=byId("skill-import-file").files?.[0];if(!file)return;try{if(file.size>65536)throw new Error("SKILL.md must be under 64 KiB.");const result=await extensionAction("/api/skills/import",{text:await file.text()},"skills-message");if(!result)return;byId("skill-name").value=result.name;byId("skill-description").value=result.description;byId("skill-instructions").value=result.body;byId("skill-model-invocable").checked=result.modelInvocable;byId("skill-user-invocable").checked=result.userInvocable;byId("skills-message").textContent="Imported into the editor. Review it, then Save & enable.";}catch(error){byId("skills-message").textContent=error.message;}finally{byId("skill-import-file").value="";}};
+function renderSkillMenu(force=false) {
+ const value=byId("prompt").value;const query=value.startsWith("/")&&!/\s/.test(value)?value.slice(1).toLowerCase():force?"":null;byId("skill-menu").hidden=query===null;if(query===null)return;
+ const commands=[{name:"skills",description:"Manage your skill packs"},{name:"mcp",description:"Connect MCP tool servers"},{name:"clear",description:"Start a new conversation"},...availableSkills];const seen=new Set();skillMenuItems=commands.filter(s=>!seen.has(s.name)&&seen.add(s.name)&&s.name.includes(query)).slice(0,8);skillMenuIndex=0;byId("skill-menu").textContent="";
+ for(const [index,skill]of skillMenuItems.entries()){const button=element("button");button.type="button";button.setAttribute("role","option");button.append(element("strong","/"+skill.name),element("span",skill.description));button.onclick=()=>{skillMenuIndex=index;chooseSkillMenu();};byId("skill-menu").append(button);}if(!skillMenuItems.length)byId("skill-menu").append(element("p","No enabled skills match."));highlightSkillMenu();
+}
+function highlightSkillMenu(){if(!skillMenuItems.length)return;skillMenuIndex=(skillMenuIndex+skillMenuItems.length)%skillMenuItems.length;for(const [index,button]of [...byId("skill-menu").children].entries())button.classList.toggle("active",index===skillMenuIndex);}
+function chooseSkillMenu(){const selected=skillMenuItems[skillMenuIndex];if(!selected)return;byId("prompt").value=`/${selected.name} `;byId("skill-menu").hidden=true;byId("prompt").focus();}
+byId("skill-picker").onclick=()=>renderSkillMenu(true);
+if(native){byId("mcp-message").textContent="Open the workspace first to configure tool servers.";byId("skills-message").textContent="Open the workspace to browse, create and enable skills.";for(const id of ["mcp-add","mcp-save","mcp-import-project","mcp-import-json","mcp-refresh","skills-refresh","skill-save","skill-import-file"])byId(id).disabled=true;}
