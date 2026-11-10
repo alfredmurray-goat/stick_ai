@@ -55,3 +55,11 @@ Max metadata identifies a 23.6B llama architecture and an embedded Devstral/Mist
 ## Picker updates publish first
 
 After all platform builds pass, the publisher creates a small signed app-only release before downloading or packaging the full Max weights. Existing Lite app users can choose Check for updates and Update and restart to obtain the file picker without waiting for or downloading the two-model packages. The full Lite + Max release follows from the same checked build. Standard GitHub-hosted runner compute is free for this now-public repository; artifact/cache storage and runner/concurrency limits remain separate.
+
+## Native Mac disk images
+
+`macos-dmg.yml` creates genuine read-only UDZO `.dmg` files on the standard Intel and Apple Silicon Mac runners, using a previously successful main desktop build. It produces full Lite + Max images for both architectures, plus an Intel Lite image with the Max file picker and no bundled Max weights. Each image contains the complete portable Stick AI folder and an Applications shortcut; copy the whole folder onto writable storage before opening the app inside it.
+
+The builder verifies the source, creates an HFS+ image, reclaims its temporary source before compression, runs `hdiutil verify`, mounts the finished image read-only, rechecks every file/model hash, and executes the native app's dry-run. It records the image SHA256, size, architecture, model set and source build beside each image. This preserves the existing app updater and linked-model behavior. Images remain unsigned test distributions.
+
+These model-containing images exceed GitHub's 2 GiB release-asset limit, including the Lite-only image. A single-file DMG download requires a large-file host; otherwise the DMG must be transported as parts and reconstructed before mounting. Actions artifacts are temporary build outputs, retained for one day, rather than permanent installer hosting.
