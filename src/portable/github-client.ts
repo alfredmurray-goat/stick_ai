@@ -122,6 +122,28 @@ export class GitHubClient {
     if (!name.startsWith("stick-ai/") || !validBranch(name) || !hash(commit)) { throw new GitHubError("Publishing requires a new stick-ai/ branch."); }
     await this.#json("POST", pathFor(repo) + "/git/refs", { ref: "refs/heads/" + name, sha: commit }, signal);
   }
+  async advanceBranch(repo: GitHubRepo, name: string, expected: string, commit: string, signal: AbortSignal): Promise<void> {
+    if (!name.startsWith("stick-ai/") || name === repo.defaultBranch || !validBranch(name) || !hash(expected) || !hash(commit)) { throw new GitHubError("Only the workspace branch can be updated."); }
+    const path = pathFor(repo) + "/git/refs/heads/" + encodeURIComponent(name);
+    const current = object(await this.#json("GET", path, undefined, signal));
+    if (current.object?.sha !== expected) { throw new GitHubError("The pull-request branch changed on GitHub. Connect a fresh workspace to keep those changes."); }
+    await this.#json("PATCH", path, { sha: commit, force: false }, signal);
+  }
+  async existingPullRequest(repo: GitHubRepo, head: string, base: string, signal: AbortSignal): Promise<{url:string;number:number}|undefined> {
+    if (!head.startsWith("stick-ai/") || !validBranch(head) || !validBranch(base)) { throw new GitHubError("Invalid workspace branch."); }
+    const data = await this.#json("GET", pathFor(repo) + "/pulls?state=all&head=" + encodeURIComponent(repo.owner + ":" + head) + "&base=" + encodeURIComponent(base) + "&per_page=100", undefined, signal);
+    if (!Array.isArray(data)) { throw new GitHubError("GitHub returned an unexpected pull-request list."); }
+    const item = data.find(value => value.head?.ref === head && value.head?.repo?.id === repo.id && value.base?.ref === base);
+    if (!item) { return undefined; }
+    if (item.state !== "open") { throw new GitHubError("This workspace pull request is closed. Connect a fresh workspace."); }
+    if (!Number.isSafeInteger(item.number) || item.number <= 0 || item.html_url !== `https://github.com/${repo.fullName}/pull/${item.number}`) { throw new GitHubError("GitHub returned an invalid pull-request link."); }
+    return {url:item.html_url,number:item.number};
+  }
+  async pullRequestOpen(repo: GitHubRepo, number: number, head: string, signal: AbortSignal): Promise<void> {
+    if (!Number.isSafeInteger(number) || number <= 0) { throw new GitHubError("Invalid pull-request identity."); }
+    const data = object(await this.#json("GET", pathFor(repo) + "/pulls/" + number, undefined, signal));
+    if (data.state !== "open" || data.head?.ref !== head || data.head?.repo?.id !== repo.id) { throw new GitHubError("The pull request is closed or its source changed. Connect a fresh workspace for another task."); }
+  }
   async pullRequest(repo: GitHubRepo, head: string, base: string, title: string, body: string, signal: AbortSignal): Promise<{ url: string; number: number }> {
     if (!head.startsWith("stick-ai/") || !validBranch(head) || !validBranch(base) || !title.trim() || title.length > 256 || body.length > 16000) { throw new GitHubError("Enter a short pull-request title and description."); }
     const data = object(await this.#json("POST", pathFor(repo) + "/pulls", { head, base, title, body, draft: true }, signal));

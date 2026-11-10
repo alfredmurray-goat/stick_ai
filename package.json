@@ -1,7 +1,7 @@
 {
   "name": "stick-ai",
   "version": "0.1.0",
-  "description": "Offline terminal coding agent",
+  "description": "Local coding assistant with optional GitHub workspaces",
   "type": "module",
   "license": "MIT",
   "author": "localilabs",
@@ -32,7 +32,8 @@
     "PORTABLE.md",
     "src-tauri",
     "DESKTOP.md",
-    "UPDATES.md"
+    "UPDATES.md",
+    "GITHUB_WORKSPACES.md"
   ],
   "scripts": {
     "build": "tsc",

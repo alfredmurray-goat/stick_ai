@@ -51,3 +51,10 @@ it("rejects unsafe paths before creating any changed tree", async () => {
   await expect(client.createTree(repo, sha, [{ path: "../outside", mode: "100644", type: "blob", sha: other }], signal())).rejects.toThrow("Unsafe repository change");
   expect(fetcher).not.toHaveBeenCalled();
 });
+it('advances only its own unchanged branch without force and refuses external changes',async()=>{
+  const calls:any[]=[];
+  const client=new GitHubClient('token',(async(input,init)=>{calls.push({url:String(input),method:init?.method,body:init?.body?JSON.parse(String(init.body)):null});return json(init?.method==='GET'?{object:{sha}}:{ref:'refs/heads/stick-ai/task'});}) as typeof fetch);
+  await client.advanceBranch(repo,'stick-ai/task',sha,other,signal());expect(calls[1].body).toEqual({sha:other,force:false});
+  await expect(client.advanceBranch(repo,'stick-ai/task',other,sha,signal())).rejects.toThrow('branch changed');
+  await expect(client.advanceBranch(repo,'main',sha,other,signal())).rejects.toThrow('workspace branch');expect(calls.filter(c=>c.method==='PATCH')).toHaveLength(1);
+});
