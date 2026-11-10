@@ -67,4 +67,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           BUILD_RUN: ${{ github.run_id }}
-        run: gh workflow run release.yml --ref main -f build_run="$BUILD_RUN"
+        run: |
+          gh workflow run release.yml --ref main -f build_run="$BUILD_RUN"
+          gh workflow run macos-dmg.yml --ref main -f build_run="$BUILD_RUN"

@@ -4,6 +4,8 @@ import { basename, join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { projectContext } from "../agent/context.js";
 import { friendlyError, type FriendlyError } from "./errors.js";
+import { GitHubWorkspaces } from "./github-workspace.js";
+import { GitHubError } from "./github-client.js";
 import { ProgressTracker } from "./progress.js";
 import { coderSystem } from "../agent/delegate.js";
 import { runAgent } from "../agent/index.js";
@@ -43,14 +45,19 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     if (events.length > 2000) { events.splice(0, events.length - 2000); }
   };
   await mkdir(join(root, "app", "project"), { recursive: true });
-  const box = await Sandbox.create(join(root, "app", "project"));
-  const tools = new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
+  let box = await Sandbox.create(join(root, "app", "project"));
+  const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID(); const space = description.indexOf(" "); const args = JSON.parse(description.slice(space + 1)) as Record<string, string>;
     const finish = (allow: boolean): void => { approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
     const cancel = (): void => finish(false);
     approvals.set(id, finish); signal.addEventListener("abort", cancel, { once: true });
     publish("approval", undefined, { id, file: basename(args.path ?? "your file"), before: args.old ?? "", after: args.new ?? args.content ?? "" });
   }));
+  let tools = makeTools();
+  const github = new GitHubWorkspaces(join(root, "logs", "github", "workspaces"));
+  let repositoryOperation: AbortController | undefined;
+  let repositoryDone: Promise<void> | undefined;
+  const switchProject = (next: Sandbox): void => { box = next; tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; publish("project", "Workspace changed. Start a new task for this project."); };
   const launch = async (model: string): Promise<void> => {
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
     progress.begin("loading"); report("Starting your private assistant...");
@@ -97,18 +104,37 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
+        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
       }
+      if (request.method === "GET" && url.pathname === "/api/github/workspaces") { send(response, 200, { workspaces: await github.list() }); return; }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
       let body = "";
       for await (const chunk of request) { body += chunk; if (body.length > 1000000) { throw new Error("UI body too large"); } }
       const data = JSON.parse(body) as Record<string, unknown>;
-      if (url.pathname === "/api/start" && ["choose", "error"].includes(phase) && typeof data.model === "string" && options.choices.includes(data.model)) { work = launch(data.model); send(response, 202, {}); return; }
-      if (url.pathname === "/api/task" && phase === "ready" && typeof data.text === "string" && data.text.trim()) { work = task(data.text.slice(0, 100000)); send(response, 202, {}); return; }
+      if (url.pathname.startsWith("/api/github/")) {
+        if (active || loading || repositoryOperation) { send(response, 409, { error: "Wait for the current task or repository operation, or cancel it first." }); return; }
+        const controller = new AbortController(); repositoryOperation = controller;
+        let finishRepository!: () => void; repositoryDone = new Promise<void>((resolve) => { finishRepository = resolve; });
+        try {
+          if (url.pathname === "/api/github/connect" && typeof data.repository === "string" && typeof data.token === "string") {
+            switchProject(await github.connect(data.repository, typeof data.branch === "string" ? data.branch : "", data.token, controller.signal)); send(response, 200, { workspace: github.view() }); return;
+          }
+          if (url.pathname === "/api/github/resume" && typeof data.id === "string" && typeof data.token === "string") {
+            switchProject(await github.resume(data.id, data.token, controller.signal)); send(response, 200, { workspace: github.view() }); return;
+          }
+          if (url.pathname === "/api/github/disconnect") { github.disconnect(); switchProject(await Sandbox.create(join(root, "app", "project"))); send(response, 200, {}); return; }
+          if (url.pathname === "/api/github/review") { send(response, 200, await github.review()); return; }
+          if (url.pathname === "/api/github/publish" && typeof data.digest === "string" && typeof data.title === "string" && typeof data.body === "string") { send(response, 200, await github.publish(data.digest, data.title, data.body, controller.signal)); return; }
+          send(response, 400, { error: "Invalid repository request." }); return;
+        } catch (error) { send(response, 400, { error: controller.signal.aborted ? "Repository operation cancelled. Local changes are kept." : error instanceof GitHubError ? error.message : "The repository operation could not finish. Local files are kept. Try again." }); return; }
+        finally { repositoryOperation = undefined; finishRepository(); repositoryDone = undefined; }
+      }
+      if (url.pathname === "/api/start" && ["choose", "error"].includes(phase) && typeof data.model === "string" && !repositoryOperation && options.choices.includes(data.model)) { work = launch(data.model); send(response, 202, {}); return; }
+      if (url.pathname === "/api/task" && phase === "ready" && typeof data.text === "string" && !repositoryOperation && data.text.trim()) { work = task(data.text.slice(0, 100000)); send(response, 202, {}); return; }
       if (url.pathname === "/api/approve" && typeof data.id === "string") { approvals.get(data.id)?.(data.allow === true); send(response, 200, {}); return; }
-      if (url.pathname === "/api/cancel") { active?.abort(); loading?.abort(); send(response, 200, {}); return; }
+      if (url.pathname === "/api/cancel") { active?.abort(); loading?.abort(); repositoryOperation?.abort(); send(response, 200, {}); return; }
       if (url.pathname === "/api/dismiss") { problem = undefined; failure = ""; send(response, 200, {}); return; }
-      if (url.pathname === "/api/faster" && !active && !loading) {
+      if (url.pathname === "/api/faster" && !active && !loading && !repositoryOperation) {
         faster = true; engine.contextSize = 4096; problem = undefined; failure = "";
         work = (async () => { await engine.stop(); await launch("stellan-1-lite"); })();
         send(response, 202, {}); return;
@@ -125,5 +151,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

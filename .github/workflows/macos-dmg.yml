@@ -75,3 +75,17 @@ jobs:
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
+
+  publish:
+    needs: dmg
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Publish after all three native disk images pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PACKAGING_RUN: ${{ github.run_id }}
+        run: gh workflow run publish-macos-dmg.yml --ref main -f packaging_run="$PACKAGING_RUN"

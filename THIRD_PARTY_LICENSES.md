@@ -31,7 +31,7 @@ SOFTWARE.
 
 ## Desktop wrapper: Tauri 2.12.5 (MIT OR Apache-2.0)
 
-https://github.com/tauri-apps/tauri . Copyright Tauri Programme within The Commons Conservancy. Direct Rust dependencies: tauri-build 2.7.4 (MIT OR Apache-2.0), serde and serde_json (MIT OR Apache-2.0), sha2 (MIT OR Apache-2.0), tempfile (MIT OR Apache-2.0). No new npm dependencies are added. Each native release must retain its generated Cargo.lock and run node scripts/native-licenses.mjs to gather the complete resolved Rust dependency licence texts. The stick builder requires that directory with --desktop-licenses. Missing texts fail generation and require upstream notice review; this source-only archive does not claim a completed binary redistribution audit. Platform webview libraries keep their own licences and are supplied by the OS. Tauri CLI 2.12.2 is a separate MIT OR Apache-2.0 build tool.
+https://github.com/tauri-apps/tauri . Copyright Tauri Programme within The Commons Conservancy. Direct Rust dependencies: tauri-build 2.7.4 (MIT OR Apache-2.0), serde and serde_json (MIT OR Apache-2.0), sha2 (MIT OR Apache-2.0), tempfile (MIT OR Apache-2.0). The desktop wrapper itself adds no npm runtime dependencies. Each native release must retain its generated Cargo.lock and run node scripts/native-licenses.mjs to gather the complete resolved Rust dependency licence texts. The stick builder requires that directory with --desktop-licenses. Missing texts fail generation and require upstream notice review; this source-only archive does not claim a completed binary redistribution audit. Platform webview libraries keep their own licences and are supplied by the OS. Tauri CLI 2.12.2 is a separate MIT OR Apache-2.0 build tool.
 
 ## Native covered-source notices (MPL-2.0)
 
@@ -442,3 +442,59 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+
+## fflate@0.8.2
+
+Declared licence: "MIT"
+
+### LICENSE
+
+MIT License
+
+Copyright (c) 2023 Arjun Barrett
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## ignore@7.0.5
+
+Declared licence: "MIT"
+
+### LICENSE-MIT
+
+Copyright (c) 2013 Kael Zhang <i@kael.me>, contributors
+http://kael.me/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

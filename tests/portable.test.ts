@@ -56,7 +56,10 @@ it("runs the generated native start file in dry-run mode from a path with spaces
   const out = join(root, "A stick with spaces");
   await buildStick(resolve("."), out, input);
   const exec = promisify(execFile);
-  const result = process.platform === "win32" ? await exec(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `\"\"${join(out, "Start.bat")}\" --dry-run\"`], { windowsVerbatimArguments: true, timeout: 20000 }) : await exec(join(out, process.platform === "darwin" ? "Start.command" : "start.sh"), ["--dry-run"], { timeout: 20000 });
+  const running = process.platform === "win32" ? exec(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `\"\"${join(out, "Start.bat")}\" --dry-run\"`], { windowsVerbatimArguments: true, timeout: 20000 }) : exec(join(out, process.platform === "darwin" ? "Start.command" : "start.sh"), ["--dry-run"], { timeout: 20000 });
+  if (process.platform === "win32") { running.child.stdin.end("\r\n"); }
+  let result;
+  try { result = await running; } catch (error) { console.error("Launcher diagnostic", (error as any).stdout, (error as any).stderr, await readFile(join(out, "logs/launcher.log"), "utf8").catch(() => "No launcher log")); throw error; }
   expect(result.stdout).toContain("Choose an unused model port between 8080 and 8099");
   expect(result.stdout).toContain(target);
 }, 30000);

@@ -1,7 +1,7 @@
 {
   "name": "stick-ai",
   "version": "0.1.0",
-  "description": "Offline terminal coding agent",
+  "description": "Local coding assistant with optional GitHub workspaces",
   "type": "module",
   "license": "MIT",
   "author": "localilabs",
@@ -32,7 +32,8 @@
     "PORTABLE.md",
     "src-tauri",
     "DESKTOP.md",
-    "UPDATES.md"
+    "UPDATES.md",
+    "GITHUB_WORKSPACES.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -46,11 +47,14 @@
     "desktop:dry-run": "npm run build && node scripts/dry-run-desktop.ts",
     "desktop:build": "cargo tauri build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "fflate": "0.8.2",
+    "ignore": "7.0.5"
+  },
   "devDependencies": {
     "@types/node": "24.10.1",
+    "esbuild": "0.28.2",
     "typescript": "5.9.3",
-    "vitest": "3.2.4",
-    "esbuild": "0.28.2"
+    "vitest": "3.2.4"
   }
 }

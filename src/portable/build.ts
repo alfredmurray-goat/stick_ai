@@ -57,6 +57,7 @@ exit "$RESULT"
 export function windowsStart(nodeHash: string, appHash: string): string {
   return `@echo off\r
 setlocal DisableDelayedExpansion\r
+set "PSModulePath="\r
 set "ROOT=%~dp0"\r
 "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -NonInteractive -Command "try { foreach ($p in @($env:ROOT+'logs', $env:ROOT+'logs\\launcher.log')) { if (Test-Path -LiteralPath $p) { $i = Get-Item -LiteralPath $p -Force; if (($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $i.LinkType -eq 'HardLink') { exit 1 } } } } catch { exit 1 }" >nul 2>nul\r
 if errorlevel 1 goto damaged\r
