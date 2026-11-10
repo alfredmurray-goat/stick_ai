@@ -32,7 +32,7 @@ export async function assembleFullRelease(baseArchive, folder, platform, maxPath
   await verifyPackage(root, false, undefined, true);
   const output = join(folder, `stick_ai-${platform}.${platform === "linux-x64" ? "tar.gz" : "zip"}`);
   if (platform === "linux-x64") { await exec("tar", ["-czf", output, "-C", extract, "Stick AI"], { env: { ...process.env, GZIP: "-1" }, maxBuffer: 1000000 }); }
-  else { await exec("zip", ["-q", "-1", "-r", output, "Stick AI"], { cwd: extract, maxBuffer: 1000000 }); }
+  else { await exec("zip", ["-q", "-0", "-r", output, "Stick AI"], { cwd: extract, maxBuffer: 1000000 }); }
   await rm(extract, { recursive: true, force: true });
   return output;
 }
