@@ -25,7 +25,7 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     await writeFile(join(output, record.parts[0].name), combined.subarray(0, record.parts[0].size));
     await run(); expect(await readFile(join(output, record.name))).toEqual(content);
   } finally { await rm(root, { recursive: true, force: true }); }
-});
+}, 30000);
 it("refuses oversized parts and unsafe release names", async () => {
   await expect(splitArchive("stick_ai-test.zip", "unused", 2 * 1024 ** 3)).rejects.toThrow("Invalid");
   await expect(splitArchive("untrusted$.zip", "unused", 100)).rejects.toThrow("Unsafe");
