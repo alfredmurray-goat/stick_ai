@@ -48,7 +48,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   let box = await Sandbox.create(join(root, "app", "project"));
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID(); const space = description.indexOf(" "); const args = JSON.parse(description.slice(space + 1)) as Record<string, string>;
-    const finish = (allow: boolean): void => { approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
+    const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
     const cancel = (): void => finish(false);
     approvals.set(id, finish); signal.addEventListener("abort", cancel, { once: true });
     publish("approval", undefined, { id, file: basename(args.path ?? "your file"), before: args.old ?? "", after: args.new ?? args.content ?? "" });
@@ -66,7 +66,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     finally { loading = undefined; }
   };
   const task = async (text: string): Promise<void> => {
-    active = new AbortController(); phase = "working"; problem = undefined; failure = ""; progress.begin("reading");
+    active = new AbortController(); publish("user", text); phase = "working"; problem = undefined; failure = ""; progress.begin("reading");
     const selected = engine.active ?? "stellan-1-lite";
     try {
       if (selected === "stellan-1-max") {
@@ -119,9 +119,9 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       }
       if (request.method === "GET" && url.pathname === "/api/github/workspaces") { send(response, 200, { workspaces: await github.list() }); return; }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
-      let body = "";
-      for await (const chunk of request) { body += chunk; if (body.length > 1000000) { throw new Error("UI body too large"); } }
-      const data = JSON.parse(body) as Record<string, unknown>;
+      const chunks: Buffer[] = []; let bodyBytes = 0;
+      for await (const chunk of request) { const bytes = Buffer.from(chunk); bodyBytes += bytes.length; if (bodyBytes > 2 * 1024 ** 2) { throw new Error("UI body too large"); } chunks.push(bytes); }
+      const data = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
       if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) { history.length = 0; maxHistory.length = 0; events.length = 0; publish("project", "New conversation. Your project files are kept."); send(response, 200, {}); return; }
       if (url.pathname === "/api/file" && !active && !loading && !repositoryOperation && typeof data.path === "string" && typeof data.content === "string") {
         const controller = new AbortController(); repositoryOperation = controller;

@@ -257,7 +257,7 @@ fn main() {
         fs::create_dir_all(&logs)?;
         app.manage(Desktop { runtime: Arc::new(Mutex::new(Runtime::default())), root, logs, temporary: data_path.clone(), settings: app.path().app_config_dir()?.join("updates.json") });
         tauri::WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-            .title("Stick AI — Workspace").inner_size(1280.0, 820.0).min_inner_size(860.0, 600.0).data_directory(data_path).incognito(true)
+            .title("Stick AI — Workspace").inner_size(1180.0, 740.0).min_inner_size(860.0, 600.0).data_directory(data_path).incognito(true)
             .on_navigation({ let runtime = app.state::<Desktop>().runtime.clone(); move |url| {
                 if url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost") { return true; }
                 runtime.lock().unwrap().url.as_ref().and_then(|value| tauri::Url::parse(value).ok()).map(|expected| url.origin() == expected.origin()).unwrap_or(false)

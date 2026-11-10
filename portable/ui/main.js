@@ -28,11 +28,13 @@ function showError(problem = {}) {
 }
 function progress(view, busy) {
   working = busy; byId("progress").hidden = !busy;
+  byId("live-indicator").textContent = busy ? "● LIVE" : "○ IDLE";
+  document.body.classList.toggle("awaiting-approval", view?.message === "Waiting for your approval");
   byId("ready-label").textContent = busy ? "Working" : native ? "Not started" : "Ready";
   byId("ready-dot").classList.toggle("pulse", busy);
   byId("thinking-state").textContent = busy ? byId("thinking").textContent ? "STREAMING" : "WAITING" : byId("thinking").textContent ? "COMPLETE" : "READY";
   byId("new-session").disabled = busy || Boolean(native);
-  if (byId("file-editor")) byId("file-editor").readOnly = busy;
+  if (byId("file-editor")) byId("file-editor").readOnly = busy || repositoryBusy || savingFile;
   if (typeof updateEditorState === "function") updateEditorState();
   byId("status").textContent = view?.message || "Thinking...";
   byId("elapsed").textContent = view?.elapsedSeconds == null ? "" : ` ${view.elapsedSeconds} seconds`;
@@ -52,7 +54,7 @@ function message(text, kind = "answer") {
     if (follow) target.scrollTop = target.scrollHeight;
     return;
   }
-  byId("chat-empty").hidden = true;
+  byId("chat-empty").hidden = true; document.body.classList.add("has-conversation");
   if (!streaming || streamKind !== kind) {
     const card = document.createElement("article"); card.className = `message ${kind}`;
     const label = document.createElement("div"); label.className = `message-label ${kind === "answer" ? "assistant-label" : ""}`; label.textContent = kind === "you" ? "YOU" : kind === "answer" ? "STELLAN" : "WORKSPACE";
@@ -65,27 +67,31 @@ async function start(faster = false) {
   byId("app-updates").hidden = true;
   retryStart = true; byId("error").hidden = true; byId("start").disabled = true;
   if (native) {
-    nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true;
+    nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true; byId("loading").hidden = false;
     progress({ message: "Starting your private assistant..." }, true);
     try {
       const url = await native.invoke("start_assistant", { faster, mode: byId("assistant-mode").value });
       location.replace(url);
-    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("welcome").hidden = false; }
+    } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("loading").hidden = true; byId("welcome").hidden = false; }
     finally { nativeStarting = false; byId("start").disabled = false; }
   } else {
     try { await api(faster ? "/api/faster" : "/api/start", faster ? {} : { model: "stellan-1-lite" }); }
     catch { showError(); byId("start").disabled = false; }
   }
 }
-async function task(text) {
-  if (!text.trim() || working || repositoryBusy || native) { return; }
-  retryStart = false; lastTask = text; byId("error").hidden = true;
+function beginTurn(text) {
+  if (innerWidth > 620) inspectorTab(false);
   if (byId("thinking").textContent) { const card = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); card.className = "message reasoning-history"; summary.textContent = "Previous turn · thinking"; content.textContent = byId("thinking").textContent; card.append(summary, content); byId("messages").append(card); }
   streaming = undefined; message(text, "you"); streaming = undefined;
   toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0";
   byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Waiting for the model’s reasoning stream. Tool activity appears below.";
   for (const id of ["thinking", "coding"]) { byId(id).textContent = ""; }
   byId("thoughts").open = true; byId("thoughts").hidden = false; byId("code-preview").hidden = true;
+}
+async function task(text) {
+  if (!text.trim() || working || repositoryBusy || native) { return; }
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before starting a task."); return; }
+  retryStart = false; lastTask = text; byId("error").hidden = true;
   byId("prompt").value = "";
   try { byId("send").disabled = true; await api("/api/task", { text }); } catch (error) { showError({message:error.message}); }
 }
@@ -100,7 +106,7 @@ byId("error-action").onclick = async () => {
   if (errorAction === "Switch to a faster setting") { await start(true); return; }
   if (retryStart) { await start(); } else { await task(lastTask); }
 };
-byId("stop").onclick = () => api("/api/stop", {}).catch(() => {});
+byId("stop").onclick = () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before closing."); return; } void api("/api/stop", {}).catch(() => {}); };
 async function update() {
   if (polling) { return; } polling = true;
   try {
@@ -129,9 +135,11 @@ async function update() {
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
     progress(state.progress, ["starting", "working"].includes(state.phase));
-    if (state.problem) { showError(state.problem); }
+    if (state.problem) { showError(state.problem); byId("ready-label").textContent = "Needs attention"; }
     for (const event of state.events) {
       after = event.id;
+      if (event.kind === "user") { beginTurn(event.text); }
+      if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
       if (event.kind === "tool") { renderTool(event.data); }
@@ -140,13 +148,13 @@ async function update() {
       if (event.kind === "status") { byId("status").textContent = event.text; }
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
-        const card = document.createElement("article"); card.className = "approval-card"; const title = document.createElement("h3"); title.textContent = `Save changes to ${event.data.file}?`;
+        const card = document.createElement("article"); card.className = "approval-card"; card.dataset.approval = event.data.id; const title = document.createElement("h3"); title.textContent = `Save changes to ${event.data.file}?`;
         const preview = document.createElement("pre"); preview.textContent = event.data.after; card.append(title, preview); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         for (const [label, allow] of [["Allow changes", true], ["Keep my file", false]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
-        byId("approvals").append(card); scrollConversation(true);
+        byId("approvals").append(card); if (innerWidth <= 620) document.body.classList.remove("inspector-open"); scrollConversation(true);
       }
     }
   } catch { if (!native) { showError({ message: "The assistant has stopped. Open the app again to continue.", action: "OK" }); } }
@@ -252,14 +260,16 @@ async function savedRepositories() {
   } catch (error) { byId("github-result").textContent = error.message; }
 }
 byId("github-connect").onclick = async () => {
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; }
   const token = byId("github-token").value; byId("github-token").value = "";
   try { const result = await repositoryAction("connect", {repository:byId("github-repo").value, branch:byId("github-branch").value, token}); clearRepositoryReview(); renderRepository(result.workspace, false); byId("github-result").textContent = "Connected. Ask the assistant to work on this repository."; await savedRepositories(); } catch {}
 };
 byId("github-resume").onclick = async () => {
+  if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; }
   const token = byId("github-token").value; byId("github-token").value = "";
   try { const result = await repositoryAction("resume", {id:byId("github-saved").value, token}); clearRepositoryReview(); renderRepository(result.workspace, false); byId("github-result").textContent = "Saved files restored. Start a new task; chat history is not saved."; } catch {}
 };
-byId("github-disconnect").onclick = async () => { try { await repositoryAction("disconnect", {}); clearRepositoryReview(); renderRepository(null, false); byId("github-result").textContent = "Using the local project. Repository changes remain in Saved workspaces."; } catch {} };
+byId("github-disconnect").onclick = async () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; } try { await repositoryAction("disconnect", {}); clearRepositoryReview(); renderRepository(null, false); byId("github-result").textContent = "Using the local project. Repository changes remain in Saved workspaces."; } catch {} };
 byId("github-refresh").onclick = savedRepositories;
 byId("github-cancel").onclick = () => api("/api/cancel", {}).catch(() => {});
 byId("github-review").onclick = async () => {
@@ -322,7 +332,7 @@ function renderTool(data) {
   if (data.phase === "finish") {
     card.classList.add(data.result?.startsWith("Error:") || data.result === "Denied by user" ? "failed" : "complete");
     const details = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); summary.textContent = "Result"; content.textContent = data.result || "Finished"; details.append(summary,content); card.append(details);
-    if (["write_file","edit_file"].includes(data.tool)) void refreshFiles();
+    if (["write_file","edit_file"].includes(data.tool)) { void refreshFiles(); void reloadCurrentFile(data.path); }
   }
 }
 async function fileEntries(parent,path) {
@@ -347,6 +357,8 @@ async function refreshFiles() {
   finally { filesLoading = false; }
 }
 byId("refresh-files").onclick = refreshFiles;
+function hasUnsavedFile() { return Boolean(currentFile && byId("file-editor").value !== originalFile); }
+async function reloadCurrentFile(path) { if (!currentFile || path?.replace(/^\.\//, "") !== currentFile || hasUnsavedFile() || savingFile) return; const selected = currentFile; try { const value = await api(`/api/file?path=${encodeURIComponent(selected)}`); if (currentFile === selected && !hasUnsavedFile()) { originalFile = value.content; byId("file-editor").value = value.content; byId("file-status").textContent = "Updated by Stellan"; updateEditorState(); } } catch {} }
 function updateEditorState() { const dirty = currentFile && byId("file-editor").value !== originalFile; byId("save-file").disabled = !dirty || savingFile || working || repositoryBusy; byId("discard-file").disabled = !dirty || savingFile; if (dirty && !savingFile) byId("file-status").textContent = "Unsaved changes"; }
 function clearEditor() { currentFile = ""; originalFile = ""; byId("file-title").textContent = "No file selected"; byId("file-editor").value = ""; byId("file-editor").disabled = true; byId("file-status").textContent = "Choose a project file."; updateEditorState(); }
 async function openFile(path) {
@@ -379,3 +391,8 @@ if (native) {
   for (const id of ["github-connect","github-resume","github-review","github-disconnect","github-refresh","github-publish"]) byId(id).disabled = true;
   byId("github-result").textContent = "Open the workspace first, then connect your repository here.";
 } else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; }
+
+const shortcutHint = document.querySelector("#new-session kbd"); if (shortcutHint) shortcutHint.textContent = /Mac/.test(navigator.platform) ? "⌘ N" : "Ctrl N";
+
+window.addEventListener("beforeunload", event => { if (hasUnsavedFile()) { event.preventDefault(); event.returnValue = ""; } });
+document.addEventListener("click", event => { if (document.body.classList.contains("sidebar-open") && !event.target.closest(".sidebar") && !event.target.closest("#sidebar-toggle")) document.body.classList.remove("sidebar-open"); });
