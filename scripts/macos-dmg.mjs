@@ -4,6 +4,7 @@ import { readFile, writeFile, rm, rename, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { bundledMax } from "../src/portable/max-release.ts";
 const exec = promisify(execFile);
+import { imageCommand } from "./macos-image-command.mjs";
 export async function prepareDmgModels(root, variant, maxPath, expectedMax = bundledMax) {
   if (!["full", "lite-picker"].includes(variant)) { throw new Error("Unknown DMG variant"); }
   const path = join(root, "manifest.json"), manifest = JSON.parse(await readFile(path, "utf8"));
@@ -24,16 +25,16 @@ export async function createMacDiskImage({ staging, temporary, output, verifyMou
   if (process.platform !== "darwin") { throw new Error("Real DMGs must be built and verified on macOS"); }
   const raw = join(temporary, "working-image.dmg"), compressed = join(temporary, "verified-image.dmg"), mount = join(temporary, "mounted");
   console.log("Creating native HFS+ disk image");
-  await exec("hdiutil", ["create", "-ov", "-fs", "HFS+", "-volname", "Stick AI", "-format", "UDRW", "-srcfolder", staging, raw], { maxBuffer: 4000000 });
+  await imageCommand(["create", "-ov", "-fs", "HFS+", "-volname", "Stick AI", "-format", "UDRW", "-srcfolder", staging, raw]);
   // Reclaim the source before converting, so there are never three full model copies.
   await rm(staging, { recursive: true, force: true });
   console.log("Converting to a compressed read-only DMG");
-  await exec("hdiutil", ["convert", raw, "-format", "UDZO", "-imagekey", "zlib-level=1", "-ov", "-o", compressed], { maxBuffer: 4000000 });
+  await imageCommand(["convert", raw, "-format", "UDZO", "-imagekey", "zlib-level=1", "-ov", "-o", compressed]);
   await rm(raw);
   await exec("hdiutil", ["verify", compressed], { maxBuffer: 4000000 });
   await mkdir(mount); let attached = false;
   try {
-    await exec("hdiutil", ["attach", "-readonly", "-nobrowse", "-mountpoint", mount, compressed], { maxBuffer: 1000000 }); attached = true;
+    await imageCommand(["attach", "-readonly", "-nobrowse", "-mountpoint", mount, compressed]); attached = true;
     await verifyMounted(join(mount, "Stick AI"));
   } finally {
     if (attached) {

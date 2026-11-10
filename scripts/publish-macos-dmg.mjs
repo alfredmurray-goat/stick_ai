@@ -57,8 +57,10 @@ try {
     const checksums=join(temporary,'DMG_CHECKSUMS.json'); await writeFile(checksums,JSON.stringify({packagingRun:runId,buildRun:desktopBuild,images:records},null,2)+'\n');
     await gh('release','upload',tag,checksums,'--repo',repo,'--clobber');
     // Verify the dedicated assets endpoint; the embedded release asset list may be stale.
-    const info=JSON.parse(await gh('api',`repos/${repo}/releases/tags/${tag}`));
-    const assets=JSON.parse(await gh('api',`repos/${repo}/releases/${info.id}/assets?per_page=100`));
+    const info=JSON.parse(await gh('release','view',tag,'--repo',repo,'--json','apiUrl'));
+    const prefix=`https://api.github.com/repos/${repo}/releases/`;
+    if(!info.apiUrl.startsWith(prefix) || !/^\d+$/.test(info.apiUrl.slice(prefix.length)))throw new Error('Invalid draft release identity');
+    const assets=JSON.parse(await gh('api',info.apiUrl+'/assets?per_page=100'));
     for(const record of records) for(const part of record.parts) {
       const asset=assets.find(a=>a.name===part.name);
       if(!asset || asset.state!=='uploaded' || asset.size!==part.size || asset.digest!==`sha256:${part.sha256}`) throw new Error('Uploaded DMG part did not verify');
