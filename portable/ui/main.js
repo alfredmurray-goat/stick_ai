@@ -1,6 +1,13 @@
-const token = location.hash.slice(1);
-const native = !token && window.__TAURI__?.core;
-if (token) { history.replaceState(null, "", "/"); }
+const localWeb = location.protocol === "http:" && location.hostname === "127.0.0.1";
+const launchToken = localWeb && /^[a-f0-9]{64}$/.test(location.hash.slice(1)) ? location.hash.slice(1) : "";
+let token = launchToken;
+if (localWeb) {
+  // The loopback credential is scoped to this tab and running app session.
+  // GitHub access tokens are never stored here.
+  try { if (launchToken) sessionStorage.setItem("stick-session", launchToken); else token = sessionStorage.getItem("stick-session") || ""; } catch {}
+}
+const native = !localWeb && window.__TAURI__?.core;
+if (launchToken) { history.replaceState(null, "", "/"); }
 const byId = (id) => document.getElementById(id);
 let after = 0;
 let streaming;
