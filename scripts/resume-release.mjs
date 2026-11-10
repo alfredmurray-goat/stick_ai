@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 const exec = promisify(execFile);
 export const releasePlatforms = ["macos-arm64", "macos-x64", "windows-x64", "linux-x64"];
@@ -28,17 +28,23 @@ export function recordFromHelper(platform, text, assets) {
   if (uploadedParts.length !== parts.length) { return undefined; }
   return { name, size, sha256, parts };
 }
-export async function completedReleasePlatforms(repo, tag, source, temporary, gh) {
+export async function downloadReleaseHelper(repo, asset, path) {
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !Number.isSafeInteger(asset.id) || asset.id <= 0 || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > 1000000) { throw new Error("Invalid release helper asset"); }
+  const result = await exec("gh", ["api", `repos/${repo}/releases/assets/${asset.id}`, "-H", "Accept: application/octet-stream"], { encoding: "buffer", maxBuffer: 1000000 });
+  await writeFile(path, result.stdout, { flag: "wx", mode: 0o600 });
+}
+export async function completedReleasePlatforms(repo, tag, source, temporary, gh, download = downloadReleaseHelper) {
   const view = JSON.parse(await gh("release", "view", tag, "--repo", repo, "--json", "apiUrl,targetCommitish,isDraft"));
   const prefix = `https://api.github.com/repos/${repo}/releases/`;
   if (!view.isDraft || view.targetCommitish !== source || !view.apiUrl.startsWith(prefix) || !/^\d+$/.test(view.apiUrl.slice(prefix.length))) { throw new Error("Refusing to resume a different or published release"); }
-  const release = JSON.parse(await gh("api", view.apiUrl)); const records = new Map();
+  // Embedded release summaries can omit recently uploaded assets. Read the asset list directly.
+  const release = { assets: JSON.parse(await gh("api", view.apiUrl + "/assets?per_page=100")) }; const records = new Map();
   for (const platform of releasePlatforms) {
     const name = helperName(platform), asset = release.assets.find((item) => item.name === name && item.state === "uploaded");
     if (!asset) { continue; }
     const folder = join(temporary, `resume-${platform}`); await mkdir(folder);
-    await gh("release", "download", tag, "--repo", repo, "--pattern", name, "--dir", folder);
-    const path = join(folder, name), bytes = await readFile(path);
+    const path = join(folder, name); await download(repo, asset, path);
+    const bytes = await readFile(path);
     if (asset.digest !== `sha256:${createHash("sha256").update(bytes).digest("hex")}`) { continue; }
     // Read the known helper as data; never execute downloaded shell or PowerShell code.
     const text = name.endsWith(".zip") ? (await exec("unzip", ["-p", path, name.slice(0, -4)], { maxBuffer: 1000000 })).stdout : bytes.toString("utf8");
