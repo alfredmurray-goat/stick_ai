@@ -54,3 +54,17 @@ jobs:
       app: stick-ai
       server: bin/llama-server
       executable: bin/node
+  publish:
+    needs: [macos-x64, macos-arm64, windows-x64, linux-x64]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Start publication after all four platforms pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_RUN: ${{ github.run_id }}
+        run: gh workflow run release.yml --ref main -f build_run="$BUILD_RUN"
