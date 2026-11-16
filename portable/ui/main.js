@@ -34,7 +34,8 @@ function showError(problem = {}) {
   byId("error").hidden = false;
 }
 function progress(view, busy) {
-  working = busy; byId("progress").hidden = !busy;
+  working = busy; byId("progress").hidden = !busy; document.body.classList.toggle("working", busy);
+  if (!busy) finishStreaming();
   byId("live-indicator").textContent = busy ? "● LIVE" : "○ IDLE";
   document.body.classList.toggle("awaiting-approval", view?.message === "Waiting for your approval");
   byId("ready-label").textContent = busy ? "Working" : native ? "Not started" : "Ready";
@@ -51,11 +52,135 @@ function scrollConversation(force = false) {
   const panel = byId("conversation-scroll");
   if (force || panel.scrollHeight - panel.scrollTop - panel.clientHeight < 160) requestAnimationFrame(() => { panel.scrollTop = panel.scrollHeight; });
 }
+// ---------- Icons and safe markdown rendering ----------
+// Everything below builds DOM nodes with textContent; model output is never parsed as HTML.
+const SVG = "http://www.w3.org/2000/svg";
+function icon(name) {
+  const svg = document.createElementNS(SVG, "svg"), use = document.createElementNS(SVG, "use");
+  svg.setAttribute("class", "i"); svg.setAttribute("aria-hidden", "true"); use.setAttribute("href", `#i-${name}`); svg.append(use); return svg;
+}
+const INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\*\*(?=\S)([\s\S]*?\S)\*\*|(?<![\w_])__(?=\S)([\s\S]*?\S)__(?![\w_])|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*])\*(?!\*)|(?<![\w_])_(?=[^\s_])([\s\S]*?[^\s_])_(?![\w_])|\[([^\]\n]+)\]\((\S+?)(?:\s+"[^"]*")?\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
+function appendText(parent, text) {
+  const parts = text.split("\n");
+  parts.forEach((part, index) => { if (index) parent.append(document.createElement("br")); if (part) parent.append(part); });
+}
+function inline(parent, text) {
+  let last = 0;
+  for (const match of text.matchAll(INLINE)) {
+    appendText(parent, text.slice(last, match.index)); last = match.index + match[0].length;
+    if (match[1]) { const code = document.createElement("code"); code.textContent = match[2].replace(/^ (.*) $/, "$1"); parent.append(code); }
+    else if (match[3] ?? match[4]) { const node = document.createElement("strong"); inline(node, match[3] ?? match[4]); parent.append(node); }
+    else if (match[5]) { const node = document.createElement("del"); inline(node, match[5]); parent.append(node); }
+    else if (match[6] ?? match[7]) { const node = document.createElement("em"); inline(node, match[6] ?? match[7]); parent.append(node); }
+    else { const url = match[9] ?? match[10]; const node = document.createElement("span"); node.className = "md-link"; node.dataset.url = url; node.title = `${url} · click to copy`; node.tabIndex = 0; node.setAttribute("role", "button"); if (match[8]) inline(node, match[8]); else node.textContent = url; parent.append(node); }
+  }
+  appendText(parent, text.slice(last));
+}
+function codeBlock(code, language) {
+  const block = document.createElement("div"), head = document.createElement("div"), lang = document.createElement("span"), copy = document.createElement("button"), pre = document.createElement("pre"), body = document.createElement("code");
+  block.className = "code-block"; head.className = "code-head"; lang.className = "code-lang"; lang.textContent = language || "code";
+  copy.type = "button"; copy.className = "copy-button"; copy.setAttribute("aria-label", "Copy code"); copy.append(icon("copy"), "Copy");
+  body.textContent = code; pre.append(body); head.append(lang, copy); block.append(head, pre); return block;
+}
+const LIST_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
+const BLOCK_START = /^\s*(#{1,6}\s|```|~~~|>|([-*_])(\s*\2){2,}\s*$)/;
+const TABLE_RULE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+function tableCells(line) { return line.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, "|")); }
+function renderList(lines, start, parent) {
+  const first = lines[start].match(LIST_ITEM); const indent = first[1].length; const ordered = /\d/.test(first[2]);
+  const list = document.createElement(ordered ? "ol" : "ul"); if (ordered && parseInt(first[2], 10) !== 1) list.start = parseInt(first[2], 10);
+  let index = start; let item;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      let next = index + 1; while (next < lines.length && !lines[next].trim()) next++;
+      const upcoming = lines[next]?.match(LIST_ITEM);
+      if (upcoming && upcoming[1].length >= indent) { index = next; continue; }
+      break;
+    }
+    const match = line.match(LIST_ITEM);
+    if (match && match[1].length > indent && item) { index = renderList(lines, index, item); continue; }
+    if (match && match[1].length <= indent) {
+      if (match[1].length < indent || /\d/.test(match[2]) !== ordered) break;
+      item = document.createElement("li"); inline(item, match[3]); list.append(item); index++; continue;
+    }
+    if (!match && item && !BLOCK_START.test(line)) { inline(item, " " + line.trim()); index++; continue; }
+    break;
+  }
+  parent.append(list); return index;
+}
+function renderMarkdown(target, source) {
+  const root = document.createDocumentFragment(); const lines = source.replace(/\r\n?/g, "\n").split("\n");
+  let paragraph = []; let index = 0;
+  const flush = () => { if (!paragraph.length) return; const p = document.createElement("p"); inline(p, paragraph.join("\n")); root.append(p); paragraph = []; };
+  while (index < lines.length) {
+    const line = lines[index];
+    const fence = line.match(/^\s*(`{3,}|~{3,})\s*([\w+#.-]*)/);
+    if (fence) {
+      flush(); const body = []; index++;
+      while (index < lines.length && !lines[index].trim().startsWith(fence[1])) body.push(lines[index++]);
+      index++; root.append(codeBlock(body.join("\n"), fence[2])); continue;
+    }
+    if (!line.trim()) { flush(); index++; continue; }
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/);
+    if (heading) { flush(); const node = document.createElement(`h${Math.min(4, heading[1].length)}`); inline(node, heading[2]); root.append(node); index++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); root.append(document.createElement("hr")); index++; continue; }
+    if (/^\s*>/.test(line)) {
+      flush(); const body = []; while (index < lines.length && /^\s*>/.test(lines[index])) body.push(lines[index++].replace(/^\s*>\s?/, ""));
+      const quote = document.createElement("blockquote"); renderMarkdown(quote, body.join("\n")); root.append(quote); continue;
+    }
+    if (LIST_ITEM.test(line) && (!paragraph.length || /^\s*([-*+]|1[.)])\s/.test(line))) { flush(); index = renderList(lines, index, root); continue; }
+    if (line.includes("|") && TABLE_RULE.test(lines[index + 1] ?? "")) {
+      flush(); const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody"), row = document.createElement("tr");
+      for (const cell of tableCells(line)) { const th = document.createElement("th"); inline(th, cell); row.append(th); }
+      head.append(row); index += 2;
+      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) { const tr = document.createElement("tr"); for (const cell of tableCells(lines[index])) { const td = document.createElement("td"); inline(td, cell); tr.append(td); } body.append(tr); index++; }
+      table.append(head, body); root.append(table); continue;
+    }
+    paragraph.push(line); index++;
+  }
+  flush(); target.replaceChildren(root);
+}
+const pendingRenders = new Set();
+function scheduleRender(target) {
+  if (!pendingRenders.size) requestAnimationFrame(() => {
+    for (const node of pendingRenders) { renderMarkdown(node, node.raw); if (node.classList.contains("live")) addCursor(node); }
+    pendingRenders.clear(); scrollConversation();
+  });
+  pendingRenders.add(target);
+}
+function addCursor(node) {
+  let target = node.lastElementChild;
+  while (target && ["UL", "OL", "BLOCKQUOTE"].includes(target.tagName) && target.lastElementChild) target = target.lastElementChild;
+  const cursor = document.createElement("span"); cursor.className = "streaming-cursor"; cursor.setAttribute("aria-hidden", "true");
+  (target && !target.classList.contains("code-block") && target.tagName !== "TABLE" ? target : node).append(cursor);
+}
+function finishStreaming() {
+  for (const node of document.querySelectorAll(".md.live")) { node.classList.remove("live"); scheduleRender(node); }
+}
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (button) { button.classList.add("copied"); button.lastChild.textContent = "Copied"; button.firstChild.replaceWith(icon("check")); setTimeout(() => { button.classList.remove("copied"); button.lastChild.textContent = "Copy"; button.firstChild.replaceWith(icon("copy")); }, 1600); }
+    return true;
+  } catch { toast("Select the text and copy it with your keyboard."); return false; }
+}
+document.addEventListener("click", (event) => {
+  const copy = event.target.closest(".copy-button");
+  if (copy) { void copyText(copy.closest(".code-block").querySelector("pre").textContent, copy); return; }
+  const link = event.target.closest(".md-link");
+  if (link) { void copyText(link.dataset.url).then((ok) => { if (ok) toast("Link copied. Paste it into your browser to open it."); }); }
+});
+document.addEventListener("keydown", (event) => { if ((event.key === "Enter" || event.key === " ") && event.target.classList?.contains("md-link")) { event.preventDefault(); event.target.click(); } });
+
+let thinkingBreak = false;
 function message(text, kind = "answer") {
   if (!text) return;
   if (kind === "thinking" || kind === "coding") {
     byId(kind === "thinking" ? "thoughts" : "code-preview").hidden = false;
     const target = byId(kind); const follow = target.scrollHeight - target.scrollTop - target.clientHeight < 60;
+    if (kind === "thinking" && thinkingBreak && target.textContent && !/\n\s*$/.test(target.textContent)) text = "\n\n" + text.replace(/^\s+/, "");
+    if (kind === "thinking") thinkingBreak = false;
     target.textContent += text;
     if (kind === "thinking") { byId("thinking-empty").hidden = true; byId("thinking-state").textContent = working ? "STREAMING" : "COMPLETE"; }
     if (follow) target.scrollTop = target.scrollHeight;
@@ -65,8 +190,11 @@ function message(text, kind = "answer") {
   if (!streaming || streamKind !== kind) {
     const card = document.createElement("article"); card.className = `message ${kind}`;
     const label = document.createElement("div"); label.className = `message-label ${kind === "answer" ? "assistant-label" : ""}`; label.textContent = kind === "you" ? "YOU" : kind === "answer" ? "STELLAN" : "WORKSPACE";
-    streaming = document.createElement("pre"); card.append(label, streaming); byId("messages").append(card); streamKind = kind;
+    if (kind === "answer") { streaming = document.createElement("div"); streaming.className = "md live"; streaming.raw = ""; }
+    else streaming = document.createElement("pre");
+    card.append(label, streaming); byId("messages").append(card); streamKind = kind;
   }
+  if (kind === "answer") { streaming.raw += text; scheduleRender(streaming); return; }
   streaming.textContent += text; scrollConversation(kind === "you");
 }
 async function start(faster = false) {
@@ -89,6 +217,7 @@ async function start(faster = false) {
 function beginTurn(text) {
   if (innerWidth > 620) inspectorTab(false);
   if (byId("thinking").textContent) { const card = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); card.className = "message reasoning-history"; summary.textContent = "Previous turn · thinking"; content.textContent = byId("thinking").textContent; card.append(summary, content); byId("messages").append(card); }
+  finishStreaming(); thinkingBreak = false;
   streaming = undefined; message(text, "you"); streaming = undefined;
   toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0";
   byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Waiting for the model’s reasoning stream. Tool activity appears below.";
@@ -102,7 +231,7 @@ async function task(text) {
   if (!text.trim() || working || repositoryBusy || native) { return; }
   if (hasUnsavedFile()) { toast("Save or discard your file edits before starting a task."); return; }
   retryStart = false; lastTask = text; byId("error").hidden = true;
-  byId("prompt").value = "";
+  byId("prompt").value = ""; byId("prompt").style.height = "";
   try { byId("send").disabled = true; await api("/api/task", { text }); } catch (error) { showError({message:error.message}); }
 }
 byId("start").onclick = () => start();
@@ -160,8 +289,7 @@ async function update() {
       if (event.kind === "status") { byId("status").textContent = event.text; }
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
-        const card = document.createElement("article"); card.className = "approval-card"; card.dataset.approval = event.data.id; const title = document.createElement("h3"); title.textContent = event.data.kind === "mcp" ? `Allow MCP call: ${event.data.title}?` : `Save changes to ${event.data.file}?`;
-        const preview = document.createElement("pre"); preview.textContent = event.data.after; card.append(title, preview); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
+        const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         for (const [label, allow] of [[event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true], [event.data.kind === "mcp" ? "Deny call" : "Keep my file", false]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
@@ -171,6 +299,34 @@ async function update() {
     }
   } catch { if (!native) { showError({ message: "The assistant has stopped. Open the app again to continue.", action: "OK" }); } }
   finally { polling = false; }
+}
+function diffLines(before, after) {
+  const a = before.split("\n"), b = after.split("\n");
+  if (a.length * b.length > 250000) return [...a.map((text) => ["del", text]), ...b.map((text) => ["add", text])];
+  const table = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) table[i][j] = a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+  const lines = []; let i = 0, j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) { lines.push(["same", a[i]]); i++; j++; }
+    else if (i < a.length && (j >= b.length || table[i + 1][j] >= table[i][j + 1])) lines.push(["del", a[i++]]);
+    else lines.push(["add", b[j++]]);
+  }
+  return lines;
+}
+function approvalCard(data) {
+  const card = document.createElement("article"), head = document.createElement("div"), text = document.createElement("div"), title = document.createElement("h3"), sub = document.createElement("span");
+  card.className = "approval-card"; card.dataset.approval = data.id; head.className = "approval-head"; sub.className = "approval-sub";
+  const mcp = data.kind === "mcp"; const editing = !mcp && Boolean(data.before);
+  title.textContent = mcp ? `Allow MCP call: ${data.title}?` : `Save changes to ${data.file}?`;
+  const lines = (value) => value.split("\n").length;
+  sub.textContent = mcp ? "Review the arguments this tool will receive" : `${data.path || data.file} · ${editing ? `replaces ${lines(data.before)} line${lines(data.before) === 1 ? "" : "s"} with ${lines(data.after)}` : `writes ${lines(data.after)} line${lines(data.after) === 1 ? "" : "s"}`}`;
+  text.append(title, sub); head.append(icon(mcp ? "plug" : "shield"), text); card.append(head);
+  if (editing) {
+    const diff = document.createElement("div"); diff.className = "diff"; diff.setAttribute("role", "group"); diff.setAttribute("aria-label", "Proposed change");
+    for (const [kind, line] of diffLines(data.before, data.after)) { const row = document.createElement("div"); row.className = `diff-line ${kind}`; row.dataset.sign = kind === "add" ? "+" : kind === "del" ? "−" : " "; row.textContent = line || " "; diff.append(row); }
+    card.append(diff);
+  } else { const preview = document.createElement("pre"); preview.textContent = data.after; card.append(preview); }
+  return card;
 }
 setInterval(update, 500);
 if (!native) { void update(); }
@@ -329,8 +485,9 @@ byId("open-updates").onclick = () => openSettings("updates");
 byId("quick-max").onclick = () => { openSettings("models"); byId("max-selection").open = true; };
 byId("close-settings").onclick = () => byId("settings-dialog").close();
 for (const button of document.querySelectorAll("[data-settings]")) button.onclick = () => openSettings(button.dataset.settings);
-byId("theme-toggle").onclick = () => { document.documentElement.classList.toggle("light"); try { localStorage.setItem("stick-theme", document.documentElement.classList.contains("light") ? "light" : "dark"); } catch {} };
-try { document.documentElement.classList.toggle("light", localStorage.getItem("stick-theme") === "light"); } catch {}
+function applyTheme(light) { document.documentElement.classList.toggle("light", light); byId("theme-label").textContent = light ? "Dark appearance" : "Light appearance"; }
+byId("theme-toggle").onclick = () => { const light = !document.documentElement.classList.contains("light"); applyTheme(light); try { localStorage.setItem("stick-theme", light ? "light" : "dark"); } catch {} };
+{ let saved = null; try { saved = localStorage.getItem("stick-theme"); } catch {} const system = matchMedia("(prefers-color-scheme: light)"); applyTheme(saved ? saved === "light" : system.matches); system.addEventListener?.("change", (event) => { let chosen = null; try { chosen = localStorage.getItem("stick-theme"); } catch {} if (!chosen) applyTheme(event.matches); }); }
 byId("sidebar-toggle").onclick = () => { if (innerWidth <= 860) document.body.classList.toggle("sidebar-open"); else document.body.classList.toggle("sidebar-hidden"); };
 byId("activity-toggle").onclick = () => { if (innerWidth <= 620) document.body.classList.toggle("inspector-open"); else document.body.classList.toggle("inspector-hidden"); };
 function inspectorTab(file) { byId("activity-panel").hidden = file; byId("file-panel").hidden = !file; byId("tab-file").classList.toggle("active", file); byId("tab-activity").classList.toggle("active", !file); document.body.classList.remove("inspector-hidden"); if (innerWidth <= 620) document.body.classList.add("inspector-open"); }
@@ -339,13 +496,15 @@ function renderTool(data) {
   let card = toolCards.get(data.step);
   if (!card) {
     if (!toolCards.size) byId("tool-activity").textContent = "";
-    card = document.createElement("div"); card.className = "tool-card";
+    card = document.createElement("div"); card.className = "tool-card"; thinkingBreak = true;
+    const badge = document.createElement("span"); badge.className = "tool-icon"; badge.append(icon(({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book"})[data.tool] || "sparkle")); card.append(badge);
     const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill"})[data.tool] || data.tool;
-    const path = document.createElement("span"); path.className = "tool-path"; path.textContent = data.path || data.detail || "Project workspace"; for (const [id,name] of mcpNames) path.textContent = path.textContent.replace(id,name);
+    const path = document.createElement("span"); path.className = "tool-path"; path.textContent = [".", "./", ""].includes(data.path ?? "") ? data.detail || "Project root" : data.path; for (const [id,name] of mcpNames) path.textContent = path.textContent.replace(id,name);
     card.append(title,path); byId("tool-activity").append(card); toolCards.set(data.step,card); byId("tool-count").textContent = String(toolCards.size);
   }
   if (data.phase === "finish") {
-    card.classList.add(data.result?.startsWith("Error:") || data.result === "Denied by user" ? "failed" : "complete");
+    const failed = data.result?.startsWith("Error:") || data.result === "Denied by user";
+    card.classList.add(failed ? "failed" : "complete"); card.querySelector(".tool-icon")?.replaceChildren(icon(failed ? "x" : "check"));
     const details = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); summary.textContent = "Result"; content.textContent = data.result || "Finished"; details.append(summary,content); card.append(details);
     if (["write_file","edit_file"].includes(data.tool)) { void refreshFiles(); void reloadCurrentFile(data.path); }
   }
@@ -354,10 +513,13 @@ async function fileEntries(parent,path) {
   const result = await api(`/api/files?path=${encodeURIComponent(path || ".")}`);
   for (const entry of result.entries) {
     const relative = path ? `${path}/${entry.name}` : entry.name;
-    const button = document.createElement("button"), icon = document.createElement("span"), name = document.createElement("span"); button.className = "file-entry"; button.title = relative; icon.className = "file-icon"; icon.textContent = entry.directory ? "▸" : "·"; name.textContent = entry.name; button.append(icon,name); parent.append(button);
+    const button = document.createElement("button"), glyph = document.createElement("span"), name = document.createElement("span"); button.className = `file-entry${entry.directory ? " is-dir" : ""}${relative === currentFile ? " active" : ""}`; button.title = relative; button.dataset.path = relative; glyph.className = "file-icon"; glyph.append(icon(entry.directory ? "folder" : "file")); name.textContent = entry.name;
+    const chevron = icon("chevron"); chevron.classList.add("chev"); if (!entry.directory) chevron.classList.add("blank");
+    button.append(chevron,glyph,name); parent.append(button);
     if (entry.directory) {
+      button.setAttribute("aria-expanded", "false");
       const children = document.createElement("div"); children.className = "file-children"; children.hidden = true; parent.append(children);
-      const expand = async () => { if (children.hidden) { children.textContent = ""; await fileEntries(children,relative); children.hidden = false; expandedFolders.add(relative); icon.textContent = "▾"; } else { children.hidden = true; expandedFolders.delete(relative); icon.textContent = "▸"; } };
+      const expand = async () => { if (children.hidden) { children.textContent = ""; await fileEntries(children,relative); children.hidden = false; expandedFolders.add(relative); button.classList.add("open"); button.setAttribute("aria-expanded", "true"); } else { children.hidden = true; expandedFolders.delete(relative); button.classList.remove("open"); button.setAttribute("aria-expanded", "false"); } };
       button.onclick = () => expand().catch(error => toast(error.message));
       if (expandedFolders.has(relative)) await expand();
     } else button.onclick = () => openFile(relative);
@@ -379,7 +541,7 @@ function clearEditor() { fileRequest++; currentFile = ""; originalFile = ""; byI
 async function openFile(path) {
   if (currentFile && byId("file-editor").value !== originalFile) { toast("Save or discard your file edits before opening another file."); return; }
   const requestId = ++fileRequest, epoch = projectEpoch;
-  try { const result = await api(`/api/file?path=${encodeURIComponent(path)}`); if (requestId !== fileRequest || epoch !== projectEpoch) return; if (hasUnsavedFile()) { toast("Your unsaved edits were kept. Save or discard them before switching files."); return; } currentFile = result.path; originalFile = result.content; byId("file-title").textContent = path; byId("file-title").title = path; byId("file-editor").value = result.content; byId("file-editor").disabled = false; byId("file-editor").readOnly = working; byId("file-status").textContent = "Saved on this stick"; updateEditorState(); inspectorTab(true); document.body.classList.remove("sidebar-open"); }
+  try { const result = await api(`/api/file?path=${encodeURIComponent(path)}`); if (requestId !== fileRequest || epoch !== projectEpoch) return; if (hasUnsavedFile()) { toast("Your unsaved edits were kept. Save or discard them before switching files."); return; } currentFile = result.path; originalFile = result.content; byId("file-title").textContent = path; byId("file-title").title = path; byId("file-editor").value = result.content; byId("file-editor").disabled = false; byId("file-editor").readOnly = working; byId("file-status").textContent = "Saved on this stick"; updateEditorState(); for (const entry of document.querySelectorAll(".file-entry")) entry.classList.toggle("active", entry.dataset.path === currentFile); inspectorTab(true); document.body.classList.remove("sidebar-open"); }
   catch (error) { toast("Could not open this file. Text files under 1 MiB are supported."); }
 }
 byId("file-editor").oninput = updateEditorState;
@@ -401,7 +563,7 @@ byId("local-project").onclick = () => { if (native) return; if (lastRepository) 
 byId("prompt").addEventListener("keydown", event => { if (!byId("skill-menu").hidden && ["ArrowDown","ArrowUp","Enter","Escape"].includes(event.key)) { event.preventDefault(); if (event.key === "Escape") byId("skill-menu").hidden = true; else if (event.key === "Enter") chooseSkillMenu(); else { skillMenuIndex += event.key === "ArrowDown" ? 1 : -1; highlightSkillMenu(); } return; } if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!byId("send").disabled) byId("question").requestSubmit(); } });
 byId("prompt").addEventListener("input", () => { renderSkillMenu(); byId("prompt").style.height = "auto"; byId("prompt").style.height = Math.min(230,byId("prompt").scrollHeight) + "px"; });
 document.addEventListener("keydown", event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") { event.preventDefault(); byId("new-session").click(); } });
-for (const button of document.querySelectorAll("[data-prompt]")) button.onclick = () => { byId("prompt").value = button.dataset.prompt; byId("prompt").focus(); };
+for (const button of document.querySelectorAll("[data-prompt]")) button.onclick = () => { byId("prompt").value = button.dataset.prompt; byId("prompt").dispatchEvent(new Event("input")); byId("prompt").focus(); };
 if (native) {
   byId("new-session").disabled = true;
   for (const id of ["github-connect","github-resume","github-review","github-disconnect","github-refresh","github-publish"]) byId(id).disabled = true;
