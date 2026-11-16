@@ -54,7 +54,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
     const cancel = (): void => finish(false);
     approvals.set(id, finish); signal.addEventListener("abort", cancel, { once: true });
-    publish("approval", undefined, { id, file: basename(args.path ?? "your file"), before: args.old ?? "", after: args.new ?? args.content ?? "" });
+    publish("approval", undefined, { id, file: basename(args.path ?? "your file"), path: args.path ?? "", before: args.old ?? "", after: args.new ?? args.content ?? "" });
   }));
   let tools = makeTools();
   let extensionStatus = ""; let extensionProblem = "";
