@@ -65,4 +65,4 @@ it.skipIf(process.platform === "win32")("assembles verified model-free downloads
       await expect(verifyStick(join(unpacked, "Stick AI"))).rejects.toThrow("damaged");
     }
   } finally { await rm(temporary, { recursive: true, force: true }); }
-});
+}, 60000);

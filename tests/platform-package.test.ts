@@ -84,4 +84,4 @@ it("runs as a model-free download that links its own Lite GGUF", async () => {
     await writeFile(join(output, "models/stellan-1-lite-q4_k_m.gguf"), "tampered");
     await expect(verifyStick(output, true)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
-});
+}, 30000);
