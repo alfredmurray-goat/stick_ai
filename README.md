@@ -1,53 +1,154 @@
-# stick_ai
+<div align="center">
 
-## One app, Lite + Max
+<img src="docs/hero.png" alt="The Stick AI workspace: a file tree on the left, a formatted answer with a code block in the middle, and live thinking and tool activity on the right" width="820">
 
-Current complete releases bundle both models in **Stick AI — Lite + Max**. On the welcome screen choose paired Lite + Max, Lite only, or Max directly (code only). Max needs at least 16 GiB RAM. You can also link an existing Max GGUF elsewhere on your stick without copying it. The original Stellan-1.0 GGUF is the confirmed Max file. See [DESKTOP.md](DESKTOP.md) and [BUILDS.md](BUILDS.md) for the current unified release and package requirements.
+# Stick AI
 
-## Model-free download
+**A private coding assistant that runs entirely on your computer.**
 
-Each desktop release also offers `stick_ai-<platform>-model-free` for all four platforms: the same app with no model files inside, so it downloads in minutes. On the welcome screen choose **Choose your Lite GGUF**, then optionally link Max under **Models & settings**. Both files are linked by path from your stick or computer, never copied or downloaded. Linked files must stay connected and unchanged; a changed file must be chosen again.
+Ask Stellan to explore, explain, fix or build code. It reads your files, plans the work, asks before it changes anything, and never sends your code or prompts anywhere. Everything runs from a USB stick or a folder on your computer.
 
-## Apple Silicon GPU
+[![macOS 13.5+](https://img.shields.io/badge/macOS-13.5%2B-000000?logo=apple&logoColor=white)](#install)
+[![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
+[![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
+[![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
+[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-E2A07B)](#benchmarks)
+[![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
+[![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-On Apple Silicon Macs the bundled llama.cpp server is built with Metal. Lite runs on the GPU; Max (14.3 GB) uses the GPU only on Macs with at least 24 GiB, because macOS limits GPU working memory to roughly two thirds of RAM. If the GPU cannot load a model, the app retries on the CPU automatically for the rest of the session. Set `STICK_GPU=0` to force CPU-only. Intel Macs, Windows and Linux stay CPU-only.
+</div>
+
+## Features
+
+- **Fully local.** Stellan runs on your own computer through a bundled llama.cpp server. No account, no cloud, no telemetry.
+- **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code when your computer has 16 GB or more. Use them together, Lite on its own, or Max directly.
+- **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
+- **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
+- **Readable answers.** Replies render with headings, lists, tables and code blocks with a Copy button.
+- **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
+- **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
+- **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
+- **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch.
+- **MCP servers and skills.** Connect local or remote MCP tool servers and reusable SKILL.md workflows. Every MCP call asks first.
+- **Signed app updates.** The app checks for signed updates and installs them without re-downloading your models.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, showing the old line in red and the new line in green, with Allow changes and Keep my file buttons"></td>
+    <td width="50%"><img src="docs/welcome-light.png" alt="The Stick AI welcome screen in light mode with an Open workspace button and three feature cards"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Every change is yours to approve</b></td>
+    <td align="center"><b>Light and dark, following your system</b></td>
+  </tr>
+</table>
+
+## Benchmarks
+
+Measured with the release Lite GGUF and the app's own llama.cpp server settings, CPU only, on a 4-core cloud machine.
+
+| Benchmark | What it measures | Stellan-1 Lite |
+| --- | --- | --- |
+| **HumanEval, 21-problem sample** | Writing a Python function that passes hidden unit tests | **17 / 21 (81%)**, pass@1 |
+
+- **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The sample is every 8th problem of the 164 (`HumanEval/0, 8, 16, … 160`).
+- **Read it as an estimate.** 21 problems is a small sample, so the 95% confidence interval is roughly **60% to 92%**. A full 164-problem run will replace this figure.
+- **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
+- **Max and agentic tasks.** Coding results for Max, and agentic results for Lite and Lite + Max on real multi-step tasks in the app, are being measured and will be added here.
+
+**Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 
 ## Download
 
-[Download stick_ai from GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases).
+Get Stick AI from [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases). Each release has two kinds of download.
 
-Choose Apple Silicon Mac, Intel Mac, Windows x64 or Linux x64. The release page links complete Lite packages and provides permanent split assets with checksum-verifying join helpers. Complete Actions links last 14 days; permanent release parts remain available. See [BUILDS.md](BUILDS.md) for extraction, prerequisites, verification and rebuilding.
-
-The app and both Lite and Max models are included; no Node.js or Ollama installation is required. These are unsigned test builds. Macs require macOS 13.5+; Windows needs an existing WebView2 runtime, and Linux needs GTK 3/WebKitGTK 4.1. All need at least 8 GiB reported RAM. Review proposed changes: the model made accuracy errors in stricter identifier-copy tests. See [VERIFICATION.md](VERIFICATION.md) for checks and limitations.
-
-An offline desktop and terminal coding assistant by localilabs. It streams responses from Stellan-1 Lite or Stellan-1 Max through Ollama or the portable llama.cpp server, plans work, calls tools, reads results and continues until finished or the configured step limit is reached. It is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
-
-## Builds for every supported desktop
-
-The [Desktop builds — Lite + Max workflow](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) builds and tests the app for all four platforms. The release publisher adds the pinned Max model and publishes complete packages containing both GGUFs. Download from GitHub Releases, using all parts and the Join helper for your platform. Temporary Actions base artifacts are internal build inputs, not the complete two-model downloads. App-only signed updates omit model bytes and keep your existing weights.
-
-| Download artifact | Computer | Open after extracting | Desktop requirements |
+| Download | What's inside | Size | Best for |
 | --- | --- | --- | --- |
-| stick_ai-macos-arm64 | Apple Silicon Mac | Stick AI.app | macOS 13.5+, 8 GiB RAM |
-| stick_ai-macos-x64 | Intel Mac | Stick AI.app | macOS 13.5+, 8 GiB RAM |
-| stick_ai-windows-x64 | Windows Intel/AMD 64-bit | Stick AI.exe | Windows 10+, 8 GiB RAM, existing Edge WebView2 |
-| stick_ai-linux-x64 | Linux Intel/AMD 64-bit | stick-ai | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GiB RAM |
+| **Complete** (`stick_ai-<platform>`) | The app, runtimes, Lite and Max | Large, split into parts | Plug-and-play on a fresh stick |
+| **Model-free** (`stick_ai-<platform>-model-free`) | The app and runtimes, no model files | Small, one file | You already have the Stellan GGUFs |
 
-Join the release parts, extract the finished archive, and keep the resulting folder together. Linux uses an inner tar.gz to preserve executable permissions. Windows and Linux desktop webviews are system prerequisites, so these are not universal no-install packages on computers lacking those components. Technical browser fallbacks use the bundled Node and the computer's existing browser. All packages use the same low-memory Lite settings, explicit Mistral-v1 compatibility formatter and validated tagged tool protocol. Complete unified releases include Max; older Lite-only packages do not. The old Intel-only workflow remains a manual compatibility workflow.
+| Platform | Open after extracting | You need |
+| --- | --- | --- |
+| Apple Silicon Mac | `Stick AI.app` | macOS 13.5+, 8 GB RAM |
+| Intel Mac | `Stick AI.app` | macOS 13.5+, 8 GB RAM |
+| Windows x64 | `Stick AI.exe` | Windows 10+, 8 GB RAM, Edge WebView2 |
+| Linux x64 | `stick-ai` | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GB RAM |
 
-These are unsigned builds. Gatekeeper, SmartScreen and interactive first launch on clean user machines require manual qualification. The build runs native dry-run, checksum verification and a real Lite read_file/tool_result/done exchange before uploading a complete artifact; a successful CI run does not prove general model accuracy.
+Max needs at least 16 GB RAM. Genuine Mac disk images (DMGs) are published as a separate **Stick AI — Mac DMGs** release.
 
-## App updates
+> [!TIP]
+> Complete downloads are split into parts because GitHub limits each file to 2 GB. Put every part and the **Join helper** for your platform in one folder, open the Join helper once, then extract the finished archive. The helper checks every part's checksum for you.
 
-New platform-specific desktop builds check for signed app updates when opened. Click **Update and restart** to download the app and runtimes while retaining your existing models, projects and logs. Private releases require read-only GitHub access configured once on each device. Offline use still works, and automatic checks can be turned off. Older installed copies need one final complete download to gain the updater. See [UPDATES.md](UPDATES.md) for setup, signing and recovery.
+> [!NOTE]
+> These are unsigned test builds. The first time you open one, macOS Gatekeeper or Windows SmartScreen may ask you to confirm. On a Mac, right-click the app and choose **Open**.
 
-## Desktop app
+## Install
 
-The desktop app is the main buyer entry point: open the app and click Start. No terminal, typed setup or installed Node/Ollama is needed when using a complete prepared stick on a supported computer with its system webview available. This repository is source plus release tooling, not a ready-to-run model distribution. See [DESKTOP.md](DESKTOP.md) for native builds, privacy limits, cancellation and hardware qualification. Start.command, Start.bat and start.sh remain technical browser fallbacks.
+1. Download and extract the release for your platform, and keep the extracted folder together.
+2. Open **Stick AI** (`Stick AI.app`, `Stick AI.exe` or `stick-ai`).
+3. Click **Open workspace**. Stellan loads on your computer and the workspace opens.
 
-## Terminal installation
+No terminal, Node.js or Ollama is needed. `Start.command`, `Start.bat` and `start.sh` are technical fallbacks that open the same workspace in your browser.
 
-Use Node.js 24.22.1 LTS and npm. The engine, .nvmrc and CI are pinned to the exact Node version tested. Obtain the source repository, then run:
+### Model-free download
+
+<p align="center">
+  <img src="docs/model-free.png" alt="The welcome screen of a model-free download with a Choose your Lite GGUF button and a note that this download has no model files" width="820">
+</p>
+
+1. Open the app. The welcome screen shows **Choose your Lite GGUF**.
+2. Pick your `stellan-1-lite` `.gguf` file. **Open workspace** unlocks.
+3. Optionally, link Max under **Models & settings → Use a Max file already on your stick**.
+
+Files are linked by path, never copied. Keep them outside the app folder, for example beside it on the same stick, and they keep working if you move the whole stick. If a linked file changes, the app asks you to choose it again.
+
+## Using the workspace
+
+- **Ask anything.** Type in the box at the bottom, or start from a suggestion such as *Explore this project* or *Find a bug*. Press ↵ to send and Shift ↵ for a new line.
+- **Approve changes.** When Stellan wants to edit a file, an approval card shows the exact before-and-after lines. Click **Allow changes** or **Keep my file**.
+- **Follow along.** The **Activity** panel streams Stellan's thinking and every tool it uses. **Stop** or Esc cancels at any time.
+- **Edit files yourself.** Click a file in the sidebar to open it in **File preview**, edit it and save.
+- **Use skills.** Type `/` to pick a skill, or manage them under **Skills**.
+- **Switch appearance.** It follows your system's light or dark mode until you choose one.
+
+## Privacy
+
+- **Inference is offline.** Prompts, code and answers stay on your computer. The model server listens only on an authenticated local connection.
+- **No telemetry.** There are no analytics or cloud fallbacks.
+- **What does use the network.** The app checks GitHub for signed app updates (you can turn this off), GitHub workspaces talk to GitHub when you connect them, and remote MCP servers receive only the calls you approve.
+- **Integrity checks.** Every app file is checked against a recorded SHA-256 before starting. A changed file is reported, not run.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Desktop app"] --> B["Local workspace (authenticated loopback)"]
+    B --> C["Agent loop"]
+    C <-->|"streamed tagged protocol"| D["llama.cpp server · Stellan-1 Lite"]
+    C -->|"tool calls"| E["Project files, search, edits"]
+    E -.->|"changes wait for"| F["Your approval"]
+    C -->|"delegate_code"| G["Stellan-1 Max writes code"]
+    G -.->|"Lite reviews and applies"| C
+```
+
+- **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags, constrained by a grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
+- **Lite and Max take turns.** In paired mode, only one model is loaded at a time. When Lite delegates, Max is started, writes the code, and Lite is restarted to review and apply it.
+- **Prompt cache.** Lite keeps its conversation cache with one context checkpoint (about 0.3 GB), and old tool output is trimmed in large steps so the start of the conversation stays identical. Each step processes only new text.
+- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite always uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Set `STICK_GPU=0` to force the CPU.
+
+## Configuration
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `STICK_GPU` | on (Apple Silicon) | `0` keeps every model on the CPU. |
+| `STICK_CONTEXT_MAX_BYTES` | `16384` | How much tool output and named-file context is sent per request (256 to 1048576). |
+| `STICK_MODEL` | `stellan-1-lite` | Terminal model: `stellan-1-lite` or `stellan-1-max`. |
+| `STICK_BASE_URL` | `http://localhost:11434` | Terminal model endpoint (`/v1/chat/completions`). Local addresses only unless `--allow-remote`. |
+| `STICK_SHELL` | your shell | Shell for `run_shell`, for example `pwsh.exe` on Windows. |
+
+## Terminal use
+
+Stick AI also runs as a terminal assistant with your own Ollama models. Use Node.js 24.22.1 and npm.
 
 ```sh
 npm install
@@ -56,11 +157,7 @@ npm test
 npm link
 ```
 
-Installation downloads development tooling; the installed assistant has zero npm runtime dependencies and requires no network apart from its configured model endpoint. There are no analytics, telemetry or cloud fallbacks in the assistant itself. The desktop updater separately checks GitHub for signed app updates unless checks are disabled; it does not send prompts or source files. Approved shell commands in restricted mode can access the network. Download dependencies and weights before working offline. This repository contains no model weights or claimed trained adapter.
-
-## Prepare Stellan
-
-Install Ollama separately. Supply your verified, merged Lite GGUF as `stellan-1-lite.gguf` beside `Modelfile`; optionally supply `stellan-1-max.gguf` for Max. Run:
+Prepare Stellan in Ollama by placing your verified GGUFs beside the Modelfiles:
 
 ```sh
 ollama create stellan-1-lite -f Modelfile
@@ -68,98 +165,99 @@ ollama create stellan-1-max -f Modelfile.max
 ollama serve
 ```
 
-If Ollama already runs as a service, do not start a second server. Both Modelfiles import the respective GGUF tokenizer/chat template; a plain base GGUF does not become a fine-tune merely by renaming it. The weights must be trained for the tagged protocol below; the app does not request native OpenAI tool calling. Verify the real weights, chat template and Ollama version. Verify with the opt-in integration test. No template is fabricated here.
-
-## Use
-
-Run from the project you want to edit; that directory becomes the root:
+Then run from the project you want to edit:
 
 ```sh
-stick init
 stick doctor
-stick
 stick chat
 stick run "Inspect this repository and fix its failing tests"
-stick run "Create the requested project" --yes
 ```
 
-Writes, exact edits and every shell command require terminal approval. `--yes` skips approval for that invocation only. Noninteractive invocations deny changes unless `--yes` is supplied. `/exit` exits, `/clear` deletes the current history and `/history` displays it. Ctrl+C cancels the active request, approval or command; the chat remains open. One-shot cancellation exits with status 1; a step limit exits with status 2.
+<details>
+<summary><b>More about terminal use</b></summary>
 
-`.stick/config.json` contains:
+- Writes, edits and every shell command need your approval. `--yes` skips approval for that one run. Non-interactive runs deny changes unless `--yes` is given.
+- `/exit` exits, `/clear` deletes the current history and `/history` shows it. Ctrl+C cancels the active request, approval or command and keeps the chat open. A cancelled one-shot run exits with status 1, and reaching the step limit exits with status 2.
+- `.stick/config.json` holds `model`, `baseUrl` and `maxSteps` (1 to 1000). `STICK_MODEL` and `STICK_BASE_URL` override them. Only `localhost`, `127.0.0.1` and `::1` are accepted unless you pass `--allow-remote`, which sends prompts and tool results to that endpoint.
+- Max is locked below 16 GiB of total RAM. `--force-max` overrides it for one run, with a warning that Max may be very slow or crash. `stick doctor` shows total memory and the lock status without loading a model.
+- Files must be UTF-8 and at most 1 MiB. Search returns up to 200 matching lines and skips `.git`, `.stick` and `node_modules`. There is no execution or inactivity deadline; use Cancel or Ctrl+C.
+- History is appended to `.stick/history.jsonl`, and one session per project is enforced with `.stick/session.lock`. History stores source contents in plain text, so keep `.stick` out of version control.
 
-```json
-{
-  "model": "stellan-1-lite",
-  "baseUrl": "http://localhost:11434",
-  "maxSteps": 20
-}
-```
+</details>
 
-`STICK_MODEL` and `STICK_BASE_URL` override those fields. `maxSteps` accepts integers from 1 through 1000. The endpoint is always `/v1/chat/completions`; the base URL can optionally end in `/v1`. Only literal localhost, 127.0.0.1 and ::1 are accepted by default. Localhost is pinned to IPv4 loopback, redirects are refused, and credentials in URLs are rejected. `--allow-remote` explicitly opts into sending prompts and tool results to the configured remote model; that invocation is no longer offline. Use a local-only Ollama model, not an Ollama cloud-backed tag. stick_ai cannot inspect how an independently operated endpoint routes requests.
+## Shell sandboxing
 
-Thinking in `<think>...</think>` is separated and dimmed on a TTY even when tags cross streaming chunks. Tool arguments and compact results appear in the terminal. Tool output and file reads are bounded. Files must be UTF-8 and at most 1 MiB; search returns up to 200 matching lines and scans up to 10,000 entries, excluding `.git`, `.stick` and `node_modules`. Model requests and shell commands have no application execution or inactivity deadline; use Cancel or Ctrl+C to stop work. The old STICK_IDLE_TIMEOUT_SECONDS setting is no longer used. Automatic project context includes only a bounded file list and task-named files, configurable with STICK_CONTEXT_MAX_BYTES. Desktop thinking is collapsed behind Show thinking, with live progress and Cancel.
-
-## Models and RAM lock
-
-`stellan-1-lite` (Stellan-1 Lite) is the default. `stellan-1-max` (Stellan-1 Max) is the only other supported identifier. Interactive chat displays a numbered picker; press Enter to keep the configured model. Below 16 * 1024^3 bytes of total RAM, Max is disabled and grey on a TTY, with: `Stellan-1 Max needs 16GB RAM or more. Your Mac has X GB.` Non-TTY output retains the disabled text without ANSI colour. Lite is never RAM-locked; it is the intended 8GB option.
-
-RAM is measured at startup with `os.totalmem()`. The threshold uses exact bytes, not the rounded display. It measures total RAM, not free RAM, GPU memory or an estimate of a particular quantization's requirements. Max is refused before making a model request even when selected through `.stick/config.json` or `STICK_MODEL`. `stick doctor` prints total bytes, displayed GB, Max lock/override status and whether the configured model is eligible. Doctor never loads a model.
-
-Use `stick chat --force-max` or `stick run "task" --force-max` to override the Max lock for that invocation. This always prints a warning that Max may be very slow or crash. `--yes` does not bypass the RAM lock. Existing stored `stellan-1.0` configurations map to Lite for compatibility; an explicit obsolete or unknown `STICK_MODEL` value is rejected. Picker choices last for the current session; edit config or set STICK_MODEL to retain a preference.
-
-## Tagged agent protocol
-
-The training protocol is plain text inside the streamed chat response:
-
-```text
-<tool_call>{"name":"list_dir","arguments":{"path":"."}}</tool_call>
-```
-
-Allowed names, exactly: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`. The first complete call terminates that model step's stream. Later calls or summaries from that response are discarded. The agent executes at most that one validated call and then supplies the next user message as `<tool_result>result text</tool_result>`. Invalid JSON, unknown tool names, missing argument objects and tool failures produce an error in the same result wrapper so the model can recover. Unknown names are also printed to the terminal and never dispatched to a tool. Old native-call history is converted to text-only messages when sent to the model; new history uses only the tagged protocol.
-
-Completion requires `<done>Final summary</done>`; only the summary inside the tags is printed as the final answer. An ordinary prose response without the required tags produces a recoverable protocol error instead of silently finishing. `<think>...</think>` is displayed separately and dimmed on a TTY; reasoning tags never appear in the visible answer. A tool call written inside a thought is not executed. Literal thinking tags inside tool JSON strings remain file content. OpenAI `tools`, `tool_choice`, tool roles and tool-call IDs are not sent to Ollama. The existing step limit also bounds malformed-response recovery.
-
-## Platform support and shell isolation
-
-At startup stick_ai detects `darwin`, `win32` or `linux`, selects a backend, and probes native sandbox startup with a fixed `exit 0` command and a three-second deadline. `stick doctor` prints the platform, selected backend, shell, canonical working directory and any fallback warning. A successful startup probe is not a full confinement audit. The test suite separately attempts an outside-project write when an enforcing backend is available.
-
-| Platform | Preferred backend | Filesystem and network limits | Fallback |
+| Platform | Backend | Limits | Fallback |
 | --- | --- | --- | --- |
-| macOS | Apple `sandbox-exec`, generated deny-by-default profile | Project read/write; standard OS, Homebrew and developer-tool paths read-only; filesystem metadata readable. Network denied. `.stick` session state protected except `.stick/tmp`. `/dev/null` is writable for normal redirection. | Restricted mode with an explicit warning if the executable is absent or its capability probe fails. |
-| Linux | bubblewrap with user, mount, PID and network namespaces | Project writable; standard runtime/toolchain directories read-only. Network namespace has no host network. `.stick` state is hidden except writable `.stick/tmp`. Minimal `/dev` and namespaced `/proc` are runtime exceptions. | Restricted mode with an explicit warning if bubblewrap is missing, user namespaces are blocked or the startup probe fails. |
-| Windows | Restricted child process | Canonical working directory check and cleaned environment only. **No OS filesystem isolation, no network isolation, no restricted token or Job Object.** Commands retain your account permissions. | This is the baseline Windows backend; every approval displays its warning. |
+| macOS | Apple `sandbox-exec` with a deny-by-default profile | Project read/write; system and developer tools read-only; no network | Restricted mode with a warning |
+| Linux | bubblewrap with user, mount, PID and network namespaces | Project writable; toolchains read-only; no host network | Restricted mode with a warning |
+| Windows | Restricted child process | Working-directory check and cleaned environment only. **No filesystem or network isolation.** | Always shows its warning |
 
-Restricted mode on any platform does not confine arbitrary shell syntax. A command can change directory, use absolute paths, launch programs, contact a network or change files outside the root. The file tools still enforce their separate path rules. Do not treat a working directory or cleaned environment as a sandbox. `--yes` bypasses approval but does not suppress fallback warnings. Never retry a sandbox-denied command outside its sandbox automatically: backend selection happens at startup; ordinary command failures are returned to the agent.
+Restricted mode does not confine arbitrary shell syntax: a command can use absolute paths, reach the network or change files outside the project. File tools still enforce their own path rules. Commands that a sandbox denies are never retried unsandboxed. Review every command you approve.
 
-POSIX commands use your `SHELL` (`zsh`/`bash`, with `sh` supported). Windows uses `ComSpec` (`cmd`) by default; select `powershell.exe` or `pwsh.exe` with `STICK_SHELL`. `STICK_SHELL` can also override the POSIX shell and accepts an absolute executable path or a shell name on PATH. Noninteractive profiles are disabled. PowerShell receives the exact command as UTF-16LE encoded text; cmd receives it with `/d /s /c`. Approval shows the lossless JSON-encoded command, canonical working directory and backend name.
+<details>
+<summary><b>Sandbox details</b></summary>
 
-The environment preserves PATH and essential Windows loader variables, removes inherited credentials and startup injection variables, and points HOME/USERPROFILE and temporary directories inside the project. POSIX shell cancellation kills the detached process group. Windows uses the system `taskkill.exe /PID <pid> /T /F` to force termination of the active process and descendants. Commands run until completion, failure or cancellation, with bounded cleanup time after termination. Process-group escape, reparenting, already-exited Windows parents and permission boundaries can defeat process-tree cleanup in restricted mode; no native Job Object guarantee is claimed. Cleanup errors are reported. CI tests bounded capability probes and ordinary child-process cancellation on all three operating systems.
+- At startup the app probes the native sandbox with a fixed `exit 0` command and a three-second deadline. `stick doctor` prints the platform, backend, shell, working directory and any fallback warning. A successful probe is not a full confinement audit.
+- POSIX commands use your `SHELL`. Windows uses `cmd` by default; choose PowerShell with `STICK_SHELL`. PowerShell receives the command as UTF-16LE encoded text, and cmd receives it with `/d /s /c`. Approval shows the JSON-encoded command, working directory and backend.
+- The environment keeps `PATH` and essential Windows loader variables, removes inherited credentials and injection variables, and points home and temporary directories inside the project. Cancellation kills the process group (POSIX) or the process tree with `taskkill /T /F` (Windows). Reparented processes are outside that guarantee.
+- File tools resolve real paths and reject traversal, absolute and drive-prefixed paths, escaping or dangling symlinks, special files and hard links. Windows drive and UNC boundaries, device names and alternate streams are checked.
+- Do not run untrusted processes that rename directories or change mounts while file tools are working. Node.js path APIs can't give a race-free sandbox against a hostile local process.
 
-Linux now mounts installed system toolchains read-only instead of requiring a copied `.stick/runtime`. The previous `sandbox:prepare` script remains available for existing users, but its copied runtime is no longer required or selected by run_shell. Tools installed only in a home-directory version manager may be inaccessible in an enforcing sandbox; use a standard system installation or a toolchain inside the project. Builds that need to download dependencies must obtain them beforehand or be run manually outside the agent's enforcing sandbox.
+</details>
 
-## TROUBLESHOOTING
+## Troubleshooting
 
-### macOS sandbox-exec deprecation
+<details>
+<summary><b>The app says the stick may be damaged</b></summary>
 
-Apple marks `sandbox-exec` deprecated; it may disappear or change on a future OS release. Run `stick doctor` after OS upgrades. Missing or unusable sandbox-exec selects restricted mode and explicitly warns before commands. This fallback is functional but is not a replacement security boundary. Use an isolated VM/container when enforcement is required and sandbox-exec is unavailable. A tool rejected by the generated profile returns an error; it is not automatically rerun unrestricted. Some Xcode services, home-directory toolchains, keychains, signing operations and caches outside the project are intentionally unavailable. The profile grants only listed system read paths, project read/write, metadata access, logging lookup and normal process operations.
+A file doesn't match its recorded checksum. Download a fresh copy and extract it again, keeping the whole folder together. In model-free copies, missing model files are expected and aren't reported as damage.
 
-### Windows warnings and shells
+</details>
 
-The Windows warning is expected: this implementation uses no native addon and cannot create a restricted token or Job Object through Node's standard APIs. Only approve commands you trust. Prefer an isolated VM for untrusted projects. Set `STICK_SHELL` to the absolute PowerShell executable if cmd is not suitable. Keep `SystemRoot` valid so process-tree cleanup can find the system taskkill executable. Verify descendant termination on your Windows build, including background jobs; reparented processes are outside the claimed guarantee. Symlink tests require Windows Developer Mode or permission to create symbolic links; CI runners must provide that capability. Directory link fixtures use junctions on Windows.
+<details>
+<summary><b>Open workspace is greyed out</b></summary>
 
-### Missing or blocked bubblewrap on Linux
+This is a model-free download with no Lite linked yet. Click **Choose your Lite GGUF** and pick your Stellan-1 Lite `.gguf`. If the file moved or changed, choose it again.
 
-Install your distribution's bubblewrap package and run `stick doctor`. Presence alone is insufficient: containers, AppArmor and disabled unprivileged user namespaces may prevent it from starting. The bounded capability probe reports the reason and selects restricted mode with a warning instead of hanging or pretending isolation works. Administrator policy changes should be made deliberately by the machine owner. A restricted-mode test asserts the warning; it does not count as proof of confinement. The native test must successfully write inside the project, fail to write an external sentinel and leave that sentinel unchanged.
+</details>
 
-## History and safety boundaries
+<details>
+<summary><b>The first answer takes a long time</b></summary>
 
-Conversation batches are appended to `.stick/history.jsonl`. Complete tool exchanges are persisted together, and an interrupted final JSONL record is repaired on resume. Cancellation after a completed write does not undo that write. A process crash between a tool effect and history persistence can leave an unrecorded effect; inspect the project before asking the agent to repeat changes. Writes use a same-directory temporary file, fsync and rename.
+The first message in a conversation has to be read in full, which can take a minute or more on a laptop CPU. Follow-up steps reuse that work and are much faster. Apple Silicon Macs use the GPU and are faster still. The activity panel shows live progress, and Stop cancels.
 
-One session per project is enforced with `.stick/session.lock`. After a crash, remove the lock only after confirming no session is running. History stores source contents locally in plaintext: protect `.stick` and exclude it from version control. File tools canonicalize existing paths with realpath, canonicalize the closest existing ancestor for new paths, and reject traversal, absolute/drive-prefixed paths, escaping or dangling symlinks, special files and hard links. Internal symlinks are resolved to canonical project paths. Windows drive/UNC boundaries, device names, alternate streams and filesystem case policy are checked; `.stick` aliases remain reserved. Approval text strips terminal control sequences.
+</details>
 
-The project directory and runtime must be under your control. Do not run concurrent untrusted processes that rename ancestor directories or manipulate mounts while file tools operate: Node.js path APIs cannot provide a race-free directory-descriptor sandbox against a hostile local process. The shell namespace is a separate OS boundary, not a guarantee against kernel vulnerabilities. Review approved commands; they can delete or change project files. No automated model output should be treated as a security policy.
+<details>
+<summary><b>Max is unavailable</b></summary>
 
-## Development and verification
+Max needs at least 16 GB of total RAM, and a Max GGUF that is bundled or linked. On a smaller computer, use Lite.
+
+</details>
+
+<details>
+<summary><b>macOS sandbox-exec warnings</b></summary>
+
+Apple marks `sandbox-exec` deprecated. Run `stick doctor` after macOS upgrades. If it's missing or unusable, the app uses restricted mode and warns before every command. Use a VM or container when you need enforced isolation.
+
+</details>
+
+<details>
+<summary><b>Linux: bubblewrap missing or blocked</b></summary>
+
+Install your distribution's `bubblewrap` package and run `stick doctor`. Containers, AppArmor or disabled user namespaces can stop it from starting; the probe reports why and falls back to restricted mode with a warning.
+
+</details>
+
+<details>
+<summary><b>Windows: command warnings</b></summary>
+
+The warning is expected. Windows commands run with your account's permissions because the app can't create a restricted token or Job Object. Only approve commands you trust, and prefer a VM for untrusted projects.
+
+</details>
+
+## Development
 
 ```sh
 npm run check
@@ -170,29 +268,20 @@ STICK_INTEGRATION=1 npm test -- tests/integration.test.ts
 npm run licenses
 ```
 
-The original test scenarios remain, with tagged-protocol assertions and a Windows directory-link fixture adjustment. New tests cover Linux/macOS/Windows path fixtures, drives, UNC, case rules, internal and escaping symlinks, backend selection/probe failure, exact approvals and warnings, environment cleaning, shell arguments, host confinement or explicit fallback warnings, process-tree timeout and cancellation. `.github/workflows/ci.yml` runs these tests, TypeScript checks, the build, doctor and licence regeneration on Ubuntu, macOS and Windows with Node 24.22.1. The CI configuration is supplied; a real hosted matrix run is not claimed by a local test run. The integration test is skipped by default and also skips if Ollama cannot be reached; if a server responds with an invalid model or lacks tool calls it fails. It contacts only the configured local chat endpoint. A real Lite or eligible Max GGUF trained for the tagged protocol is required for this check. Additional unit tests cover the 8GB, 15.9GB and 16GB RAM thresholds, the exact byte boundary, force override, disabled picker, environment override, malformed JSON recovery, unknown names, first-call stream cancellation, done summaries and thinking separation.
+CI runs type checks and the test suite on Ubuntu, macOS and Windows. The [Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) workflow builds all four platforms and runs a real Lite tool exchange on each before anything is published. Source lives in `src/cli`, `src/agent`, `src/tools`, `src/model`, `src/config`, `src/sandbox` and `src/portable`, with the desktop shell in `src-tauri` and the workspace UI in `portable/ui`.
 
-Source layout: `src/cli`, `src/agent`, `src/tools`, `src/model`, `src/config` and `src/sandbox`. Strict TypeScript and ESM are used throughout. No code comments are included. Development tools are pinned directly; this source distribution does not include a dependency lockfile, so transitive development-tool versions can vary.
+More detail: [DESKTOP.md](DESKTOP.md) (desktop app), [BUILDS.md](BUILDS.md) (packages and releases), [PORTABLE.md](PORTABLE.md) (USB browser launcher), [UPDATES.md](UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](GITHUB_WORKSPACES.md), [MCP_SKILLS.md](MCP_SKILLS.md) and [VERIFICATION.md](VERIFICATION.md) (what has and hasn't been verified).
+
+## Limits
+
+- **Review what it writes.** Stellan can make mistakes. In stricter tests it mis-copied long random identifiers.
+- **Lite's chat template.** The supplied Lite GGUF has no embedded template, so the app uses a tested Mistral-v1 formatter. The original training template is unverified.
+- **Unsigned builds.** Gatekeeper, SmartScreen, clean-machine launch and physical USB performance still need manual checks.
+- **Memory is total, not free.** The 8 GB and 16 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
 
 ## Licences
 
-- [LICENSE](LICENSE): MIT, copyright localilabs, for stick_ai source.
-- [NOTICE](NOTICE): retained gpt-engineer MIT copyright/permission notice and Mistral AI base-model attribution.
-- [MODEL_LICENSE.md](MODEL_LICENSE.md): Stellan base, LoRA provenance, dataset licences and outstanding provider-terms review.
-- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md): generated runtime dependency notices. `npm run licenses` walks installed runtime dependencies and their transitive dependencies offline and fails if licence texts are missing. Development tools and separately installed runtimes retain their own licences.
-
-Model weights, datasets, Ollama, Node.js, bubblewrap and prepared shell-runtime binaries are not bundled or relicensed by stick_ai.
-
-## No-install USB browser launcher and paired models
-
-[PORTABLE.md](PORTABLE.md) documents the build inputs, exact output layout, local browser workflow, verification, lifecycle boundaries and hardware qualification. Use `npm run build:stick -- ...` with the four pinned llama.cpp executables, four Node runtimes and their licences, and both actual GGUF files. No fake models or executables are bundled in this source repository. The builder fails on missing inputs.
-
-On eligible managed sessions, Lite orchestrates while Max codes through `delegate_code`. Only one owned model process runs at a time, using the same port. There is no delegation call cap. The under-16GB fallback and `--no-swap` still apply. Desktop, browser and terminal launchers wait for model readiness until failure or cancellation, without startup, swap or inactivity deadlines. The configured agent step limit still bounds the overall task. Short retryable health probes, HTTP request protections and shutdown cleanup deadlines remain; they do not limit active task duration. Ordinary Ollama sessions remain supported; use `--stick-root` for lifecycle-managed delegation. Standalone Max is code-only, with no tool execution. The portable browser interface disables shell commands to preserve its offline behavior.
-
-The prepared desktop release asks the buyer to click Start; the technical scripts open a terminal and browser. See DESKTOP.md for system-webview requirements. A normal browser and the operating system can still write their own caches, history and swap files; this app cannot promise a completely write-free host or deletion after power loss. Real weight compatibility, memory use, Gatekeeper, SmartScreen and USB swap performance remain release-qualification tasks.
-
-## All-platform Lite builds
-
-The Intel Mac app workflow assembles a macOS 13.5+ folder with Lite, portable Node and a CPU-only llama.cpp v0.9.0 server pinned to commit cd959bae99ff4bed22bef2604f45241c09bbb8c8. The old b5046 server cannot load the supplied Lite mamba2 architecture. Downloads are pinned to a model revision and SHA256. The supplied Lite GGUF lacks a chat template; this personal test build uses the Mistral-v1 formatter matching its [INST] tokenizer markers and refuses to publish a package unless the real model returns a tagged completion. The original training template remains unverified. Max is not bundled in this Lite-only Intel package. Unsigned apps remain subject to Gatekeeper.
-
-Lite's managed server uses one slot, no duplicate CPU weight repacking and no cross-conversation RAM prompt cache. It keeps the active conversation's prompt cache with one context checkpoint, so each agent step only processes new text: on a 4-core CPU a follow-up step fell from about 95 seconds to about 5, for roughly 0.3 GB more peak memory. Older tool context is trimmed in steps of half the context limit so the cached beginning of the conversation stays valid. Its raw tagged responses are constrained to the training protocol rather than native function calling. The app still validates names and arguments independently. The compatibility formatter remains an explicit fallback because the supplied GGUF has no template metadata. Model accuracy is not guaranteed: repeated diagnostic tests exposed incorrect quoting of long random identifiers, so review proposed changes.
+- [LICENSE](LICENSE): MIT, copyright localilabs, for the Stick AI source.
+- [NOTICE](NOTICE): the retained gpt-engineer MIT notice and Mistral AI base-model attribution. Stick AI is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
+- [MODEL_LICENSE.md](MODEL_LICENSE.md): Stellan base model, LoRA provenance, dataset licences and outstanding provider-terms review.
+- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md): generated runtime dependency notices. Each package also includes llama.cpp, Node.js and desktop runtime notices.
