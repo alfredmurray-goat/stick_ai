@@ -1,10 +1,12 @@
+// Releases stay private drafts (visible only to people with write access) unless STICK_PUBLIC_RELEASES=1:
+// the app is sold preinstalled on sticks, so builds are for the owner, not public downloads.
 import { createPrivateKey, createHash, sign, verify } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { updatePublicKey } from "../src/portable/update-key.ts";
 
-export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey }) {
+export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey, publicRelease = process.env.STICK_PUBLIC_RELEASES === "1" }) {
   if (!signingKey) { throw new Error("STICK_UPDATE_SIGNING_KEY is required to publish the app update"); }
   const key = createPrivateKey(signingKey); const probe = Buffer.from("stick-ai-update-key-check");
   if (!verify(null, probe, publicKey, sign(null, probe, key))) { throw new Error("Update signing key does not match the app public key"); }
@@ -35,7 +37,7 @@ export async function publishAppUpdate({ repo, runId, source, artifacts, platfor
   const feed = join(temporary, "stick_ai-updates.json");
   await writeFile(feed, JSON.stringify({ payload: payload.toString("base64"), signature: sign(null, payload, key).toString("base64") }) + "\n");
   await gh("release", "upload", tag, feed, "--repo", repo, "--clobber");
-  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notes, "--draft=false");
-  console.log(`Published app update: https://github.com/${repo}/releases/tag/${tag}`);
+  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notes, ...(publicRelease ? ["--draft=false"] : []));
+  console.log(publicRelease ? `Published app update: https://github.com/${repo}/releases/tag/${tag}` : `Private app update draft ready: https://github.com/${repo}/releases`);
   return tag;
 }

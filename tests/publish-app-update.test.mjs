@@ -22,12 +22,29 @@ it("publishes the picker update only after all platform payloads and the valid s
       if (args[1] === "upload" && args[3].endsWith("stick_ai-updates.json")) { envelope = JSON.parse(await readFile(args[3], "utf8")); }
       return "";
     };
-    const tag = await publishAppUpdate({ repo: "alfredmurray-goat/stick_ai", runId: "123", source: "a".repeat(40), artifacts: platforms.map((platform) => ({ name: `stick_ai-update-${platform}` })), platforms, temporary, signingKey, publicKey, gh });
+    const tag = await publishAppUpdate({ repo: "alfredmurray-goat/stick_ai", runId: "123", source: "a".repeat(40), artifacts: platforms.map((platform) => ({ name: `stick_ai-update-${platform}` })), platforms, temporary, signingKey, publicKey, gh, publicRelease: true });
     expect(tag).toBe("app-123");
     const feed = verifyFeed(envelope, publicKey, "alfredmurray-goat/stick_ai"); expect(feed.assets).toHaveLength(4);
     expect(calls.filter((args) => args[1] === "upload")).toHaveLength(5);
     expect(calls.at(-1)).toContain("--draft=false");
     expect(calls.every((args) => !args.join(" ").includes("gguf"))).toBe(true);
+  } finally { await rm(temporary, { recursive: true, force: true }); }
+});
+it("keeps a complete app update as a private draft by default", async () => {
+  const temporary = await mkdtemp(join(tmpdir(), "stick-publish-private-")); const calls = [];
+  try {
+    const gh = async (...args) => {
+      calls.push(args);
+      if (args[0] === "release" && args[1] === "view") { throw Object.assign(new Error("not found"), { stderr: "release not found" }); }
+      if (args[0] === "run" && args[1] === "download") {
+        const folder = args[args.indexOf("--dir") + 1]; const name = args[args.indexOf("--name") + 1].replace("stick_ai-update-", "");
+        await mkdir(folder); await writeFile(join(folder, `stick_ai-update-${name}.gz`), `payload for ${name}`);
+      }
+      return "";
+    };
+    await publishAppUpdate({ repo: "owner/repo", runId: "123", source: "a".repeat(40), artifacts: platforms.map((platform) => ({ name: `stick_ai-update-${platform}` })), platforms, temporary, signingKey, publicKey, gh, publicRelease: false });
+    expect(calls.at(-1)?.slice(0, 2)).toEqual(["release", "edit"]);
+    expect(calls.some((args) => args.includes("--draft=false"))).toBe(false);
   } finally { await rm(temporary, { recursive: true, force: true }); }
 });
 it("rejects the wrong signing key before creating or publishing anything", async () => {

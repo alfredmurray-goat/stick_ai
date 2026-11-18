@@ -1,3 +1,5 @@
+// Releases stay private drafts (visible only to people with write access) unless STICK_PUBLIC_RELEASES=1:
+// the app is sold preinstalled on sticks, so builds are for the owner, not public downloads.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -62,7 +64,8 @@ try {
       const asset=assets.find(a=>a.name===part.name);
       if(!asset || asset.state!=='uploaded' || asset.size!==part.size || asset.digest!==`sha256:${part.sha256}`) throw new Error('Uploaded DMG part did not verify');
     }
-    await gh('release','edit',tag,'--repo',repo,'--notes-file',notes,'--draft=false');
-    console.log(`Published https://github.com/${repo}/releases/tag/${tag}`);
+    const publicRelease=process.env.STICK_PUBLIC_RELEASES==='1';
+    await gh('release','edit',tag,'--repo',repo,'--notes-file',notes,...(publicRelease?['--draft=false']:[]));
+    console.log(publicRelease?`Published https://github.com/${repo}/releases/tag/${tag}`:`Private draft ready (only people with write access can see it): https://github.com/${repo}/releases`);
   }
 } finally { await rm(temporary,{recursive:true,force:true}); }
