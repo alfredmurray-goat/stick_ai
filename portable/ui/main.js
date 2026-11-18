@@ -199,8 +199,9 @@ function message(text, kind = "answer") {
 }
 async function start(faster = false) {
   if (installingUpdate) { return; }
-  byId("app-updates").hidden = true;
-  retryStart = true; byId("error").hidden = true; byId("start").disabled = true;
+  // A model-free copy has nothing to start until Lite is linked: say so instead of ignoring the click.
+  if (native && !liteReady) { toast("Choose your Stellan-1 Lite GGUF first. This download has no model files inside."); byId("quick-lite").click(); return; }
+  retryStart = true; byId("error").hidden = true; byId("start").disabled = true; byId("install-update").disabled = true;
   if (native) {
     nativeStarting = true; nativeStarted = Date.now(); byId("welcome").hidden = true; byId("loading").hidden = false;
     progress({ message: "Starting your private assistant..." }, true);
@@ -208,7 +209,7 @@ async function start(faster = false) {
       const url = await native.invoke("start_assistant", { faster, mode: byId("assistant-mode").value });
       location.replace(url);
     } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("loading").hidden = true; byId("welcome").hidden = false; }
-    finally { nativeStarting = false; byId("start").disabled = !liteReady; }
+    finally { nativeStarting = false; byId("start").disabled = false; byId("install-update").disabled = false; }
   } else {
     try { await api(faster ? "/api/faster" : "/api/start", faster ? {} : { model: "stellan-1-lite" }); }
     catch { showError(); byId("start").disabled = false; }
@@ -383,7 +384,7 @@ function showLocalModels(status) {
   byId("model-status").textContent = status.message; byId("max-quick-status").textContent = status.message;
   const lite = status.lite || { available: true };
   liteReady = lite.available;
-  byId("quick-lite").hidden = liteReady; byId("start").disabled = !liteReady || nativeStarting || installingUpdate;
+  byId("quick-lite").hidden = liteReady; byId("start").disabled = nativeStarting || installingUpdate; byId("start").classList.toggle("needs-model", !liteReady);
   byId("unlink-lite").hidden = lite.source !== "linked";
   if (lite.path) { byId("lite-path").value = lite.path; }
   if (!liteReady) { byId("lite-selection").open = true; }
@@ -399,7 +400,7 @@ async function setLocalModel(action, path, model = "max") {
   for (const id of ids) { byId(id).disabled = true; }
   try { showLocalModels(await native.invoke(action, { ...(path === undefined ? {} : { path }), model })); }
   catch (error) { byId("model-status").textContent = typeof error === "string" ? error : `The ${model === "lite" ? "Lite" : "Max"} file could not be linked. Check the file and try again.`; }
-  finally { byId("start").disabled = !liteReady; for (const id of ids) { byId(id).disabled = false; } }
+  finally { byId("start").disabled = false; for (const id of ids) { byId(id).disabled = false; } }
 }
 const setLocalMax = (action, path) => setLocalModel(action, path, "max");
 if (native) {

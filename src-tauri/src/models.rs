@@ -16,6 +16,7 @@ fn run(state: &Desktop, action: &str, path: Option<String>, model: &str) -> Resu
     let (platform, executable) = target()?;
     let node = format!("bin/{platform}/{executable}");
     for file in [node.as_str(), "app/stick-models.cjs"] { verify(&state.root, file).map_err(|_| "This copy needs an app update to manage model files")?; }
+    super::release_quarantine(&state.root.join(&node));
     let mut command = Command::new(state.root.join(node));
     command.arg(state.root.join("app/stick-models.cjs")).arg("--root").arg(&state.root).arg("--model").arg(model).arg(action);
     if let Some(path) = path { command.arg(path); }

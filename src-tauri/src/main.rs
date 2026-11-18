@@ -86,6 +86,17 @@ fn target() -> Result<(&'static str, &'static str), String> {
     }
 }
 
+// A browser-downloaded zip marks every file with com.apple.quarantine. Opening the app with
+// right-click > Open clears that only for the app bundle, so macOS would refuse to run the
+// bundled, unsigned Node runtime and llama.cpp server it starts. Callers clear the mark only
+// for files whose SHA-256 has just matched the manifest.
+pub(crate) fn release_quarantine(path: &Path) {
+    #[cfg(target_os = "macos")]
+    { let _ = Command::new("/usr/bin/xattr").args(["-d", "com.apple.quarantine"]).arg(path).stdout(Stdio::null()).stderr(Stdio::null()).status(); }
+    #[cfg(not(target_os = "macos"))]
+    { let _ = path; }
+}
+
 fn stop(state: &Desktop) {
     let (mut child, model_pid) = {
         let mut runtime = state.runtime.lock().unwrap();
@@ -172,9 +183,11 @@ fn start(state: &Desktop, faster: bool, mode: &str) -> Result<String, String> {
 fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, String> {
     let (platform, executable) = target()?;
     let relative = format!("bin/{platform}/{executable}");
-    for file in [relative.as_str(), "app/launcher.cjs"] {
+    let server = format!("bin/{platform}/{}", if platform == "windows-x64" { "llama-server.exe" } else { "llama-server" });
+    for file in [relative.as_str(), server.as_str(), "app/launcher.cjs"] {
         verify(&state.root, file).map_err(|error| format!("Bootstrap verification: {error}"))?;
     }
+    for file in [relative.as_str(), server.as_str()] { release_quarantine(&state.root.join(file)); }
     let stderr = OpenOptions::new().create(true).append(true).open(state.logs.join("service.log")).map_err(|error| error.to_string())?;
     let mut command = Command::new(state.root.join(relative));
     command.arg(state.root.join("app/launcher.cjs")).arg("--root").arg(&state.root).arg("--desktop").arg("--log-dir").arg(&state.logs);
