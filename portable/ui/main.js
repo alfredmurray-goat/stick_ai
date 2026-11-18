@@ -328,7 +328,8 @@ function approvalCard(data) {
   } else { const preview = document.createElement("pre"); preview.textContent = data.after; card.append(preview); }
   return card;
 }
-setInterval(update, 500);
+// Poll quickly while the model is streaming so text arrives smoothly, and slowly when idle.
+(function poll() { setTimeout(async () => { await update(); poll(); }, working || nativeStarting ? 150 : 500); })();
 if (!native) { void update(); }
 
 async function checkAppUpdates() {

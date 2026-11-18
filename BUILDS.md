@@ -18,7 +18,7 @@ Each complete released folder contains both Lite and Max GGUFs, native desktop a
 - Node: version `24.22.1`. `scripts/fetch-platform-assets.mjs` pins each archive's SHA256 from the official `https://nodejs.org/dist/v24.22.1/SHASUMS256.txt` and verifies it before extraction. Downloads and build tools need internet; model inference works offline; the separate app updater checks GitHub unless checks are disabled.
 - Tauri: the checked-in `src-tauri/Cargo.lock` pins native dependencies. The builder collects the resolved target's full notices and required covered source, plus the pinned llama.cpp source archive. Missing notices fail the build.
 
-The supplied Lite is Mamba2 with no embedded chat template. Each package writes `app/model-templates.json` selecting the tested Mistral-v1 compatibility formatter, and starts Lite with `--no-jinja --skip-chat-parsing`. Managed Lite requests use the tagged-response grammar. One slot, disabled CPU repacking and prompt caching, and smaller batches reduce memory use. These settings do not prove general model accuracy or the original training template.
+The supplied Lite is Mamba2 with no embedded chat template. Each package writes `app/model-templates.json` selecting the tested Mistral-v1 compatibility formatter, and starts Lite with `--no-jinja --skip-chat-parsing`. Managed Lite requests use the tagged-response grammar. One slot, disabled CPU repacking, no cross-conversation RAM prompt cache and a single context checkpoint keep memory bounded while the active conversation's prompt cache avoids reprocessing earlier steps. These settings do not prove general model accuracy or the original training template.
 
 ## Requirements
 

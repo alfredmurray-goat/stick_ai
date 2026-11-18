@@ -66,13 +66,23 @@ export function projectContext(box: Sandbox): ContextSource {
     }
   };
 }
+// Trims the oldest tool and assistant context once the total exceeds the limit.
+// The trimmed amount grows in steps of half the limit, measured from the start of
+// the append-only history, so the beginning of each request stays byte-identical
+// across several agent steps. That keeps the model server's prompt cache valid;
+// trimming a little more every step would force it to reprocess the whole prompt.
 export function boundedToolHistory(messages: Message[], limit = contextLimit()): Message[] {
-  let remaining = limit;
-  return [...messages].reverse().map((message) => {
-    if (message.role === "system" || message.role === "user" && !message.content.startsWith("<tool_result>")) { return message; }
-    const bytes = Buffer.byteLength(message.content);
-    if (bytes <= remaining) { remaining -= bytes; return message; }
-    const payload = clipUtf8(message.content, Math.max(0, remaining - 100)); remaining = 0;
-    return { ...message, content: `${payload}\n[Older context omitted to keep this request small; read focused files if needed.]` };
-  }).reverse();
+  const omitted = "\n[Older context omitted to keep this request small; read focused files if needed.]";
+  const sizes = messages.map((message) => message.role === "system" || message.role === "user" && !message.content.startsWith("<tool_result>") ? 0 : Buffer.byteLength(message.content));
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  if (total <= limit) { return [...messages]; }
+  const step = Math.max(1, Math.floor(limit / 2));
+  const drop = Math.ceil((total - limit) / step) * step;
+  let offset = 0;
+  return messages.map((message, index) => {
+    const size = sizes[index]!; if (!size) { return message; }
+    const start = offset; offset += size;
+    if (start >= drop) { return message; }
+    return { ...message, content: `${clipUtf8(message.content, Math.max(0, offset - drop - 100))}${omitted}` };
+  });
 }

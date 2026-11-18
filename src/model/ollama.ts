@@ -14,7 +14,7 @@ export class Ollama implements Model {
   async complete(messages: Message[], signal: AbortSignal, emit: (text: string, thinking: boolean) => void): Promise<Reply> {
     try {
       let response: Response;
-      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: false } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
+      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
       try {
         response = await fetch(this.url, {
           method: "POST",

@@ -35,7 +35,7 @@ These hashes refer to the outer GitHub artifact ZIPs. RELEASE_CHECKSUMS.json sep
 - The longest generated README.txt is 149 words, below the 200-word limit.
 - Real archive assembly and artifact uploads passed on every platform. CI removes the copied model input before archiving to bound disk use.
 - The release splitter and join helpers passed tests, including a tampered part and actual Windows/Unix helper execution. The publisher also passed a mocked end-to-end draft/upload/publish sequence.
-- Lite retains one slot, disabled CPU weight repacking and RAM prompt caching, smaller processing batches and its configured 8192 context. Model requests use the tagged grammar and explicit Mistral-v1 compatibility formatter.
+- Lite retains one slot, disabled CPU weight repacking and cross-conversation RAM prompt caching, and its configured 8192 context. It keeps the active slot's prompt cache with one context checkpoint and 512/256 processing batches. Measured with the release Lite GGUF on 4 CPU cores: a follow-up step processed 112 instead of 1,926 prompt tokens (about 5 s instead of 95 s); peak memory rose from 4.16 to 4.47 GB. Model requests use the tagged grammar and explicit Mistral-v1 compatibility formatter.
 - Silent model requests have no application inactivity deadline. Live thinking/progress, reduced context and cancellation behavior remain covered by tests.
 - Authored stick_ai code remains MIT. No new npm dependencies were added. The native notices include required covered source and the pinned llama.cpp source archive.
 
