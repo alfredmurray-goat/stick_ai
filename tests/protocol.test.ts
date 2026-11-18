@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { modelMessages, parseStep, TaggedStream } from "../src/model/protocol.js";
 import { runAgent } from "../src/agent/index.js";
 import { Ollama } from "../src/model/ollama.js";
+import { ramStatus } from "../src/config/models.js";
 import { Tools } from "../src/tools/index.js";
 import type { Call, Message, Model } from "../src/model/types.js";
 import type { Sandbox } from "../src/sandbox/paths.js";
@@ -77,6 +78,21 @@ it("cancels the open stream after its first complete block and sends no native t
   expect(response.content).toBe(tagged()); expect(response.calls).toHaveLength(1); expect(cancelled).toBe(true);
   const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
   expect(body.tools).toBeUndefined(); expect(body.tool_choice).toBeUndefined(); expect(body.stream).toBe(true);
+});
+
+it("asks the bundled server for prompt progress and skips progress chunks", async () => {
+  const progress = (processed: number) => `data: ${JSON.stringify({ choices: [{ finish_reason: null, index: 0, delta: { role: "assistant", content: null } }], prompt_progress: { total: 1514, cache: 0, processed, time_ms: 900 } })}\n\n`;
+  const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(new ReadableStream({ start(controller) {
+    for (const chunk of [progress(256), progress(1514), `data: ${JSON.stringify({ choices: [{ delta: { content: "def add(a, b):\n    return a + b" } }] })}\n\n`, `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`, "data: [DONE]\n\n"]) { controller.enqueue(new TextEncoder().encode(chunk)); }
+    controller.close();
+  } })));
+  vi.stubGlobal("fetch", fetch);
+  const ram = ramStatus(64 * 1024 ** 3);
+  const managed = await new Ollama("stellan-1-max", "http://127.0.0.1:1", false, ram, { apiKey: "key", specialist: true }).complete([{ role: "user", content: "add" }], new AbortController().signal, () => {});
+  expect(managed.content).toContain("return a + b");
+  expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).return_progress).toBe(true);
+  await new Ollama("stellan-1-max", "http://127.0.0.1:1", false, ram, { specialist: true }).complete([{ role: "user", content: "add" }], new AbortController().signal, () => {});
+  expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).return_progress).toBeUndefined();
 });
 
 it("converts legacy native history without sending tool roles or IDs", () => {

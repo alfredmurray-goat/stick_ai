@@ -14,7 +14,10 @@ export class Ollama implements Model {
   async complete(messages: Message[], signal: AbortSignal, emit: (text: string, thinking: boolean) => void): Promise<Reply> {
     try {
       let response: Response;
-      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
+      // return_progress makes the bundled llama.cpp server stream prompt-progress chunks while it
+      // reads a long prompt. Without them a slow computer can spend over five minutes before the
+      // first token, and Node's fetch drops a response that is silent for 300 s ("fetch failed").
+      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.options.apiKey ? { return_progress: true } : {}), ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
       try {
         response = await fetch(this.url, {
           method: "POST",
