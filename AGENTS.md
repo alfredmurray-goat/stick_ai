@@ -58,7 +58,7 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 - **Slow runners.** The Intel macOS runner is several times slower. Tests that package or archive need an explicit timeout (`it(..., 30000)`).
 - **llama.cpp web UI assets.** At the pinned commit, a fresh server build downloads web UI assets that no longer match and fails. Builds pass `-DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF`; the app runs with `--no-webui`.
 - **Apple Silicon runners are scarce.** A `macos-arm64` job can sit queued and be cancelled. Re-run it rather than changing code.
-- **Metal on CI.** GitHub's macOS VMs expose a paravirtual Metal device. The engine falls back to the CPU if a GPU start fails, and the smoke test records which ran in `model-smoke.json`. Real Mac performance needs an on-device check.
+- **Metal on CI.** GitHub's macOS runners are virtual machines with a paravirtual Metal device that loads the model but runs it many times slower than the CPU: the Lite smoke test went from about 5 to over 30 minutes and timed out. The engine therefore skips the GPU on virtual Macs (`kern.hv_vmm_present`), so CI only proves the Metal server builds. Check Metal itself on a real Apple Silicon Mac.
 - **`origin` branches after a squash merge.** The working branch can hold already-merged commits. Merge `origin/<branch>` into the new work instead of force-pushing, then check the diff against `main` is only your change.
 
 ## Style

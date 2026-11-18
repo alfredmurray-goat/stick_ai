@@ -1,7 +1,7 @@
 import { resolveLocalModel } from "./local-models.js";
 import { writeSync } from "node:fs";
 import { type ServerStatus } from "./progress.js";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -42,9 +42,21 @@ export function modelRuntimeArgs(model: ModelName): string[] {
 // shared with the GPU, but macOS caps GPU working memory at roughly two thirds of RAM,
 // so Max (14.3 GB) only offloads on Macs with at least 24 GiB. Every other target, and
 // STICK_GPU=0, stays CPU-only. ManagedEngine falls back to the CPU if a GPU start fails.
-export function gpuLayerArgs(target: Target, model: ModelName, totalBytes: number, env: NodeJS.ProcessEnv = process.env): string[] {
-  const gpu = target === "macos-arm64" && env.STICK_GPU !== "0" && (model === "stellan-1-lite" || totalBytes >= 24 * 1024 ** 3);
+// macOS virtual machines only expose a paravirtual Metal device, which loads the model but
+// runs it many times slower than the CPU (a CI tool exchange went from ~5 to 30+ minutes),
+// so Macs running as virtual machines stay on the CPU too.
+export function gpuLayerArgs(target: Target, model: ModelName, totalBytes: number, env: NodeJS.ProcessEnv = process.env, virtualMachine = false): string[] {
+  const gpu = target === "macos-arm64" && env.STICK_GPU !== "0" && !virtualMachine && (model === "stellan-1-lite" || totalBytes >= 24 * 1024 ** 3);
   return ["--gpu-layers", gpu ? "999" : "0"];
+}
+let virtualMac: boolean | undefined;
+export function isVirtualMac(): boolean {
+  if (process.platform !== "darwin") { return false; }
+  if (virtualMac === undefined) {
+    try { virtualMac = execFileSync("/usr/sbin/sysctl", ["-n", "kern.hv_vmm_present"], { encoding: "utf8", timeout: 2000 }).trim() === "1"; }
+    catch { virtualMac = false; }
+  }
+  return virtualMac;
 }
 export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
   let templateArgs: string[] = [];
@@ -73,7 +85,7 @@ export class ManagedEngine implements Switchable {
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
   gpuFailed = false;
   async start(model: ModelName, signal: AbortSignal): Promise<void> {
-    const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem());
+    const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem(), process.env, isVirtualMac());
     try { await this.launch(model, signal, gpu); }
     catch (error) {
       // A GPU that cannot load the model (driver, memory or unsupported operation) must not

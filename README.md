@@ -138,7 +138,7 @@ flowchart LR
 - **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags, constrained by a grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
 - **Lite and Max take turns.** In paired mode, only one model is loaded at a time. When Lite delegates, Max is started, writes the code, and Lite is restarted to review and apply it.
 - **Prompt cache.** Lite keeps its conversation cache with one context checkpoint (about 0.3 GB), and old tool output is trimmed in large steps so the start of the conversation stays identical. Each step processes only new text.
-- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite always uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Set `STICK_GPU=0` to force the CPU.
+- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Macs running as virtual machines stay on the CPU, because their virtual GPU is far slower. Set `STICK_GPU=0` to force the CPU.
 
 ## Configuration
 

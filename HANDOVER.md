@@ -22,7 +22,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 
 ## Known issues
 
-- **Metal hasn't been checked on a real Apple Silicon Mac.** CI builds the Metal server and runs Lite on GitHub's paravirtual GPU, with a CPU fallback. The platform smoke test records which one ran in `model-smoke.json`. Speed and memory on real M-series Macs (especially 8 GB) still need checking.
+- **Metal hasn't been checked on a real Apple Silicon Mac.** CI builds the Metal server, but GitHub's Macs are virtual machines whose paravirtual GPU was so slow that the Lite smoke test timed out, so virtual Macs now stay on the CPU and CI can't exercise Metal. Speed and memory on real M-series Macs (especially 8 GB) still need checking.
 - **The Lite → Max handoff is slow.** Paired mode unloads Lite, loads Max, then reloads Lite, which loses Lite's prompt cache, so the conversation is read again from the start. llama.cpp's slot save/restore doesn't keep context checkpoints for Mamba2, so it won't fix this as is.
 - **Max can't share memory with Lite.** Only one model runs at a time by design; Max needs 16 GB, and on 16 GB Macs it stays on the CPU because macOS caps GPU memory at about two thirds of RAM.
 - **Lite's chat template is unverified.** The GGUF has none, so the app uses a tested Mistral-v1 formatter.
