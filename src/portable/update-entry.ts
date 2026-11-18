@@ -4,6 +4,7 @@ import { join, resolve, dirname } from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 import { checkForUpdate, prepareUpdate, applyPreparedUpdate, readUpdateConfig } from "./update.js";
+import { appFolder } from "./layout.js";
 
 function argument(name: string): string {
   const at = process.argv.indexOf(name); const value = at < 0 ? undefined : process.argv[at + 1];
@@ -14,8 +15,9 @@ async function relaunch(root: string, temporary: string, failed = false): Promis
   const config = await readUpdateConfig(root); const args = ["--cleanup-update", temporary, ...(failed ? ["--update-failed"] : [])];
   // An all-devices stick has every app, so reopen the one for this computer rather than the configured target.
   const mac = process.platform === "darwin";
-  const command = mac ? "/usr/bin/open" : join(root, process.platform === "win32" ? "Stick AI.exe" : "stick-ai");
-  const child = spawn(command, mac ? ["-n", "-a", join(root, "Stick AI.app"), "--args", ...args] : args, { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
+  const apps = appFolder(root);
+  const command = mac ? "/usr/bin/open" : join(apps, process.platform === "win32" ? "Stick AI.exe" : "stick-ai");
+  const child = spawn(command, mac ? ["-n", "-a", join(apps, "Stick AI.app"), "--args", ...args] : args, { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); }); child.unref();
 }
 export async function updaterMain(): Promise<void> {

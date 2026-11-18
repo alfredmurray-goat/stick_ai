@@ -24,7 +24,7 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 | `src/model/` | Model client (`ollama.ts`, OpenAI-compatible streaming) and the tagged protocol parser |
 | `src/tools/` | Tools the model can call, and their schemas |
 | `src/sandbox/` | Safe path resolution and sandboxed shell execution per platform |
-| `src/portable/` | Desktop/USB runtime: `web.ts` (local API + UI server), `engine.ts` (managed llama.cpp), `local-models.ts` (bundled or linked GGUFs), `integrity.ts`, `package.ts`, `update*.ts`, GitHub workspaces, MCP, skills |
+| `src/portable/` | Desktop/USB runtime: `layout.ts` (all-devices sticks keep the apps at the top and everything shared in `Stellan/`, which is the "root" everywhere else), `universal.ts` (builds that stick), `web.ts` (local API + UI server), `engine.ts` (managed llama.cpp), `local-models.ts` (bundled or linked GGUFs), `integrity.ts`, `package.ts`, `update*.ts`, GitHub workspaces, MCP, skills |
 | `src/cli/` | `stick` terminal assistant |
 | `portable/ui/` | Workspace UI: `index.html`, `main.js`, `style.css`, no build step |
 | `src-tauri/` | Rust desktop shell (Tauri 2): start/stop, native file chooser, updates |

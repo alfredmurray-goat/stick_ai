@@ -11,7 +11,7 @@ import { publishAppUpdate } from "./publish-app-update.mjs";
 import { fetchMaxForRelease } from "./assemble-full-release.mjs";
 import { joinHelper } from "./release-parts.mjs";
 import { uploadSplitArchive } from "./upload-release-parts.mjs";
-import { assembleUniversalStick } from "../dist/portable/universal.js";
+import { assembleUniversalStick, universalUpdateSource } from "../dist/portable/universal.js";
 import { buildUpdateBundle } from "../dist/portable/update-package.js";
 
 const exec = promisify(execFile);
@@ -28,7 +28,7 @@ const date = new Date().toISOString().slice(0, 10);
 const tag = `stick-${runId}`; const temporary = await mkdtemp(join(tmpdir(), "stick-release-"));
 const notes = `# Stick AI: all devices, build ${runId}
 
-**One stick for Mac (Apple Silicon and Intel), Windows and Linux**, with Stellan-1 Lite and Max included once and shared. Private draft: only people with write access to this repository can see it.
+**One stick for Mac (Apple Silicon and Intel), Windows and Linux.** The three apps sit at the top of the stick; everything they share, including one copy of Stellan-1 Lite and Max, is in the \`Stellan\` folder. Private draft: only people with write access to this repository can see it.
 
 ## Make a stick
 
@@ -38,11 +38,11 @@ const notes = `# Stick AI: all devices, build ${runId}
    - Windows: double-click \`Join-stick_ai-all-devices.bat\`.
    - Linux: \`Join-stick_ai-all-devices.sh.zip\`, unzip it, then run \`sh Join-stick_ai-all-devices.sh\`.
    The helper checks every part and creates \`stick_ai-all-devices.tar\` (about 19 GB).
-3. Extract it onto the stick. This creates a \`Stick AI\` folder:
+3. Extract it onto the stick. The apps and the \`Stellan\` folder land at the top of the stick:
    - Mac: \`tar -xf stick_ai-all-devices.tar -C "/Volumes/STICK AI"\`
    - Windows (Command Prompt): \`tar -xf stick_ai-all-devices.tar -C E:\\\` (use your stick's letter)
    - Linux: \`tar -xf stick_ai-all-devices.tar -C /media/$USER/STICK\\ AI\`
-4. Check the stick: open \`Stick AI\`, then the app for the computer (\`Stick AI.app\`, \`Stick AI.exe\` or \`stick-ai\`) and click **Open workspace**.
+4. Check the stick: open the app for the computer (\`Stick AI.app\`, \`Stick AI.exe\` or \`stick-ai\`) and click **Open workspace**.
 
 ## Files
 
@@ -76,21 +76,21 @@ try {
   await gh("run", "download", runId, "--repo", repo, "--name", "stick_ai-macapp-universal", "--dir", macFolder);
   await exec("tar", ["-xf", join(macFolder, "stick_ai-macapp-universal.tar"), "-C", macFolder]);
   const max = await fetchMaxForRelease(join(temporary, "shared-models"));
-  const stickParent = join(temporary, "stick"); await mkdir(stickParent);
-  const stick = join(stickParent, "Stick AI");
+  // The image is the stick's top level: the three apps, "Read me.txt" and the shared Stellan folder.
+  const stick = join(temporary, "stick");
   await assembleUniversalStick(stick, { bases, macApp: join(macFolder, "Stick AI.app"), max }, console.log);
   await rm(join(temporary, "bases"), { recursive: true, force: true }); await rm(macFolder, { recursive: true, force: true });
   console.log("Assembled and verified the all-devices stick");
 
   // Updates: the four platform bundles from the build plus one for all-devices sticks, in this release and on the update host.
   const universal = join(temporary, "stick_ai-update-universal.gz");
-  await buildUpdateBundle(stick, "universal", universal, true);
+  await buildUpdateBundle(join(stick, "Stellan"), "universal", universal, true, await universalUpdateSource(stick));
   await publishAppUpdate({ repo, runId, source: run.head_sha, artifacts, platforms, temporary, signingKey: process.env.STICK_UPDATE_SIGNING_KEY, gh, tag, ownRelease: false, universal });
   await rm(universal);
 
   const image = join(temporary, "stick_ai-all-devices.tar");
-  await exec("tar", ["-cf", image, "-C", stickParent, "Stick AI"], { maxBuffer: 1000000 });
-  await rm(stickParent, { recursive: true, force: true }); await rm(join(temporary, "shared-models"), { recursive: true, force: true });
+  await exec("tar", ["-cf", image, "-C", stick, "Stick AI.app", "Stick AI.exe", "stick-ai", "Read me.txt", "Stellan"], { maxBuffer: 1000000 });
+  await rm(stick, { recursive: true, force: true }); await rm(join(temporary, "shared-models"), { recursive: true, force: true });
   const parts = join(temporary, "parts");
   const record = await uploadSplitArchive(image, parts, async (paths) => { await gh("release", "upload", tag, ...paths, "--repo", repo, "--clobber"); });
   await rm(image, { force: true });

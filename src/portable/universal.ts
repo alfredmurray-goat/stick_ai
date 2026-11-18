@@ -5,9 +5,11 @@ import { posixStart, windowsStart } from "./build.js";
 import { hashFile, staticFiles, verifyStick, type FileRecord, type Manifest } from "./integrity.js";
 import { bundledMax } from "./max-release.js";
 import { llamaRelease, nodeRelease, targets, type Target } from "./platform.js";
+import { desktopApps, desktopEntry, sharedFolder } from "./layout.js";
 
-// One stick for every computer: the four verified platform packages share one app folder and one copy
-// of each model, and each computer opens its own desktop app (a single universal app on Macs).
+// One stick for every computer. The output folder is the stick itself:
+//   Stick AI.app (universal Mac)  Stick AI.exe  stick-ai  Read me.txt  Stellan/
+// Stellan holds what every app shares: manifest, app, runtimes per computer, and one copy of each model.
 export interface UniversalInputs {
   /** Extracted, verified platform packages. Lite is moved out of the Linux one. */
   bases: Record<Target, string>;
@@ -28,6 +30,8 @@ This stick works on Mac, Windows and Linux. Open the app for your computer:
   Mac      Stick AI (Stick AI.app). The first time, right-click it and choose Open.
   Windows  Stick AI.exe. If Windows warns you, choose More info, then Run anyway.
   Linux    stick-ai
+
+Everything the apps share, including the AI models, is in the Stellan folder. Keep it next to the apps.
 
 Then click Open workspace. Everything runs on this computer; nothing is sent anywhere.
 Lite needs 8 GB of memory. Max needs at least 16 GB and runs best with 24 GB or more.
@@ -59,7 +63,7 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     if (manifest.targets?.length !== 1 || manifest.targets[0] !== target) { throw new Error(`The ${target} package is for a different computer`); }
     manifests[target] = manifest;
   }
-  const staging = `${output}.building-${randomUUID()}`;
+  const staging = `${output}.building-${randomUUID()}`, stick = `${staging}-stick`;
   const executable = new Map<string, boolean>(); const sharedFrom = new Map<string, FileRecord>();
   try {
     for (const path of ["app/project", "logs", "models"]) { await mkdir(join(staging, path), { recursive: true }); }
@@ -103,6 +107,30 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     if (!inputs.max) { manifest.files.push({ ...bundledMax, executable: false, optional: true }); }
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     await verifyStick(staging, !inputs.max, undefined, true);
-    await rename(staging, output); return manifest;
-  } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }
+    // Move the apps out beside the shared folder. Their files stay out of Stellan's manifest because they
+    // aren't inside it; updates carry them and put them back beside it.
+    await mkdir(stick); await rename(staging, join(stick, sharedFolder));
+    for (const app of desktopApps) { await rename(join(stick, sharedFolder, app), join(stick, app)); }
+    const shared: Manifest = { ...manifest, files: manifest.files.filter((record) => !desktopEntry(record.path)) };
+    await writeFile(join(stick, sharedFolder, "manifest.json"), JSON.stringify(shared, null, 2) + "\n");
+    await writeFile(join(stick, "Read me.txt"), universalReadme);
+    await verifyStick(join(stick, sharedFolder), !inputs.max, undefined, true);
+    await rename(stick, output); return manifest;
+  } catch (error) { await rm(staging, { recursive: true, force: true }); await rm(stick, { recursive: true, force: true }); throw error; }
+}
+
+/** The full file list of an all-devices stick, apps included, for building its update bundle. */
+export async function universalUpdateSource(stick: string): Promise<{ manifest: Manifest; locate: (path: string) => string }> {
+  const shared = JSON.parse(await readFile(join(stick, sharedFolder, "manifest.json"), "utf8")) as Manifest;
+  const files = [...shared.files];
+  for (const app of desktopApps) {
+    const info = await lstat(join(stick, app));
+    const paths = info.isDirectory() ? (await staticFiles(join(stick, app))).map((path) => `${app}/${path}`) : [app];
+    for (const path of paths) {
+      const mode = (await lstat(join(stick, path))).mode;
+      files.push({ path, ...await hashFile(join(stick, path)), executable: Boolean(mode & 0o111) || path === app || path.endsWith("/Contents/MacOS/stick-ai") });
+    }
+  }
+  files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  return { manifest: { ...shared, files }, locate: (path) => desktopEntry(path) ? join(stick, path) : join(stick, sharedFolder, path) };
 }

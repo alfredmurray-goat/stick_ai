@@ -62,7 +62,7 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 
 Stick AI ships preinstalled on a USB stick (launching February 2027 in the EU and May 2027 worldwide). Builds aren't public downloads: each release is kept as a **private draft** on [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases) that only people with write access to this repository can see, and is used to prepare the sticks. Sold sticks get app updates from a private, signed update host instead (see [docs/UPDATES.md](docs/UPDATES.md)). Each build produces **one** release, `Stick AI — all devices — build N`, holding the stick image, its Join helpers, checksums and the signed app updates. See **[docs/STICKS.md](docs/STICKS.md)** for how to make a stick.
 
-One stick works on every supported computer: the apps for each sit side by side and share a single copy of Lite and Max (about 19 GB, so use a 32 GB stick formatted as exFAT).
+One stick works on every supported computer: the three apps sit at the top of the stick and share one `Stellan` folder with a single copy of Lite and Max (about 19 GB, so use a 32 GB stick formatted as exFAT).
 
 | Computer | Open on the stick | You need |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ Max needs at least 16 GB RAM and runs best with 24 GB or more.
 
 ## Install
 
-1. Plug in the stick (or [make one](docs/STICKS.md)) and open the `Stick AI` folder.
+1. Plug in the stick (or [make one](docs/STICKS.md)).
 2. Open **Stick AI** (`Stick AI.app`, `Stick AI.exe` or `stick-ai`).
 3. Click **Open workspace**. Stellan loads on your computer and the workspace opens.
 
