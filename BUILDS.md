@@ -52,6 +52,10 @@ To limit Actions cost and runner disk use, the four native build jobs test Lite 
 
 Max metadata identifies a 23.6B llama architecture and an embedded Devstral/Mistral chat template. The hosted build runners test real Lite inference. Max's pinned file and full package integrity are checked during publication; these runners do not qualify real Max inference or Lite/Max swapping under 16 GiB memory pressure. Test the complete app with the actual Max model on the target hardware before treating model accuracy or performance as established.
 
+## Model-free archives and Apple Silicon Metal
+
+Manifests mark both model files optional. The publisher derives `stick_ai-<platform>-model-free` archives for all four platforms from the same tested base artifacts by leaving the model files out, verifies them, and uploads each as a single asset (no splitting) before assembling the complete packages. The `macos-arm64` server is built with `-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON` under its own cache key; all server builds disable llama.cpp's downloadable web UI (`-DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF`) because the app runs with `--no-webui` and the pinned commit's UI download no longer matches.
+
 ## Picker updates publish first
 
 After all platform builds pass, the publisher creates a small signed app-only release before downloading or packaging the full Max weights. Existing Lite app users can choose Check for updates and Update and restart to obtain the file picker without waiting for or downloading the two-model packages. The full Lite + Max release follows from the same checked build. Standard GitHub-hosted runner compute is free for this now-public repository; artifact/cache storage and runner/concurrency limits remain separate.

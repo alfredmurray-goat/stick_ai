@@ -1,4 +1,4 @@
-import { resolveLocalMax } from "./local-models.js";
+import { resolveLocalModel } from "./local-models.js";
 import { writeSync } from "node:fs";
 import { type ServerStatus } from "./progress.js";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -6,13 +6,14 @@ import { once } from "node:events";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { totalmem } from "node:os";
 import { killProcessTree } from "../sandbox/process.js";
 import { cleanEnvironment } from "../sandbox/backends.js";
 import { Ollama } from "../model/ollama.js";
 import { coderSystem } from "../agent/delegate.js";
 import { ramStatus, type ModelName } from "../config/models.js";
 import { reservePort } from "./ports.js";
-import { executableName, modelFile, UserError, type Target } from "./platform.js";
+import { executableName, UserError, type Target } from "./platform.js";
 
 export interface Switchable {
   stop(): Promise<void>;
@@ -36,6 +37,14 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
 // for +0.06 GB. RAM prompt caching across conversations stays off (--cache-ram 0).
 export function modelRuntimeArgs(model: ModelName): string[] {
   return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "512", "--ubatch-size", "256", "--cache-ram", "0", "--ctx-checkpoints", "1"] : ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"];
+}
+// Apple Silicon builds include the Metal GPU backend. Weights are memory-mapped and
+// shared with the GPU, but macOS caps GPU working memory at roughly two thirds of RAM,
+// so Max (14.3 GB) only offloads on Macs with at least 24 GiB. Every other target, and
+// STICK_GPU=0, stays CPU-only. ManagedEngine falls back to the CPU if a GPU start fails.
+export function gpuLayerArgs(target: Target, model: ModelName, totalBytes: number, env: NodeJS.ProcessEnv = process.env): string[] {
+  const gpu = target === "macos-arm64" && env.STICK_GPU !== "0" && (model === "stellan-1-lite" || totalBytes >= 24 * 1024 ** 3);
+  return ["--gpu-layers", gpu ? "999" : "0"];
 }
 export async function modelTemplateArgs(root: string, model: ModelName): Promise<string[]> {
   let templateArgs: string[] = [];
@@ -62,23 +71,37 @@ export class ManagedEngine implements Switchable {
   readonly key = randomBytes(32).toString("hex");
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
+  gpuFailed = false;
   async start(model: ModelName, signal: AbortSignal): Promise<void> {
+    const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem());
+    try { await this.launch(model, signal, gpu); }
+    catch (error) {
+      // A GPU that cannot load the model (driver, memory or unsupported operation) must not
+      // leave the user without a model: retry once on the CPU and keep it for this session.
+      if (gpu[1] === "0" || signal.aborted || this.disposing || !(error instanceof UserError) || !["loading", "busy"].includes(error.code)) { throw error; }
+      this.gpuFailed = true; this.log(new Error(`GPU start failed for ${model}; retrying on the CPU`));
+      await this.launch(model, signal, ["--gpu-layers", "0"]);
+    }
+  }
+  private async launch(model: ModelName, signal: AbortSignal, gpu: string[]): Promise<void> {
     if (this.disposing) { throw new UserError("general"); }
     if (this.child) { throw new Error("A model process is already active"); }
     signal.throwIfAborted();
+    // Resolve the model file first so a missing Lite or Max is reported before any port or process work.
+    const selected = await resolveLocalModel(this.root, model === "stellan-1-max" ? "max" : "lite");
+    if (model === "stellan-1-max" && !selected) { throw new Error("Choose your Max GGUF before starting Max."); }
+    if (!selected) { throw new UserError("nomodel"); }
     const reservation = await reservePort(this.port, this.port); await reservation.release();
     const keyFile = join(this.temp, "server-key"); await writeFile(keyFile, this.key, { mode: 0o600 });
     const env = cleanEnvironment(this.temp, process.platform);
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
     const templateArgs = await modelTemplateArgs(this.root, model);
-    const max = model === "stellan-1-max" ? await resolveLocalMax(this.root) : undefined;
-    if (model === "stellan-1-max" && !max) { throw new Error("Choose your Max GGUF before starting Max."); }
     const contextSize = model === "stellan-1-max" ? Math.min(this.contextSize, 4096) : this.contextSize;
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
-      "--model", max?.path ?? join(this.root, modelFile(model)), "--alias", model, "--ctx-size", String(contextSize),
+      "--model", selected.path, "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
-      "--no-webui", "--no-warmup", "--gpu-layers", "0", ...modelRuntimeArgs(model), ...templateArgs
+      "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model), ...templateArgs
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
     this.onProcess?.(child.pid ?? null);

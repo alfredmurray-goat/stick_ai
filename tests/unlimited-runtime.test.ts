@@ -8,7 +8,7 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(async () => {}),
   readFile: vi.fn(async () => { throw Object.assign(new Error("absent"), { code: "ENOENT" }); })
 }));
-vi.mock("../src/portable/local-models.js", () => ({ resolveLocalMax: vi.fn(async () => ({ path: "/external/Max.gguf", name: "Max.gguf", source: "linked" })) }));
+vi.mock("../src/portable/local-models.js", () => ({ resolveLocalModel: vi.fn(async (_root: string, kind: string) => ({ path: `/external/${kind === "max" ? "Max" : "Lite"}.gguf`, name: `${kind === "max" ? "Max" : "Lite"}.gguf`, source: "linked" })) }));
 vi.mock("../src/portable/ports.js", () => ({ reservePort: vi.fn(async () => ({ release: async () => {} })) }));
 import { ManagedEngine } from "../src/portable/engine.js";
 import { runProcess } from "../src/sandbox/process.js";

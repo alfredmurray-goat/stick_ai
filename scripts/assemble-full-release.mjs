@@ -18,6 +18,26 @@ export async function fetchMaxForRelease(directory) {
     await rename(temporary, output); return output;
   } catch (error) { await rm(temporary, { force: true }); throw error; }
 }
+// Model-free downloads are the same verified app with every model file left out. Users link
+// their own Lite (and optionally Max) GGUF on the welcome screen. The base archive is kept for
+// the complete package.
+export async function assembleModelFreeRelease(baseArchive, folder, platform, verifier) {
+  const extract = join(folder, "model-free"); await mkdir(extract);
+  if (baseArchive.endsWith(".tar.gz")) { await exec("tar", ["-xzf", baseArchive, "-C", extract]); }
+  else { await exec("unzip", ["-q", baseArchive, "-d", extract]); }
+  const root = join(extract, "Stick AI");
+  const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8"));
+  const models = manifest.files.filter((file) => file.path.startsWith("models/"));
+  if (!models.length || models.some((file) => !file.optional)) { throw new Error("Base package does not mark its model files optional; it cannot ship without models"); }
+  for (const file of models) { await rm(join(root, file.path), { force: true }); }
+  const verifyPackage = verifier ?? (await import("../dist/portable/integrity.js")).verifyStick;
+  await verifyPackage(root, true);
+  const output = join(folder, `stick_ai-${platform}-model-free.${platform === "linux-x64" ? "tar.gz" : "zip"}`);
+  if (platform === "linux-x64") { await exec("tar", ["-czf", output, "-C", extract, "Stick AI"], { maxBuffer: 1000000 }); }
+  else { await exec("zip", ["-q", "-r", "-y", output, "Stick AI"], { cwd: extract, maxBuffer: 1000000 }); }
+  await rm(extract, { recursive: true, force: true });
+  return output;
+}
 export async function assembleFullRelease(baseArchive, folder, platform, maxPath, expectedMax = bundledMax, verifier) {
   const extract = join(folder, "extracted"); await mkdir(extract);
   if (baseArchive.endsWith(".tar.gz")) { await exec("tar", ["-xzf", baseArchive, "-C", extract]); }

@@ -83,6 +83,14 @@ The welcome screen also lets you choose a single compatible Max GGUF elsewhere o
 GGUF header checks establish file format, not fine-tuning identity or code quality. The selected file is loaded by llama.cpp with its embedded chat template. A load failure is reported; Lite can finish the current task when the Max specialist fails. Source builds can still omit the optional Max file and link an existing model instead.
 
 
+## Model-free downloads and linked Lite
+
+Model-free downloads contain the app and runtimes but no GGUF files. The welcome screen shows **Choose your Lite GGUF**, and **Open workspace** stays unavailable until Lite is linked. Lite and Max are linked independently (`logs/lite-model.json`, `logs/max-model.json`) with the same rules as the Max picker: a single `.gguf` outside the app folder, stored relative to the app when it is on the same drive, re-checked by size and modification time before each start. A linked file takes precedence over a bundled one; **Remove file link** returns to the bundled file when there is one. The integrity check accepts missing optional model files but still rejects any present model file whose checksum changed. App updates work for model-free copies.
+
+## Apple Silicon GPU
+
+Apple Silicon builds include llama.cpp's Metal backend with embedded shaders. Lite always offloads to the GPU there; Max offloads only with at least 24 GiB RAM. A GPU start failure is logged and the same model is restarted on the CPU, which then stays in use until the app is reopened. `STICK_GPU=0` disables the GPU. GitHub's macOS runners expose a paravirtual Metal device, so the build smoke test reports whether Metal or the CPU fallback served Lite (`model-smoke.json`); real Apple Silicon performance still needs on-device checks.
+
 ## Coding workspace
 
 Open **Open workspace** on the launch screen. **Choose your Max GGUF** opens model settings and the native file chooser; linked weights stay in place. The workspace has a project file tree, conversation and composer, and a live activity panel. Thinking opens automatically for each task and streams reasoning actually emitted by the model. Some responses emit no separate reasoning; tool reads, searches, file writes and Lite-to-Max handoffs remain visible. Stop or Escape cancels current work. Selecting file text and copying with Ctrl+C does not cancel the model.

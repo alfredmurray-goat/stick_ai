@@ -79,7 +79,7 @@
       <p class="eyebrow">YOUR LOCAL CODING WORKSPACE</p>
       <h1>What will you build?</h1>
       <p class="welcome-subtitle">A conversation, your files, and a little help from Stellan.<br>Everything runs on this computer.</p>
-      <div class="welcome-actions"><button id="start" class="primary">Open workspace <svg class="i"><use href="#i-arrow-right"/></svg></button><button id="quick-max" class="secondary">Choose your Max GGUF</button></div>
+      <div class="welcome-actions"><button id="quick-lite" class="primary" hidden>Choose your Lite GGUF</button><button id="start" class="primary">Open workspace <svg class="i"><use href="#i-arrow-right"/></svg></button><button id="quick-max" class="secondary">Choose your Max GGUF</button></div>
       <p id="max-quick-status" class="welcome-footnote">Lite is included. Link your existing Max model without copying it.</p>
       <ul class="welcome-points">
         <li><svg class="i"><use href="#i-lock"/></svg><div><strong>Private by design</strong><span>Your code and prompts never leave this computer.</span></div></li>
@@ -165,6 +165,12 @@
       <p id="model-status" class="status-box" role="status">Checking your models...</p>
       <label for="assistant-mode">Assistant mode</label>
       <select id="assistant-mode"><option value="auto">Lite + Max when available</option><option value="lite">Lite only</option><option value="max" disabled>Max directly (code only)</option></select>
+      <details id="lite-selection"><summary>Use a Lite file already on your stick</summary>
+        <p>Model-free downloads need this. The file stays where it is. No copying or download.</p>
+        <label for="lite-path">Lite GGUF file</label>
+        <input id="lite-path" type="text" placeholder="Full path to your Lite .gguf" spellcheck="false">
+        <div class="button-row"><button id="browse-lite" class="secondary">Choose GGUF…</button><button id="link-lite" class="secondary">Use this file</button><button id="unlink-lite" class="secondary" hidden>Remove file link</button></div>
+      </details>
       <details id="max-selection"><summary>Use a Max file already on your stick</summary>
         <p>The file stays where it is. No copying or download.</p>
         <label for="max-path">Max GGUF file</label>

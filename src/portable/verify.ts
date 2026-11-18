@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 import { verifyStick } from "./integrity.js";
 
 export async function verifyMain(root: string): Promise<void> {
-  await verifyStick(resolve(root));
+  // Optional model files may be absent (model-free downloads link their own GGUFs); any file
+  // that is present must still match its recorded checksum.
+  await verifyStick(resolve(root), true);
   console.log("All files match the recorded checksums.");
 }
 if (process.argv[1] && /verify\.(?:js|cjs)$/.test(process.argv[1])) {

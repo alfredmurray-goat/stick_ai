@@ -208,7 +208,7 @@ async function start(faster = false) {
       const url = await native.invoke("start_assistant", { faster, mode: byId("assistant-mode").value });
       location.replace(url);
     } catch { const state = await native.invoke("desktop_status").catch(() => ({})); showError(state.error); progress(null, false); byId("loading").hidden = true; byId("welcome").hidden = false; }
-    finally { nativeStarting = false; byId("start").disabled = false; }
+    finally { nativeStarting = false; byId("start").disabled = !liteReady; }
   } else {
     try { await api(faster ? "/api/faster" : "/api/start", faster ? {} : { model: "stellan-1-lite" }); }
     catch { showError(); byId("start").disabled = false; }
@@ -377,21 +377,31 @@ if (native) {
   }).catch(() => { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; });
 }
 
+// Model-free downloads link Lite (and optionally Max) from elsewhere on the stick.
+let liteReady = true;
 function showLocalModels(status) {
   byId("model-status").textContent = status.message; byId("max-quick-status").textContent = status.message;
+  const lite = status.lite || { available: true };
+  liteReady = lite.available;
+  byId("quick-lite").hidden = liteReady; byId("start").disabled = !liteReady || nativeStarting || installingUpdate;
+  byId("unlink-lite").hidden = lite.source !== "linked";
+  if (lite.path) { byId("lite-path").value = lite.path; }
+  if (!liteReady) { byId("lite-selection").open = true; }
   byId("assistant-mode").querySelector('[value="max"]').disabled = !(status.available && status.eligible);
   byId("assistant-mode").querySelector('[value="auto"]').textContent = status.available && status.eligible ? "Lite + Max (recommended)" : "Lite (Max unavailable on this computer)";
   byId("unlink-max").hidden = status.source !== "linked";
   if (status.path) { byId("max-path").value = status.path; }
   if (!(status.available && status.eligible) && byId("assistant-mode").value === "max") { byId("assistant-mode").value = "auto"; }
 }
-async function setLocalMax(action, path) {
+async function setLocalModel(action, path, model = "max") {
+  const ids = [`browse-${model}`, `link-${model}`, `unlink-${model}`];
   byId("start").disabled = true;
-  for (const id of ["browse-max", "link-max", "unlink-max"]) { byId(id).disabled = true; }
-  try { showLocalModels(await native.invoke(action, path === undefined ? {} : { path })); }
-  catch (error) { byId("model-status").textContent = typeof error === "string" ? error : "The Max file could not be linked. Check the file and try again."; }
-  finally { byId("start").disabled = false; for (const id of ["browse-max", "link-max", "unlink-max"]) { byId(id).disabled = false; } }
+  for (const id of ids) { byId(id).disabled = true; }
+  try { showLocalModels(await native.invoke(action, { ...(path === undefined ? {} : { path }), model })); }
+  catch (error) { byId("model-status").textContent = typeof error === "string" ? error : `The ${model === "lite" ? "Lite" : "Max"} file could not be linked. Check the file and try again.`; }
+  finally { byId("start").disabled = !liteReady; for (const id of ids) { byId(id).disabled = false; } }
 }
+const setLocalMax = (action, path) => setLocalModel(action, path, "max");
 if (native) {
   byId("model-settings").hidden = false;
   native.invoke("local_model_status").then(showLocalModels).catch(() => { byId("model-status").textContent = "Max selection could not be read. Lite is still available."; });
@@ -401,6 +411,14 @@ if (native) {
     try { const path = await native.invoke("choose_max_model"); if (path) { byId("max-path").value = path; await setLocalMax("link_max_model", path); } }
     catch (error) { byId("model-status").textContent = typeof error === "string" ? error : "Paste the full GGUF path, then choose Use this file."; }
   };
+  byId("link-lite").onclick = () => setLocalModel("link_max_model", byId("lite-path").value, "lite");
+  byId("unlink-lite").onclick = () => setLocalModel("unlink_max_model", undefined, "lite");
+  const chooseLite = async () => {
+    try { const path = await native.invoke("choose_max_model", { model: "lite" }); if (path) { byId("lite-path").value = path; await setLocalModel("link_max_model", path, "lite"); } }
+    catch (error) { byId("model-status").textContent = typeof error === "string" ? error : "Paste the full GGUF path, then choose Use this file."; }
+  };
+  byId("browse-lite").onclick = chooseLite;
+  byId("quick-lite").onclick = async () => { await chooseLite(); if (!liteReady) { openSettings("models"); byId("lite-selection").open = true; } };
 }
 
 let repositoryBusy = false;

@@ -39,3 +39,30 @@ it.skipIf(process.platform === "win32")("assembles all four complete release for
     }
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }, 30000);
+it.skipIf(process.platform === "win32")("assembles verified model-free downloads for all four platforms from the same base", async () => {
+  const { assembleModelFreeRelease } = await import("../scripts/assemble-full-release.mjs");
+  const temporary = await mkdtemp(join(tmpdir(), "stick-model-free-release-"));
+  try {
+    const fixture = await assets(temporary);
+    for (const target of ["linux-x64", "windows-x64", "macos-arm64", "macos-x64"] as const) {
+      const folder = join(temporary, target); await mkdir(folder);
+      const input = join(folder, "input"); await mkdir(input); const base = join(input, "Stick AI");
+      const app = target.startsWith("macos-") ? join(folder, "Test.app") : fixture.servers[target];
+      if (target.startsWith("macos-")) { await mkdir(join(app, "Contents/MacOS"), { recursive: true }); await cp(fixture.servers[target], join(app, "Contents/MacOS/stick-ai")); }
+      const notices = join(folder, "notices"); await mkdir(notices); await writeFile(join(notices, "NOTICE.txt"), "Fixture");
+      await buildPlatform(resolve("."), base, target, { app, lite: fixture.lite, node: fixture.nodes[target], server: fixture.servers[target], nodeLicense: fixture.nodeLicenses[target], serverLicense: fixture.nodeLicenses[target], desktopLicenses: notices, maxRelease: true });
+      const archive = join(folder, target === "linux-x64" ? "base.tar.gz" : "base.zip");
+      if (target === "linux-x64") { await exec("tar", ["-czf", archive, "-C", input, "Stick AI"]); }
+      else { await exec("zip", ["-q", "-r", archive, "Stick AI"], { cwd: input }); }
+      const output = await assembleModelFreeRelease(archive, folder, target, verifyStick);
+      expect(output.endsWith(`stick_ai-${target}-model-free.${target === "linux-x64" ? "tar.gz" : "zip"}`)).toBe(true);
+      await expect(readFile(archive)).resolves.toBeTruthy();
+      const unpacked = join(folder, "verify"); await mkdir(unpacked);
+      if (target === "linux-x64") { await exec("tar", ["-xzf", output, "-C", unpacked]); }
+      else { await exec("unzip", ["-q", output, "-d", unpacked]); }
+      await verifyStick(join(unpacked, "Stick AI"), true);
+      await expect(readFile(join(unpacked, "Stick AI/models/stellan-1-lite-q4_k_m.gguf"))).rejects.toThrow();
+      await expect(verifyStick(join(unpacked, "Stick AI"))).rejects.toThrow("damaged");
+    }
+  } finally { await rm(temporary, { recursive: true, force: true }); }
+}, 60000);

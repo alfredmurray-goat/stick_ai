@@ -55,7 +55,7 @@ export async function buildPlatform(project: string, output: string, target: Tar
     const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, targets: [target], files: [] };
     for (const path of await staticFiles(staging)) {
       const info = await lstat(join(staging, path));
-      manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111), ...(path === bundledMax.path ? { optional: true } : {}) });
+      manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111), ...(path === bundledMax.path || path === "models/stellan-1-lite-q4_k_m.gguf" ? { optional: true } : {}) });
     }
     if (input.maxRelease && !input.max) { manifest.files.push({ ...bundledMax }); }
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
