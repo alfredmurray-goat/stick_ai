@@ -59,6 +59,7 @@ it("offloads to the Apple Silicon GPU only where it fits, and stays CPU-only els
 });
 it("falls back to the CPU for the rest of the session when a GPU start fails", async () => {
   const engine = new ManagedEngine("/nonexistent", "macos-arm64", 1, "/tmp", 0, () => {});
+  engine.detectVirtualMachine = () => false; // CI macOS runners are virtual Macs
   const launch = vi.spyOn(engine as unknown as { launch: (...args: unknown[]) => Promise<void> }, "launch")
     .mockRejectedValueOnce(new UserError("loading")).mockResolvedValue(undefined);
   const signal = new AbortController().signal;

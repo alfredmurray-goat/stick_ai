@@ -84,8 +84,9 @@ export class ManagedEngine implements Switchable {
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
   gpuFailed = false;
+  detectVirtualMachine: () => boolean = isVirtualMac;
   async start(model: ModelName, signal: AbortSignal): Promise<void> {
-    const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem(), process.env, isVirtualMac());
+    const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem(), process.env, this.detectVirtualMachine());
     try { await this.launch(model, signal, gpu); }
     catch (error) {
       // A GPU that cannot load the model (driver, memory or unsupported operation) must not
