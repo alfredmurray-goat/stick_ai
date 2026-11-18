@@ -12,7 +12,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
 [![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
 [![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
-[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-E2A07B)](#benchmarks)
+[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-FF8A65)](#benchmarks)
 [![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -34,7 +34,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, showing the old line in red and the new line in green, with Allow changes and Keep my file buttons"></td>
+    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, with a gradient shield icon, the old line in red and the new line in green, and Keep my file and Allow changes buttons"></td>
     <td width="50%"><img src="docs/welcome-light.png" alt="The Stick AI welcome screen in light mode with an Open workspace button and three feature cards"></td>
   </tr>
   <tr>
@@ -111,6 +111,10 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 - **Use skills.** Type `/` to pick a skill, or manage them under **Skills**.
 - **Switch appearance.** It follows your system's light or dark mode until you choose one.
 
+<p align="center">
+  <img src="docs/settings.png" alt="The Stick AI settings window with an app tile, a segmented Models, GitHub, MCP, Skills and Updates control, and grouped cards for linking Lite and Max files" width="820">
+</p>
+
 ## Privacy
 
 - **Inference is offline.** Prompts, code and answers stay on your computer. The model server listens only on an authenticated local connection.
@@ -134,7 +138,7 @@ flowchart LR
 - **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags, constrained by a grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
 - **Lite and Max take turns.** In paired mode, only one model is loaded at a time. When Lite delegates, Max is started, writes the code, and Lite is restarted to review and apply it.
 - **Prompt cache.** Lite keeps its conversation cache with one context checkpoint (about 0.3 GB), and old tool output is trimmed in large steps so the start of the conversation stays identical. Each step processes only new text.
-- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite always uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Set `STICK_GPU=0` to force the CPU.
+- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Macs running as virtual machines stay on the CPU, because their virtual GPU is far slower. Set `STICK_GPU=0` to force the CPU.
 
 ## Configuration
 
@@ -157,11 +161,11 @@ npm test
 npm link
 ```
 
-Prepare Stellan in Ollama by placing your verified GGUFs beside the Modelfiles:
+Prepare Stellan in Ollama by placing your verified `stellan-1-lite.gguf` and `stellan-1-max.gguf` in the `ollama/` folder, beside the Modelfiles:
 
 ```sh
-ollama create stellan-1-lite -f Modelfile
-ollama create stellan-1-max -f Modelfile.max
+ollama create stellan-1-lite -f ollama/Modelfile
+ollama create stellan-1-max -f ollama/Modelfile.max
 ollama serve
 ```
 
@@ -270,7 +274,11 @@ npm run licenses
 
 CI runs type checks and the test suite on Ubuntu, macOS and Windows. The [Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) workflow builds all four platforms and runs a real Lite tool exchange on each before anything is published. Source lives in `src/cli`, `src/agent`, `src/tools`, `src/model`, `src/config`, `src/sandbox` and `src/portable`, with the desktop shell in `src-tauri` and the workspace UI in `portable/ui`.
 
-More detail: [DESKTOP.md](DESKTOP.md) (desktop app), [BUILDS.md](BUILDS.md) (packages and releases), [PORTABLE.md](PORTABLE.md) (USB browser launcher), [UPDATES.md](UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](GITHUB_WORKSPACES.md), [MCP_SKILLS.md](MCP_SKILLS.md) and [VERIFICATION.md](VERIFICATION.md) (what has and hasn't been verified).
+More detail: [DESKTOP.md](docs/DESKTOP.md) (desktop app), [BUILDS.md](docs/BUILDS.md) (packages and releases), [PORTABLE.md](docs/PORTABLE.md) (USB browser launcher), [UPDATES.md](docs/UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](docs/GITHUB_WORKSPACES.md), [MCP_SKILLS.md](docs/MCP_SKILLS.md) and [VERIFICATION.md](docs/VERIFICATION.md) (what has and hasn't been verified).
+
+## Contributing
+
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the pieces fit together, how to build and test, and how to open a pull request. AI coding agents should read [AGENTS.md](AGENTS.md), and [HANDOVER.md](HANDOVER.md) covers the current state of the project and what's next.
 
 ## Limits
 

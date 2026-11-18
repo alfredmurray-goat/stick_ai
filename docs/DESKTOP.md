@@ -89,7 +89,7 @@ Model-free downloads contain the app and runtimes but no GGUF files. The welcome
 
 ## Apple Silicon GPU
 
-Apple Silicon builds include llama.cpp's Metal backend with embedded shaders. Lite always offloads to the GPU there; Max offloads only with at least 24 GiB RAM. A GPU start failure is logged and the same model is restarted on the CPU, which then stays in use until the app is reopened. `STICK_GPU=0` disables the GPU. GitHub's macOS runners expose a paravirtual Metal device, so the build smoke test reports whether Metal or the CPU fallback served Lite (`model-smoke.json`); real Apple Silicon performance still needs on-device checks.
+Apple Silicon builds include llama.cpp's Metal backend with embedded shaders. Lite always offloads to the GPU there; Max offloads only with at least 24 GiB RAM. A GPU start failure is logged and the same model is restarted on the CPU, which then stays in use until the app is reopened. `STICK_GPU=0` disables the GPU. Macs running as virtual machines (`kern.hv_vmm_present`) stay on the CPU, because their paravirtual Metal device runs the model many times slower. GitHub's macOS runners are such virtual machines, so the build smoke test runs Lite on the CPU and reports that in `model-smoke.json`; real Apple Silicon performance still needs on-device checks.
 
 ## Coding workspace
 

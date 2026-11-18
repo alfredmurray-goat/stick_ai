@@ -55,9 +55,11 @@ it("offloads to the Apple Silicon GPU only where it fits, and stays CPU-only els
   expect(gpuLayerArgs("macos-arm64", "stellan-1-max", 24 * GiB, {})).toEqual(["--gpu-layers", "999"]);
   expect(gpuLayerArgs("macos-arm64", "stellan-1-lite", 32 * GiB, { STICK_GPU: "0" })).toEqual(["--gpu-layers", "0"]);
   for (const target of ["macos-x64", "windows-x64", "linux-x64"] as const) expect(gpuLayerArgs(target, "stellan-1-lite", 64 * GiB, {})).toEqual(["--gpu-layers", "0"]);
+  expect(gpuLayerArgs("macos-arm64", "stellan-1-lite", 32 * GiB, {}, true)).toEqual(["--gpu-layers", "0"]);
 });
 it("falls back to the CPU for the rest of the session when a GPU start fails", async () => {
   const engine = new ManagedEngine("/nonexistent", "macos-arm64", 1, "/tmp", 0, () => {});
+  engine.detectVirtualMachine = () => false; // CI macOS runners are virtual Macs
   const launch = vi.spyOn(engine as unknown as { launch: (...args: unknown[]) => Promise<void> }, "launch")
     .mockRejectedValueOnce(new UserError("loading")).mockResolvedValue(undefined);
   const signal = new AbortController().signal;
