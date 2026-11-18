@@ -12,7 +12,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
 [![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
 [![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
-[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-E2A07B)](#benchmarks)
+[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-FF8A65)](#benchmarks)
 [![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -34,7 +34,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, showing the old line in red and the new line in green, with Allow changes and Keep my file buttons"></td>
+    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, with a gradient shield icon, the old line in red and the new line in green, and Keep my file and Allow changes buttons"></td>
     <td width="50%"><img src="docs/welcome-light.png" alt="The Stick AI welcome screen in light mode with an Open workspace button and three feature cards"></td>
   </tr>
   <tr>
@@ -110,6 +110,10 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 - **Edit files yourself.** Click a file in the sidebar to open it in **File preview**, edit it and save.
 - **Use skills.** Type `/` to pick a skill, or manage them under **Skills**.
 - **Switch appearance.** It follows your system's light or dark mode until you choose one.
+
+<p align="center">
+  <img src="docs/settings.png" alt="The Stick AI settings window with an app tile, a segmented Models, GitHub, MCP, Skills and Updates control, and grouped cards for linking Lite and Max files" width="820">
+</p>
 
 ## Privacy
 

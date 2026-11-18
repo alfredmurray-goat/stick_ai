@@ -290,7 +290,7 @@ async function update() {
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
         const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
-        for (const [label, allow] of [[event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true], [event.data.kind === "mcp" ? "Deny call" : "Keep my file", false]]) {
+        for (const [label, allow] of [[event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
