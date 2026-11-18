@@ -58,6 +58,14 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 
 **Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 
+## Model-free download
+
+Each desktop release also offers `stick_ai-<platform>-model-free` for all four platforms: the same app with no model files inside, so it downloads in minutes. On the welcome screen choose **Choose your Lite GGUF**, then optionally link Max under **Models & settings**. Both files are linked by path from your stick or computer, never copied or downloaded. Linked files must stay connected and unchanged; a changed file must be chosen again.
+
+## Apple Silicon GPU
+
+On Apple Silicon Macs the bundled llama.cpp server is built with Metal. Lite runs on the GPU; Max (14.3 GB) uses the GPU only on Macs with at least 24 GiB, because macOS limits GPU working memory to roughly two thirds of RAM. If the GPU cannot load a model, the app retries on the CPU automatically for the rest of the session. Set `STICK_GPU=0` to force CPU-only. Intel Macs, Windows and Linux stay CPU-only.
+
 ## Download
 
 Get Stick AI from [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases). Each release has two kinds of download.
