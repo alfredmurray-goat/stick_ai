@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { hashFile, staticFiles, type Manifest } from "../src/portable/integrity.js";
 import { buildUpdateBundle } from "../src/portable/update-package.js";
-import { checkForUpdate, findUpdate, prepareUpdate, applyPreparedUpdate, githubResponse, readUpdateConfig } from "../src/portable/update.js";
-import { safeUpdatePath, validateUpdateManifest, verifyFeed, type SignedFeed, type UpdateFeed } from "../src/portable/update-format.js";
+import { checkForUpdate, findUpdate, prepareUpdate, applyPreparedUpdate, githubResponse, hostedResponse, readUpdateConfig } from "../src/portable/update.js";
+import { safeUpdatePath, validateConfig, validateUpdateManifest, verifyFeed, type SignedFeed, type UpdateFeed } from "../src/portable/update-format.js";
 import { targets } from "../src/portable/platform.js";
 
 const roots: string[] = [];
@@ -140,4 +140,38 @@ it("preserves included Max when installing a Lite-compatible app update", async 
   expect(await readFile(path, "utf8")).toBe("existing Max weights"); expect((await lstat(path)).ino).toBe(inode);
   const manifest = JSON.parse(await readFile(join(f.root, "manifest.json"), "utf8"));
   expect(manifest.files.some((record: { path: string }) => record.path === "models/stellan-1-max-q4_k_m.gguf")).toBe(true);
+});
+const hostedFeed = "https://updates.example.com/stick-ai/stick_ai-updates.json";
+async function useHostedFeed(root: string): Promise<void> {
+  const path = join(root, "app/update-config.json"); const config = JSON.parse(await readFile(path, "utf8"));
+  await writeFile(path, JSON.stringify({ ...config, feed: hostedFeed }));
+  const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest; const record = manifest.files.find((file) => file.path === "app/update-config.json")!;
+  Object.assign(record, await hashFile(path)); await writeFile(join(root, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+}
+it("installs a signed update from the private update host without GitHub or a token", async () => {
+  const f = await fixture(); await useHostedFeed(f.root);
+  const bundle = await readFile(join(f.parent, "update.gz")); const requested: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: URL, init: RequestInit) => {
+    requested.push(url.toString()); expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    if (url.toString() === hostedFeed) { return Response.json(signed(f.feed)); }
+    if (url.toString() === "https://updates.example.com/stick-ai/2/stick_ai-update-linux-x64.gz") { return new Response(bundle); }
+    return new Response("missing", { status: 404 });
+  }));
+  expect((await checkForUpdate(f.root, "", new AbortController().signal)).state).not.toBe("authentication");
+  const work = await prepareUpdate(f.root, "", new AbortController().signal, publicKey);
+  await applyPreparedUpdate(f.root, work, publicKey);
+  expect(await readFile(join(f.root, "app/launcher.cjs"), "utf8")).toBe("app version 2");
+  expect(requested.every((url) => url.startsWith("https://updates.example.com/"))).toBe(true);
+});
+it("treats a missing hosted feed as up to date and refuses tampered or off-host downloads", async () => {
+  const f = await fixture(); await useHostedFeed(f.root); const config = await readUpdateConfig(f.root);
+  expect(config.feed).toBe(hostedFeed);
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("missing", { status: 404 })));
+  expect(await findUpdate(config, "", new AbortController().signal, publicKey)).toBeUndefined();
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...signed(f.feed), payload: Buffer.from(JSON.stringify({ ...f.feed, sequence: 9 })).toString("base64") })));
+  await expect(findUpdate(config, "", new AbortController().signal, publicKey)).rejects.toThrow("signature");
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 302, headers: { location: "https://evil.example.net/stick_ai-update-linux-x64.gz" } })));
+  await expect(hostedResponse("https://updates.example.com/stick-ai/2/stick_ai-update-linux-x64.gz", new AbortController().signal)).rejects.toThrow("Untrusted");
+  expect(() => validateConfig({ ...config, feed: "http://updates.example.com/stick_ai-updates.json" })).toThrow("Invalid update configuration");
+  expect(() => validateConfig({ ...config, feed: "https://updates.example.com/other.json" })).toThrow("Invalid update configuration");
 });

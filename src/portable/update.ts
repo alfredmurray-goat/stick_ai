@@ -7,7 +7,7 @@ import { extractUpdateBundle } from "./update-package.js";
 import { maxUpdateBytes, sameRecord, validateConfig, validateUpdateManifest, verifyFeed, type UpdateAsset, type UpdateConfig, type UpdateFeed, type SignedFeed } from "./update-format.js";
 
 export interface UpdateResult { state: "available" | "current" | "offline" | "authentication" | "unsupported"; message: string; sequence?: number; bytes?: number }
-interface ReleaseAsset { id: number; name: string; size: number }
+interface ReleaseAsset { id?: number; name: string; size: number; url?: string }
 interface Release { draft: boolean; assets: ReleaseAsset[] }
 export interface AvailableUpdate { feed: UpdateFeed; envelope: SignedFeed; asset: UpdateAsset; download: ReleaseAsset }
 const hosts = new Set(["api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com"]);
@@ -23,6 +23,31 @@ export async function githubResponse(url: string, token: string, signal: AbortSi
   }
   throw new Error("Too many update redirects");
 }
+// Fetches from the configured update host only. Redirects may not leave that host.
+export async function hostedResponse(url: string, signal: AbortSignal): Promise<Response> {
+  const origin = new URL(url).origin; let next = new URL(url);
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    if (next.protocol !== "https:" || next.origin !== origin || next.username || next.password) { throw new Error("Untrusted update download host"); }
+    const response = await fetch(next, { redirect: "manual", signal, headers: { "User-Agent": "stick-ai-updater", "Cache-Control": "no-cache" } });
+    if (![301, 302, 303, 307, 308].includes(response.status)) { return response; }
+    const location = response.headers.get("location"); await response.body?.cancel();
+    if (!location) { throw new Error("Missing update redirect"); } next = new URL(location, next);
+  }
+  throw new Error("Too many update redirects");
+}
+async function findHostedUpdate(config: UpdateConfig & { feed: string }, signal: AbortSignal, publicKey: string): Promise<AvailableUpdate | undefined> {
+  const response = await hostedResponse(config.feed, signal);
+  // No feed yet means nothing has been published to sticks.
+  if (response.status === 404) { await response.body?.cancel(); return undefined; }
+  if (!response.ok) { await response.body?.cancel(); throw new Error("UPDATE_NETWORK"); }
+  const envelope = await jsonResponse(response) as SignedFeed;
+  const feed = verifyFeed(envelope, publicKey, config.repository);
+  if (feed.sequence <= config.sequence || feed.source === config.source) { return undefined; }
+  const asset = feed.assets.find((item) => item.target === config.target)!;
+  // Each build lives in its own folder, so publishing a new one never changes files a stick is downloading.
+  const url = new URL(`${feed.sequence}/${asset.name}`, config.feed).href;
+  return { feed, envelope, asset, download: { name: asset.name, size: asset.size, url } };
+}
 async function jsonResponse(response: Response, limit = 2000000): Promise<unknown> {
   if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error([401, 403, 404].includes(response.status) ? "UPDATE_AUTH" : "UPDATE_NETWORK"); }
   const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
@@ -36,6 +61,7 @@ export async function readUpdateConfig(root: string): Promise<UpdateConfig> {
   return validateConfig(JSON.parse(await readFile(path, "utf8")));
 }
 export async function findUpdate(config: UpdateConfig, token: string, signal: AbortSignal, publicKey = updatePublicKey): Promise<AvailableUpdate | undefined> {
+  if (config.feed) { return findHostedUpdate({ ...config, feed: config.feed }, signal, publicKey); }
   const api = `https://api.github.com/repos/${config.repository}`;
   const releases = await jsonResponse(await githubResponse(`${api}/releases?per_page=20`, token, signal));
   if (!Array.isArray(releases)) { throw new Error("Invalid update releases"); }
@@ -65,7 +91,7 @@ export async function checkForUpdate(root: string, token: string, signal: AbortS
   }
 }
 async function downloadBundle(config: UpdateConfig, update: AvailableUpdate, token: string, path: string, signal: AbortSignal): Promise<void> {
-  const response = await githubResponse(`https://api.github.com/repos/${config.repository}/releases/assets/${update.download.id}`, token, signal, "application/octet-stream");
+  const response = update.download.url ? await hostedResponse(update.download.url, signal) : await githubResponse(`https://api.github.com/repos/${config.repository}/releases/assets/${update.download.id}`, token, signal, "application/octet-stream");
   if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error("App update download failed"); }
   const file = await open(path, "wx", 0o600); const hash = createHash("sha256"); let size = 0; const reader = response.body.getReader();
   try {

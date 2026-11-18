@@ -5,12 +5,14 @@ import { createReadStream } from "node:fs";
 import { readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { updatePublicKey } from "../src/portable/update-key.ts";
+import { createUpdateHost, defaultFeedUrl, feedKey, publishedSequence } from "./update-host.mjs";
 
-export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey, publicRelease = process.env.STICK_PUBLIC_RELEASES === "1" }) {
+export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey, publicRelease = process.env.STICK_PUBLIC_RELEASES === "1", host = createUpdateHost(), feedUrl = process.env.STICK_UPDATE_FEED || defaultFeedUrl, currentSequence = publishedSequence }) {
   if (!signingKey) { throw new Error("STICK_UPDATE_SIGNING_KEY is required to publish the app update"); }
   const key = createPrivateKey(signingKey); const probe = Buffer.from("stick-ai-update-key-check");
   if (!verify(null, probe, publicKey, sign(null, probe, key))) { throw new Error("Update signing key does not match the app public key"); }
-  const tag = `app-${runId}`;
+  const tag = `app-${runId}`; const prefix = feedKey(feedUrl).replace(/stick_ai-updates\.json$/, "");
+  if (!host) { console.log("R2 update host is not configured (R2_* secrets); sold sticks won't receive this update."); }
   let existing;
   try { existing = JSON.parse(await gh("release", "view", tag, "--repo", repo, "--json", "isDraft")); }
   catch (error) { if (!/release not found|HTTP 404/i.test(String(error.stderr))) { throw error; } }
@@ -31,12 +33,19 @@ export async function publishAppUpdate({ repo, runId, source, artifacts, platfor
     if (!size || size > 512 * 1024 ** 2) { throw new Error("App update size is invalid"); }
     assets.push({ target: platform, name, size, sha256: hash.digest("hex") });
     await gh("release", "upload", tag, join(folder, name), "--repo", repo, "--clobber");
+    if (host) { await host.put(join(folder, name), `${prefix}${runId}/${name}`, { contentType: "application/gzip", cacheControl: "public, max-age=31536000, immutable" }); }
     await rm(folder, { recursive: true, force: true });
   }
   const payload = Buffer.from(JSON.stringify({ format: 1, repository: repo, sequence: Number(runId), source, assets }));
   const feed = join(temporary, "stick_ai-updates.json");
   await writeFile(feed, JSON.stringify({ payload: payload.toString("base64"), signature: sign(null, payload, key).toString("base64") }) + "\n");
   await gh("release", "upload", tag, feed, "--repo", repo, "--clobber");
+  if (host) {
+    // Never move sticks back to an older build, for example when an old run is re-run.
+    const live = await currentSequence(feedUrl);
+    if (live >= Number(runId)) { console.log(`Sticks already get build ${live}; leaving the update feed unchanged.`); }
+    else { await host.put(feed, feedKey(feedUrl), { contentType: "application/json", cacheControl: "no-cache, max-age=0" }); console.log(`Sold sticks will now update to build ${runId}: ${feedUrl}`); }
+  }
   await gh("release", "edit", tag, "--repo", repo, "--notes-file", notes, ...(publicRelease ? ["--draft=false"] : []));
   console.log(publicRelease ? `Published app update: https://github.com/${repo}/releases/tag/${tag}` : `Private app update draft ready: https://github.com/${repo}/releases`);
   return tag;

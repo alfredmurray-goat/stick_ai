@@ -343,7 +343,8 @@ async function checkAppUpdates() {
     const size = result.bytes ? ` Download: ${(result.bytes / 1024 / 1024).toFixed(1)} MB.` : "";
     byId("update-message").textContent = (lastUpdateFailed ? "The last update could not finish; your previous app was kept. " : "") + result.message + size;
     byId("install-update").hidden = result.state !== "available";
-    if (result.state === "authentication") { byId("update-access").open = true; }
+    // Copies updated from the private update host need no token; only older GitHub-based copies show this.
+    if (result.state === "authentication") { byId("update-access").hidden = false; byId("update-access").open = true; }
   } catch { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; }
   finally { byId("check-update").disabled = false; }
 }

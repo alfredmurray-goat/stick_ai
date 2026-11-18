@@ -31,7 +31,7 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     expect(manifest.files.some((file) => file.path === "app/stick-update.cjs")).toBe(true);
     expect(manifest.files.some((file) => file.path === "app/stick-mcp.cjs")).toBe(true);
     const config = JSON.parse(await readFile(join(output, "app/update-config.json"), "utf8"));
-    expect(config.target).toBe(target);
+    expect(config.target).toBe(target); expect(config.feed).toBe("https://updates.localilabs.com/stick-ai/stick_ai-updates.json");
     const bundle = join(root, "app-update.gz"); await buildUpdateBundle(output, target, bundle);
     const extracted = join(root, "extracted"); await mkdir(extracted);
     const update = await extractUpdateBundle(bundle, extracted, target, new AbortController().signal);

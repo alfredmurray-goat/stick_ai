@@ -38,5 +38,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           STICK_UPDATE_SIGNING_KEY: ${{ secrets.STICK_UPDATE_SIGNING_KEY }}
+          # Private update host for sold sticks (Cloudflare R2). Without these, updates stay GitHub drafts only.
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           BUILD_RUN: ${{ github.event.workflow_run.id || inputs.build_run }}
         run: node scripts/publish-release.mjs
