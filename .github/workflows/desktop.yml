@@ -89,7 +89,8 @@ jobs:
           cp -R "arm/Stick AI.app" "out/Stick AI.app"
           diff -rq -x stick-ai -x _CodeSignature "arm/Stick AI.app" "intel/Stick AI.app" || echo "Note: bundle resources differ; using the Apple Silicon copy"
           lipo -create "arm/Stick AI.app/Contents/MacOS/stick-ai" "intel/Stick AI.app/Contents/MacOS/stick-ai" -output "out/Stick AI.app/Contents/MacOS/stick-ai"
-          lipo -verify_arch "out/Stick AI.app/Contents/MacOS/stick-ai" x86_64 arm64
+          lipo "out/Stick AI.app/Contents/MacOS/stick-ai" -verify_arch x86_64 arm64
+          lipo -archs "out/Stick AI.app/Contents/MacOS/stick-ai"
           codesign --force --deep --sign - "out/Stick AI.app"
           codesign --verify --deep --strict "out/Stick AI.app"
           "out/Stick AI.app/Contents/MacOS/stick-ai" --dry-run
