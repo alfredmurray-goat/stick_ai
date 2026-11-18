@@ -106,14 +106,15 @@
 
     <section id="benchmarks" class="section">
       <h2>Better than GPT-4 and Claude 2 at coding. <span class="grad">On your laptop.</span></h2>
-      <p class="sub">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT&#8209;4 and Claude&nbsp;2, which were OpenAI's and Anthropic's best models until November 2023. It's a 4.1 GB file that runs on your own computer, with no data centre involved.</p>
+      <p class="sub">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT&#8209;4 and Claude&nbsp;2, which were OpenAI's and Anthropic's best models until November 2023. With 7.3 billion parameters, it's about 99.6% smaller than GPT&#8209;4's estimated 1.8 trillion, and it runs on your own computer with no data centre involved.</p>
       <div class="bars" role="table" aria-label="HumanEval pass@1 scores">
-        <div class="bar-row us" role="row"><span class="bar-name" role="cell">Stellan-1 Lite <small>on your laptop</small></span><span class="bar" role="cell"><span class="fill w732"></span></span><span class="bar-val" role="cell">73.2%</span></div>
-        <div class="bar-row" role="row"><span class="bar-name" role="cell">Claude 2 <small>Anthropic's best, Jul–Nov 2023</small></span><span class="bar" role="cell"><span class="fill w712"></span></span><span class="bar-val" role="cell">71.2%</span></div>
-        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-4 <small>OpenAI's best, Mar–Nov 2023</small></span><span class="bar" role="cell"><span class="fill w670"></span></span><span class="bar-val" role="cell">67.0%</span></div>
+        <div class="bar-row us" role="row"><span class="bar-name" role="cell">Stellan-1 Lite <small>7.3B parameters · on your laptop</small></span><span class="bar" role="cell"><span class="fill w732"></span></span><span class="bar-val" role="cell">73.2%</span></div>
+        <div class="bar-row" role="row"><span class="bar-name" role="cell">Claude 2 <small>Anthropic's best, Jul–Nov 2023</small><small>Size never published</small></span><span class="bar" role="cell"><span class="fill w712"></span></span><span class="bar-val" role="cell">71.2%</span></div>
+        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-4 <small>OpenAI's best, Mar–Nov 2023</small><small>~1.8T parameters (estimate)</small></span><span class="bar" role="cell"><span class="fill w670"></span></span><span class="bar-val" role="cell">67.0%</span></div>
         <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-3.5 <small>OpenAI · 2022 · cloud</small></span><span class="bar" role="cell"><span class="fill w481"></span></span><span class="bar-val" role="cell">48.1%</span></div>
       </div>
       <div class="stats">
+        <div class="stat"><span class="big grad">99.6%</span><span>smaller than GPT-4 (by its estimated 1.8 trillion parameters), and it scores higher on HumanEval.</span></div>
         <div class="stat"><span class="big grad">4.1 GB</span><span>Stellan-1 Lite's whole model. It fits on the stick and runs on an ordinary computer with 8 GB of memory.</span></div>
         <div class="stat"><span class="big grad">~5 s</span><span>for a follow-up step, down from ~95 s, thanks to the conversation cache.</span></div>
         <div class="stat"><span class="big grad">0</span><span>bytes of your code sent to anyone. There is no server to send it to.</span></div>
@@ -122,6 +123,7 @@
         <summary>How we measured, and the small print</summary>
         <p><strong>Stellan-1 Lite:</strong> all 164 HumanEval problems, pass@1 with greedy decoding (temperature 0), each answer run against the official hidden tests. It runs on the CPU of a 4-core computer with the app's own settings: 120 of 164 passed.</p>
         <p><strong>Other models:</strong> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
+        <p><strong>Model sizes:</strong> Stellan-1 Lite has 7.29 billion parameters, counted from its model file. OpenAI has never published GPT-4's size; ~1.8 trillion is the most widely cited estimate, from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">July 2023 SemiAnalysis report</a>, so "99.6% smaller" (7.29B ÷ 1.8T ≈ 0.4%) is based on that estimate. Anthropic has never published Claude 2's size and there is no reliable estimate, so we don't give one.</p>
         <p><strong>To be clear:</strong> today's newest cloud models from OpenAI and Anthropic score 95% or more on this test and are far larger. Stick AI is about getting 2023-flagship-level coding help privately, offline, on your own machine. Stellan-1 Max's scores are still being measured.</p>
       </details>
     </section>
@@ -179,8 +181,8 @@
           <p>€15 per stick in the EU, including VAT, and $17 in the rest of the world, plus shipping. It's a one-off price: there's no subscription.</p>
         </details>
         <details>
-          <summary>Is it really better than GPT-4 and Claude 2?</summary>
-          <p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023, when GPT-4 Turbo and Claude 2.1 replaced them. Today's newest cloud models score higher still. What makes Stick AI different is that it runs privately, on your own computer.</p>
+          <summary>Is it really better than GPT-4 and Claude 2, and smaller?</summary>
+          <p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023, when GPT-4 Turbo and Claude 2.1 replaced them. Stellan-1 Lite has 7.3 billion parameters, about 99.6% fewer than GPT-4's estimated 1.8 trillion (OpenAI has never confirmed GPT-4's size). Today's newest cloud models score higher still. What makes Stick AI different is that it runs privately, on your own computer.</p>
         </details>
         <details>
           <summary>Do I pay for shipping?</summary>
