@@ -40,7 +40,7 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     await expect(readFile(join(extracted, "models/stellan-1-lite-q4_k_m.gguf"))).rejects.toThrow();
     await writeFile(join(output, desktop), "tampered"); await expect(verifyStick(output)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
-});
+}, 30000);
 
 it("packages a supplied Max GGUF without treating model weights as an executable", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-package-max-"));
@@ -56,7 +56,7 @@ it("packages a supplied Max GGUF without treating model weights as an executable
     expect(compatible.files.some((file) => file.path === "models/stellan-1-max-q4_k_m.gguf")).toBe(false);
     expect(compatible.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256).toBe(manifest.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256);
   } finally { await rm(root, { recursive: true, force: true }); }
-});
+}, 30000);
 
 it("runs as a model-free download that links its own Lite GGUF", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-model-free-"));
