@@ -87,15 +87,16 @@ export class ManagedEngine implements Switchable {
     if (this.disposing) { throw new UserError("general"); }
     if (this.child) { throw new Error("A model process is already active"); }
     signal.throwIfAborted();
+    // Resolve the model file first so a missing Lite or Max is reported before any port or process work.
+    const selected = await resolveLocalModel(this.root, model === "stellan-1-max" ? "max" : "lite");
+    if (model === "stellan-1-max" && !selected) { throw new Error("Choose your Max GGUF before starting Max."); }
+    if (!selected) { throw new UserError("nomodel"); }
     const reservation = await reservePort(this.port, this.port); await reservation.release();
     const keyFile = join(this.temp, "server-key"); await writeFile(keyFile, this.key, { mode: 0o600 });
     const env = cleanEnvironment(this.temp, process.platform);
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
     const templateArgs = await modelTemplateArgs(this.root, model);
-    const selected = await resolveLocalModel(this.root, model === "stellan-1-max" ? "max" : "lite");
-    if (model === "stellan-1-max" && !selected) { throw new Error("Choose your Max GGUF before starting Max."); }
-    if (!selected) { throw new UserError("nomodel"); }
     const contextSize = model === "stellan-1-max" ? Math.min(this.contextSize, 4096) : this.contextSize;
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", selected.path, "--alias", model, "--ctx-size", String(contextSize),

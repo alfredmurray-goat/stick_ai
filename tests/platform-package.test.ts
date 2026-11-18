@@ -71,7 +71,7 @@ it("runs as a model-free download that links its own Lite GGUF", async () => {
     await expect(verifyStick(output)).rejects.toThrow("damaged");
     const status = await localModelStatus(output, 32 * 1024 ** 3);
     expect(status.lite.available).toBe(false); expect(status.message).toContain("Choose your Stellan-1 Lite GGUF");
-    const engine = new ManagedEngine(output, target, 1, root, 0, () => {});
+    const engine = new ManagedEngine(output, target, 49152, root, 0, () => {});
     const error = await engine.start("stellan-1-lite", new AbortController().signal).catch((value: unknown) => value);
     expect(error).toBeInstanceOf(UserError); expect((error as UserError).code).toBe("nomodel");
     // Link a Lite GGUF kept beside the app, as with Max.
