@@ -23,7 +23,7 @@ const fd = openSync("release-assets/smoke.log", "a", 0o600); const reservation =
 const engine = new ManagedEngine(root, target, reservation.port, temporary, fd, console.error);
 // Public Apple Silicon runners have fewer cores and less memory than private runners.
 // Keep the complete real-tool check, with a CI-only deadline that allows CPU inference.
-const signal = AbortSignal.timeout(30 * 60 * 1000);
+const signal = AbortSignal.timeout(45 * 60 * 1000);
 const started = Date.now(); let reporting = false;
 async function reportMemory() {
   if (reporting) { return; } reporting = true;
