@@ -6,6 +6,7 @@ import { build } from "esbuild";
 import { binaryTarget, posixStart, windowsStart } from "./build.js";
 import { hashFile, staticFiles, verifyStick, type Manifest } from "./integrity.js";
 import { llamaRelease, nodeRelease, executableName, type Target } from "./platform.js";
+import { defaultUpdateFeed } from "./update-format.js";
 
 export interface PlatformInputs { app: string; node: string; server: string; lite: string; nodeLicense: string; serverLicense: string; desktopLicenses: string; max?: string; maxRelease?: boolean }
 export async function buildPlatform(project: string, output: string, target: Target, input: PlatformInputs): Promise<Manifest> {
@@ -28,7 +29,7 @@ export async function buildPlatform(project: string, output: string, target: Tar
     for (const name of ["launcher", "stick-verify", "stick-update", "stick-models", "stick-mcp"]) {
       await build({ entryPoints: [join(project, name === "launcher" ? "src/portable/entry.ts" : name === "stick-update" ? "src/portable/update-entry.ts" : name === "stick-models" ? "src/portable/models-entry.ts" : name === "stick-mcp" ? "src/portable/mcp-stdio-entry.ts" : "src/portable/verify.ts")], outfile: join(staging, `app/${name}.cjs`), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     }
-    await writeFile(join(staging, "app/update-config.json"), JSON.stringify({ format: 1, repository: "alfredmurray-goat/stick_ai", target, sequence: Number(process.env.GITHUB_RUN_ID ?? 0), source: process.env.GITHUB_SHA ?? "development" }) + "\n");
+    await writeFile(join(staging, "app/update-config.json"), JSON.stringify({ format: 1, repository: "alfredmurray-goat/stick_ai", target, sequence: Number(process.env.GITHUB_RUN_ID ?? 0), source: process.env.GITHUB_SHA ?? "development", feed: process.env.STICK_UPDATE_FEED ?? defaultUpdateFeed }) + "\n");
     await writeFile(join(staging, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }) + "\n");
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await cp(input.app, join(staging, desktop), { recursive: true, preserveTimestamps: true });

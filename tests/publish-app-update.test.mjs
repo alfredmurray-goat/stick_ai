@@ -59,3 +59,24 @@ it("leaves an incomplete app update as a draft", async () => {
     expect(calls.some((args) => args.includes("--draft=false"))).toBe(false);
   } finally { await rm(temporary, { recursive: true, force: true }); }
 });
+it("uploads every bundle to the private update host before the feed, in a per-build folder", async () => {
+  const temporary = await mkdtemp(join(tmpdir(), "stick-publish-host-")); const uploads = [];
+  try {
+    const gh = async (...args) => {
+      if (args[0] === "release" && args[1] === "view") { throw Object.assign(new Error("not found"), { stderr: "release not found" }); }
+      if (args[0] === "run" && args[1] === "download") {
+        const folder = args[args.indexOf("--dir") + 1]; const name = args[args.indexOf("--name") + 1].replace("stick_ai-update-", "");
+        await mkdir(folder); await writeFile(join(folder, `stick_ai-update-${name}.gz`), `payload for ${name}`);
+      }
+      return "";
+    };
+    const host = { put: async (_file, key, options) => { uploads.push({ key, ...options }); } };
+    const base = { repo: "alfredmurray-goat/stick_ai", source: "a".repeat(40), artifacts: platforms.map((platform) => ({ name: `stick_ai-update-${platform}` })), platforms, temporary, signingKey, publicKey, gh, host, feedUrl: "https://updates.example.com/stick-ai/stick_ai-updates.json" };
+    await publishAppUpdate({ ...base, runId: "200", currentSequence: async () => 100 });
+    expect(uploads.map((item) => item.key)).toEqual([...platforms.map((platform) => `stick-ai/200/stick_ai-update-${platform}.gz`), "stick-ai/stick_ai-updates.json"]);
+    expect(uploads.at(-1).cacheControl).toContain("no-cache");
+    uploads.length = 0;
+    await publishAppUpdate({ ...base, runId: "150", currentSequence: async () => 200 });
+    expect(uploads.some((item) => item.key.endsWith("stick_ai-updates.json"))).toBe(false);
+  } finally { await rm(temporary, { recursive: true, force: true }); }
+});

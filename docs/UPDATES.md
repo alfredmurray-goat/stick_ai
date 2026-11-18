@@ -4,13 +4,28 @@ New platform-specific desktop packages check for signed app updates when the wel
 
 Older copies cannot gain an updater remotely: download a complete package once after this change is released. Keep the entire extracted folder together, in a location you can write to. The universal development stick and terminal/browser fallbacks do not install desktop updates; use a platform-specific desktop package.
 
-## Private GitHub access
+## Where updates come from
 
-This repository is now public: normal update checks and downloads need no GitHub token. For a private deployment, on the welcome screen open **Private GitHub access** and save a fine-grained GitHub token with **Contents: Read-only** access to `alfredmurray-goat/stick_ai`, and check again. Organization approval or repository access may also be required by GitHub. Expired or revoked tokens can be replaced there. **Remove saved access** deletes the saved token. Public release feeds do not require a token.
+Stick AI is sold preinstalled on sticks and its GitHub releases are private drafts, so sold copies don't update from GitHub. Builds made after this change check a private update host instead: `https://updates.localilabs.com/stick-ai/stick_ai-updates.json` (set at build time with `STICK_UPDATE_FEED`, stored as `feed` in `app/update-config.json`). It's a Cloudflare R2 bucket on a custom domain. No token is needed, and the host doesn't have to be trusted: the feed is Ed25519-signed and every bundle is checked by size and SHA-256 before anything is installed. Downloads may only redirect within the same host.
 
-The token is saved in `updates.json` in Tauri's per-user application configuration directory, outside the stick and its project. It is stored as plaintext with the user's normal filesystem protection (mode 0600 on Unix), not in an OS credential vault. It never goes into model requests, project context, command-line arguments or logs. Updater processes receive it through stdin. The token is sent only to `api.github.com`, and is stripped from redirects to GitHub's download CDN. An optional `STICK_UPDATE_TOKEN` environment variable overrides saved access for managed deployments.
+Each build is uploaded to its own folder (`stick-ai/RUN_ID/stick_ai-update-PLATFORM.gz`), and the feed is uploaded last with `no-cache`, so sticks never see a feed whose files aren't there yet. The publisher never moves the feed back to an older build. A missing feed simply means "up to date".
 
-Only the updater contacts GitHub for release metadata and app downloads. Questions and project contents remain local. Turning off automatic checks avoids the startup network request; the manual Check button still works. The assistant itself has no cloud fallback or telemetry.
+### Setting up the update host (once)
+
+1. In Cloudflare, create an **R2** bucket (for example `stick-ai-updates`).
+2. In the bucket's **Settings → Custom Domains**, connect `updates.localilabs.com`. The domain must be on Cloudflare DNS.
+3. Under **R2 → Manage API tokens**, create a token with **Object Read & Write** for that bucket only.
+4. In GitHub, under **Settings → Secrets and variables → Actions**, add `R2_ACCOUNT_ID` (the 32-character account ID), `R2_BUCKET`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`.
+
+Every successful build on `main` then goes out to sold sticks automatically. Without these secrets, publishing still works but skips the host, and the log says so.
+
+### Older GitHub-based copies
+
+Copies built before the update host have no `feed` and still look at GitHub releases, which are now private drafts, so they find nothing. They can be moved over by installing a current build once. The **Private GitHub access** box only appears for these copies when GitHub asks for access.
+
+The saved token, if any, lives in `updates.json` in Tauri's per-user application configuration directory (mode 0600 on Unix), is sent only to `api.github.com`, and never goes into model requests, project context, command-line arguments or logs. An optional `STICK_UPDATE_TOKEN` environment variable overrides it for managed deployments.
+
+Only the updater contacts the update host. Questions and project contents remain local. Turning off automatic checks avoids the startup network request; the manual Check button still works. The assistant itself has no cloud fallback or telemetry.
 
 ## What changes during installation
 

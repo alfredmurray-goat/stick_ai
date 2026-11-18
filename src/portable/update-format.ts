@@ -4,7 +4,16 @@ import { targets, type Target } from "./platform.js";
 
 export const updateMagic = Buffer.from("STICKUP1");
 export const maxUpdateBytes = 512 * 1024 ** 2;
-export interface UpdateConfig { format: 1; repository: string; target: Target; sequence: number; source: string }
+// Sticks are sold with private builds, so app updates come from a private host rather than public
+// GitHub releases. The feed is Ed25519-signed and every bundle is checked by size and SHA-256, so the
+// host only has to be reachable, not trusted.
+export const defaultUpdateFeed = "https://updates.localilabs.com/stick-ai/stick_ai-updates.json";
+export interface UpdateConfig { format: 1; repository: string; target: Target; sequence: number; source: string; feed?: string }
+export function validFeedUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 500) { return false; }
+  try { const url = new URL(value); return url.protocol === "https:" && !url.port && !url.username && !url.password && !url.search && !url.hash && url.pathname.endsWith("/stick_ai-updates.json"); }
+  catch { return false; }
+}
 export interface UpdateAsset { target: Target; name: string; sha256: string; size: number }
 export interface UpdateFeed { format: 1; repository: string; sequence: number; source: string; assets: UpdateAsset[] }
 export interface SignedFeed { payload: string; signature: string }
@@ -13,7 +22,7 @@ export function safeUpdatePath(path: unknown): path is string {
 }
 export function validateConfig(value: unknown): UpdateConfig {
   const config = value as UpdateConfig;
-  if (!config || config.format !== 1 || !/^[\w.-]+\/[\w.-]+$/.test(config.repository) || !targets.includes(config.target) || !Number.isSafeInteger(config.sequence) || config.sequence < 0 || typeof config.source !== "string") { throw new Error("Invalid update configuration"); }
+  if (!config || config.format !== 1 || !/^[\w.-]+\/[\w.-]+$/.test(config.repository) || !targets.includes(config.target) || !Number.isSafeInteger(config.sequence) || config.sequence < 0 || typeof config.source !== "string" || (config.feed !== undefined && !validFeedUrl(config.feed))) { throw new Error("Invalid update configuration"); }
   return config;
 }
 export function verifyFeed(envelope: SignedFeed, publicKey: string, repository: string): UpdateFeed {
