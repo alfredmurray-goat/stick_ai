@@ -4,6 +4,14 @@
 
 Current complete releases bundle both models in **Stick AI — Lite + Max**. On the welcome screen choose paired Lite + Max, Lite only, or Max directly (code only). Max needs at least 16 GiB RAM. You can also link an existing Max GGUF elsewhere on your stick without copying it. The original Stellan-1.0 GGUF is the confirmed Max file. See [DESKTOP.md](DESKTOP.md) and [BUILDS.md](BUILDS.md) for the current unified release and package requirements.
 
+## Model-free download
+
+Each desktop release also offers `stick_ai-<platform>-model-free` for all four platforms: the same app with no model files inside, so it downloads in minutes. On the welcome screen choose **Choose your Lite GGUF**, then optionally link Max under **Models & settings**. Both files are linked by path from your stick or computer, never copied or downloaded. Linked files must stay connected and unchanged; a changed file must be chosen again.
+
+## Apple Silicon GPU
+
+On Apple Silicon Macs the bundled llama.cpp server is built with Metal. Lite runs on the GPU; Max (14.3 GB) uses the GPU only on Macs with at least 24 GiB, because macOS limits GPU working memory to roughly two thirds of RAM. If the GPU cannot load a model, the app retries on the CPU automatically for the rest of the session. Set `STICK_GPU=0` to force CPU-only. Intel Macs, Windows and Linux stay CPU-only.
+
 ## Download
 
 [Download stick_ai from GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases).

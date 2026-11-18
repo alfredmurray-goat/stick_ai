@@ -1,9 +1,9 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { modelTemplateArgs, modelRuntimeArgs } from "../src/portable/engine.js";
-import { llamaRelease } from "../src/portable/platform.js";
+import { modelTemplateArgs, modelRuntimeArgs, gpuLayerArgs, ManagedEngine } from "../src/portable/engine.js";
+import { llamaRelease, UserError } from "../src/portable/platform.js";
 it("uses the Mamba2-capable pinned release and applies the Lite-specific formatter only to Lite", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-lite-template-"));
   try {
@@ -46,4 +46,26 @@ it("bounds Lite recurrent-state memory without reducing its configured context w
   const args = modelRuntimeArgs("stellan-1-lite");
   expect(args).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "512", "--ubatch-size", "256", "--cache-ram", "0", "--ctx-checkpoints", "1"]);
   expect(args).not.toContain("--ctx-size"); expect(modelRuntimeArgs("stellan-1-max")).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"]);
+});
+
+it("offloads to the Apple Silicon GPU only where it fits, and stays CPU-only elsewhere", () => {
+  const GiB = 1024 ** 3;
+  expect(gpuLayerArgs("macos-arm64", "stellan-1-lite", 8 * GiB, {})).toEqual(["--gpu-layers", "999"]);
+  expect(gpuLayerArgs("macos-arm64", "stellan-1-max", 16 * GiB, {})).toEqual(["--gpu-layers", "0"]);
+  expect(gpuLayerArgs("macos-arm64", "stellan-1-max", 24 * GiB, {})).toEqual(["--gpu-layers", "999"]);
+  expect(gpuLayerArgs("macos-arm64", "stellan-1-lite", 32 * GiB, { STICK_GPU: "0" })).toEqual(["--gpu-layers", "0"]);
+  for (const target of ["macos-x64", "windows-x64", "linux-x64"] as const) expect(gpuLayerArgs(target, "stellan-1-lite", 64 * GiB, {})).toEqual(["--gpu-layers", "0"]);
+});
+it("falls back to the CPU for the rest of the session when a GPU start fails", async () => {
+  const engine = new ManagedEngine("/nonexistent", "macos-arm64", 1, "/tmp", 0, () => {});
+  const launch = vi.spyOn(engine as unknown as { launch: (...args: unknown[]) => Promise<void> }, "launch")
+    .mockRejectedValueOnce(new UserError("loading")).mockResolvedValue(undefined);
+  const signal = new AbortController().signal;
+  await engine.start("stellan-1-lite", signal);
+  expect(launch.mock.calls.map((call) => call[2])).toEqual([["--gpu-layers", "999"], ["--gpu-layers", "0"]]);
+  expect(engine.gpuFailed).toBe(true);
+  await engine.start("stellan-1-lite", signal);
+  expect(launch.mock.calls.at(-1)![2]).toEqual(["--gpu-layers", "0"]);
+  launch.mockRejectedValueOnce(new UserError("loading"));
+  await expect(engine.start("stellan-1-lite", signal)).rejects.toThrow("loading");
 });

@@ -6,6 +6,9 @@ import { assets } from "./portable-fixtures.js";
 import { buildPlatform } from "../src/portable/package.js";
 import { buildUpdateBundle, extractUpdateBundle } from "../src/portable/update-package.js";
 import { verifyStick } from "../src/portable/integrity.js";
+import { linkModelFile, localModelStatus, resolveLocalModel } from "../src/portable/local-models.js";
+import { ManagedEngine } from "../src/portable/engine.js";
+import { UserError } from "../src/portable/platform.js";
 
 it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the updated Lite desktop and target-specific runtime for %s", async (target) => {
   const root = await mkdtemp(join(tmpdir(), "stick-package-"));
@@ -52,5 +55,33 @@ it("packages a supplied Max GGUF without treating model weights as an executable
     const compatible = await extractUpdateBundle(bundle, extracted, target, new AbortController().signal);
     expect(compatible.files.some((file) => file.path === "models/stellan-1-max-q4_k_m.gguf")).toBe(false);
     expect(compatible.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256).toBe(manifest.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.sha256);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it("runs as a model-free download that links its own Lite GGUF", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-model-free-"));
+  try {
+    const fixture = await assets(root); const notices = join(root, "notices"); await mkdir(notices); await writeFile(join(notices, "NOTICE.txt"), "Fixture");
+    const target = "linux-x64"; const output = join(root, "Stick AI");
+    const manifest = await buildPlatform(resolve("."), output, target, { app: fixture.servers[target], node: fixture.nodes[target], server: fixture.servers[target], lite: fixture.lite, nodeLicense: fixture.nodeLicenses[target], serverLicense: fixture.nodeLicenses[target], desktopLicenses: notices, maxRelease: true });
+    expect(manifest.files.find((file) => file.path === "models/stellan-1-lite-q4_k_m.gguf")?.optional).toBe(true);
+    // The model-free archive is the same app with the model files left out.
+    await rm(join(output, "models/stellan-1-lite-q4_k_m.gguf"));
+    await expect(verifyStick(output, true)).resolves.toHaveProperty("format", 1);
+    await expect(verifyStick(output)).rejects.toThrow("damaged");
+    const status = await localModelStatus(output, 32 * 1024 ** 3);
+    expect(status.lite.available).toBe(false); expect(status.message).toContain("Choose your Stellan-1 Lite GGUF");
+    const engine = new ManagedEngine(output, target, 1, root, 0, () => {});
+    const error = await engine.start("stellan-1-lite", new AbortController().signal).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(UserError); expect((error as UserError).code).toBe("nomodel");
+    // Link a Lite GGUF kept beside the app, as with Max.
+    const lite = join(root, "My Lite.gguf"); const header = Buffer.alloc(64); header.write("GGUF"); header.writeUInt32LE(3, 4); header.writeBigUInt64LE(1n, 8); await writeFile(lite, header);
+    await linkModelFile(output, "lite", lite);
+    expect((await resolveLocalModel(output, "lite"))?.source).toBe("linked");
+    const linked = await localModelStatus(output, 32 * 1024 ** 3);
+    expect(linked.lite.available).toBe(true); expect(linked.lite.message).toContain("Lite linked: My Lite.gguf");
+    // A present but changed model file is still reported as damaged.
+    await writeFile(join(output, "models/stellan-1-lite-q4_k_m.gguf"), "tampered");
+    await expect(verifyStick(output, true)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

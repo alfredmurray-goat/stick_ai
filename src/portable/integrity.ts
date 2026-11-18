@@ -44,7 +44,9 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       try {
       let info;
       try { info = await lstat(path); } catch (error) {
-        if (optionalMax && record.optional && record.path === "models/stellan-1-max-q4_k_m.gguf" && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
+        // Optional model files may be absent (model-free downloads link their own GGUFs);
+        // a present model file must still match its recorded hash.
+        if (optionalMax && record.optional && ["models/stellan-1-max-q4_k_m.gguf", "models/stellan-1-lite-q4_k_m.gguf"].includes(record.path) && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
         throw error;
       }
       const resolved = await realpath(path);

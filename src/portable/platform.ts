@@ -5,7 +5,7 @@ export type Target = typeof targets[number];
 export const llamaRelease = "v0.9.0";
 export const nodeRelease = "24.22.1";
 export class UserError extends Error {
-  constructor(readonly code: "unsupported" | "memory" | "damaged" | "busy" | "loading" | "browser" | "storage" | "general") { super(code); }
+  constructor(readonly code: "unsupported" | "memory" | "damaged" | "busy" | "loading" | "browser" | "storage" | "nomodel" | "general") { super(code); }
 }
 export function userMessage(error: unknown): string {
   const code = error instanceof UserError ? error.code : "general";
@@ -17,6 +17,7 @@ export function userMessage(error: unknown): string {
     loading: "The model could not start. Check the selected GGUF and available memory, or use Lite.",
     browser: "A browser could not open; choose a default browser and try again.",
     storage: "The stick cannot save its files; unlock the stick and try again.",
+    nomodel: "Choose your Stellan-1 Lite GGUF on the welcome screen first; this download has no model files.",
     general: "The assistant could not start; unplug the stick and plug it into a different port."
   }[code];
 }

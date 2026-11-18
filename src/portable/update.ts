@@ -93,7 +93,8 @@ async function compatibleModels(root: string, manifest: Manifest): Promise<void>
   const before = current.files.filter((record) => record.path.startsWith("models/"));
   const after = manifest.files.filter((record) => record.path.startsWith("models/"));
   if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.path === "models/stellan-1-max-q4_k_m.gguf" && record.optional === true)) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
-  if (!await safeDirectory(join(root, "models"))) { throw new Error("The installed models are missing"); }
+  // Model-free copies may have no models folder at all; their GGUFs are linked from elsewhere.
+  if (!await safeDirectory(join(root, "models")) && !after.every((record) => record.optional === true)) { throw new Error("The installed models are missing"); }
 }
 export async function prepareUpdate(rootPath: string, token: string, signal: AbortSignal, publicKey = updatePublicKey): Promise<string> {
   const root = await realpath(rootPath); const config = await readUpdateConfig(root);

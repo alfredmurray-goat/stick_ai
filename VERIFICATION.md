@@ -39,6 +39,8 @@ These hashes refer to the outer GitHub artifact ZIPs. RELEASE_CHECKSUMS.json sep
 - Silent model requests have no application inactivity deadline. Live thinking/progress, reduced context and cancellation behavior remain covered by tests.
 - Authored stick_ai code remains MIT. No new npm dependencies were added. The native notices include required covered source and the pinned llama.cpp source archive.
 
+- Model-free archives are produced from the verified base artifacts with model files removed and pass the integrity check that permits absent optional models. Apple Silicon smoke runs report whether Metal or the automatic CPU fallback served Lite.
+
 ## Model accuracy and performance limits
 
 The supplied Lite file identifies itself as mamba2, 7.3B, with a Mistral-style tokenizer and no embedded chat template. The old b5046 server cannot load it. Mistral-v1 is a tested compatibility formatter; the original training template and Lite base-model provenance remain unverified.
