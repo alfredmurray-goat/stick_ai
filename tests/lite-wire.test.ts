@@ -9,7 +9,7 @@ it("keeps managed Lite on the text training protocol with constrained tags and a
   vi.stubGlobal("fetch", fetch);
   await new Ollama("stellan-1-lite", "http://127.0.0.1:8080", false, ramStatus(8 * 1024 ** 3), { apiKey: "local-test-key" }).complete([], new AbortController().signal, () => {});
   const body = JSON.parse(String((fetch.mock.calls as unknown as [string, RequestInit][])[0]![1].body));
-  expect(body.grammar).toBe(stellanGrammar); expect(body.cache_prompt).toBe(false); expect(body.temperature).toBe(0.2);
+  expect(body.grammar).toBe(stellanGrammar); expect(body.cache_prompt).toBe(true); expect(body.temperature).toBe(0.2);
   expect(body.tools).toBeUndefined(); expect(body.tool_choice).toBeUndefined();
   for (const name of toolNames) { expect(stellanGrammar).toContain(name); }
 });

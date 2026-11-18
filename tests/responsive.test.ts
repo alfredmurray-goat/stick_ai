@@ -3,6 +3,7 @@ import { TaggedStream } from "../src/model/protocol.js";
 import { CodeThinkingStream } from "../src/model/thinking.js";
 import { buildTaskContext, boundedToolHistory, contextLimit } from "../src/agent/context.js";
 import { ProgressTracker } from "../src/portable/progress.js";
+import type { Message } from "../src/model/types.js";
 import { friendlyError } from "../src/portable/errors.js";
 import { Ollama } from "../src/model/ollama.js";
 
@@ -64,6 +65,26 @@ it("does not guess ambiguous filenames and respects UTF-8 context limits", async
 it("bounds sent tool context without mutating retained conversation history", () => {
   const history = [{ role: "user" as const, content: "Task" }, { role: "user" as const, content: `<tool_result>${"x".repeat(5000)}</tool_result>` }];
   const sent = boundedToolHistory(history, 256); expect(sent[1]!.content.length).toBeLessThan(300); expect(history[1]!.content.length).toBeGreaterThan(5000);
+});
+it("trims old tool context in stable steps so the model's prompt cache stays valid", () => {
+  const limit = 16384; const history: Message[] = [{ role: "system", content: "System" }, { role: "user", content: "Task" }];
+  let reprocessed = 0; let sentTotal = 0; let previous = "";
+  for (let step = 0; step < 60; step++) {
+    history.push({ role: "assistant", content: `<tool_call>{"name":"read_file","arguments":{"path":"f${step}.ts"}}</tool_call>` });
+    history.push({ role: "user", content: `<tool_result>${String(step % 10).repeat(1500 + (step * 977) % 2500)}</tool_result>` });
+    const sent = boundedToolHistory(history, limit);
+    const bounded = sent.filter((message) => message.role === "assistant" || message.content.startsWith("<tool_result>"));
+    const notes = bounded.filter((message) => message.content.includes("[Older context omitted")).length;
+    expect(bounded.reduce((sum, message) => sum + Buffer.byteLength(message.content), 0)).toBeLessThanOrEqual(limit + notes * 100);
+    expect(sent[0]).toEqual(history[0]); expect(sent[1]).toEqual(history[1]); expect(sent.at(-1)).toEqual(history.at(-1));
+    // A cached server only processes text after the longest prefix shared with the previous request.
+    const prompt = sent.map((message) => `${message.role}\u0000${message.content}\u0001`).join("");
+    let shared = 0; while (shared < previous.length && shared < prompt.length && previous[shared] === prompt[shared]) { shared++; }
+    reprocessed += prompt.length - shared; sentTotal += prompt.length; previous = prompt;
+  }
+  // Rewriting the oldest context on every step would make the server reprocess almost every request in full.
+  expect(reprocessed / sentTotal).toBeLessThan(0.35);
+  expect(history[2]!.content).toContain("f0.ts");
 });
 it("hides technical errors", () => {
   expect(JSON.stringify(friendlyError(new Error("secret path /tmp/port:8080")))).not.toContain("8080");
