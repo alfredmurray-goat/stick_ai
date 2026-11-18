@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stick AI · Your private coding assistant on a USB stick</title>
-  <meta name="description" content="Stick AI is a private coding assistant that runs entirely on your own computer, from a USB stick. No cloud, no account. Launching February 2027 in the EU and May 2027 worldwide.">
+  <meta name="description" content="Stick AI is a private coding assistant on a $15 USB stick. It beat the original GPT-4 on the HumanEval coding test and runs entirely on your own computer. Launching February 2027 in the EU and May 2027 worldwide.">
   <meta name="theme-color" content="#111112">
   <link rel="canonical" href="https://stick_ai.localilabs.com/">
   <meta property="og:type" content="website">
@@ -25,6 +25,7 @@
     <nav aria-label="Main">
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
+      <a href="#benchmarks">Benchmarks</a>
       <a href="#pricing">Pricing</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
@@ -103,14 +104,26 @@
       </ol>
     </section>
 
-    <section class="section">
-      <h2>Honest benchmarks</h2>
-      <p class="sub">Measured on a plain 4-core computer with no graphics card, using the app's own settings.</p>
+    <section id="benchmarks" class="section">
+      <h2>Beats the original GPT-4 at coding. <span class="grad">On your laptop.</span></h2>
+      <p class="sub">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than the original GPT-4 and Claude 2. It's a 4.1 GB file that runs on your own computer, with no data centre involved.</p>
+      <div class="bars" role="table" aria-label="HumanEval pass@1 scores">
+        <div class="bar-row us" role="row"><span class="bar-name" role="cell">Stellan-1 Lite <small>on your laptop</small></span><span class="bar" role="cell"><span class="fill w732"></span></span><span class="bar-val" role="cell">73.2%</span></div>
+        <div class="bar-row" role="row"><span class="bar-name" role="cell">Claude 2 <small>Anthropic, 2023 · cloud</small></span><span class="bar" role="cell"><span class="fill w712"></span></span><span class="bar-val" role="cell">71.2%</span></div>
+        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-4 <small>OpenAI, 2023 · cloud</small></span><span class="bar" role="cell"><span class="fill w670"></span></span><span class="bar-val" role="cell">67.0%</span></div>
+        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-3.5 <small>OpenAI, 2023 · cloud</small></span><span class="bar" role="cell"><span class="fill w481"></span></span><span class="bar-val" role="cell">48.1%</span></div>
+      </div>
       <div class="stats">
-        <div class="stat"><span class="big grad">73.2%</span><span>Stellan-1 Lite on HumanEval, all 164 problems (pass@1). It writes a Python function and hidden tests check it.</span></div>
+        <div class="stat"><span class="big grad">4.1 GB</span><span>Stellan-1 Lite's whole model. It fits on the stick and runs on an ordinary computer with 8 GB of memory.</span></div>
         <div class="stat"><span class="big grad">~5 s</span><span>for a follow-up step, down from ~95 s, thanks to the conversation cache.</span></div>
         <div class="stat"><span class="big grad">0</span><span>bytes of your code sent to anyone. There is no server to send it to.</span></div>
       </div>
+      <details class="method">
+        <summary>How we measured, and the small print</summary>
+        <p><strong>Stellan-1 Lite:</strong> all 164 HumanEval problems, pass@1 with greedy decoding (temperature 0), each answer run against the official hidden tests. It runs on the CPU of a 4-core computer with the app's own settings: 120 of 164 passed.</p>
+        <p><strong>Other models:</strong> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
+        <p><strong>To be clear:</strong> today's newest cloud models from OpenAI and Anthropic score 95% or more on this test and are far larger. Stick AI is about getting 2023-flagship-level coding help privately, offline, on your own machine. Stellan-1 Max's scores are still being measured.</p>
+      </details>
     </section>
 
     <section id="pricing" class="section">
@@ -120,9 +133,9 @@
         <article class="price-card featured">
           <p class="tag">The stick</p>
           <h3>Stick AI</h3>
-          <!-- PRICE: replace "Price coming soon" with the launch price, e.g. €99 -->
-          <p class="amount">Price coming soon</p>
-          <p class="ship">+ shipping, calculated at checkout</p>
+          <!-- PRICE: the launch price per stick -->
+          <p class="amount">$15</p>
+          <p class="ship">per stick + shipping, calculated at checkout</p>
           <ul class="ticks">
             <li>USB stick with the app, Stellan-1 Lite and Stellan-1 Max preinstalled</li>
             <li>Works on Mac (Apple Silicon and Intel), Windows and Linux</li>
@@ -187,6 +200,14 @@
         <details>
           <summary>When can I buy it?</summary>
           <p>Stick AI isn't launched yet. Orders open in February 2027 with shipping across the European Union, and in May 2027 for the rest of the world.</p>
+        </details>
+        <details>
+          <summary>How much is it?</summary>
+          <p>$15 per stick, plus shipping. That's a one-off price: there's no subscription.</p>
+        </details>
+        <details>
+          <summary>Is it really better than GPT-4?</summary>
+          <p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. The original GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Today's newest cloud models score higher still. What makes Stick AI different is that it runs privately, on your own computer.</p>
         </details>
         <details>
           <summary>Do I pay for shipping?</summary>
