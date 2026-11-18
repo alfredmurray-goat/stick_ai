@@ -132,6 +132,8 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
   transition: filter .15s, transform .1s, box-shadow .15s;
 }
 .primary:disabled { background: var(--raised-2); color: var(--faint); box-shadow: none; opacity: 1; }
+/* Open workspace before Lite is linked: still clickable (it explains what to do) but visually secondary. */
+.primary.needs-model { background: var(--raised-2); color: var(--muted); box-shadow: none; }
 .primary:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 8px 26px -8px var(--glow-a); }
 .primary:active:not(:disabled) { transform: translateY(1px); }
 .primary.small { padding: 8px 16px; font-size: 12.5px; }

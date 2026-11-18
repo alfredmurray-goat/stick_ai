@@ -220,9 +220,22 @@ A file doesn't match its recorded checksum. Download a fresh copy and extract it
 </details>
 
 <details>
-<summary><b>Open workspace is greyed out</b></summary>
+<summary><b>Open workspace does nothing, or asks for a Lite file</b></summary>
 
-This is a model-free download with no Lite linked yet. Click **Choose your Lite GGUF** and pick your Stellan-1 Lite `.gguf`. If the file moved or changed, choose it again.
+This is a model-free download with no Lite linked yet. Click **Open workspace** or **Choose your Lite GGUF** and pick your Stellan-1 Lite `.gguf`. If the file moved or changed, choose it again. The `.gguf` needs about 4.1 GB of free space wherever you keep it.
+
+</details>
+
+<details>
+<summary><b>On a Mac, the assistant won't start</b></summary>
+
+Open the app with right-click → **Open** the first time. A zip downloaded in a browser marks every file inside as "from the internet", and macOS refuses to run the bundled model server until that mark is cleared. From this version the app clears it itself, but only for its own runtimes after checking their checksums. With an older copy, run this once in Terminal, dragging the **Stick AI** folder in for the path:
+
+```bash
+xattr -dr com.apple.quarantine "/path/to/Stick AI"
+```
+
+The app's logs are in `~/Library/Logs/build.localilabs.stickai/`.
 
 </details>
 
