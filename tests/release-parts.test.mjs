@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { splitArchive, joinHelper } from "../scripts/release-parts.mjs";
+// Windows can briefly hold the folder after the PowerShell join helper exits (EBUSY); Node retries removal for exactly this.
+const cleanup = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
 
 it("splits a release below the per-file limit and rejoins it after checking every hash", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-release-test-"));
@@ -24,7 +26,7 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     await expect(readFile(join(output, record.name))).rejects.toThrow();
     await writeFile(join(output, record.parts[0].name), combined.subarray(0, record.parts[0].size));
     await run(); expect(await readFile(join(output, record.name))).toEqual(content);
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally { await rm(root, cleanup); }
 }, 30000);
 it("refuses oversized parts and unsafe release names", async () => {
   await expect(splitArchive("stick_ai-test.zip", "unused", 2 * 1024 ** 3)).rejects.toThrow("Invalid");
@@ -40,7 +42,7 @@ it("uploads and removes each finished part before writing the next, bounding pub
       const bytes = await readFile(path); expect(bytes.length).toBe(part.size); uploaded.push(bytes); await rm(path);
     });
     expect(uploaded).toHaveLength(record.parts.length); expect(Buffer.concat(uploaded)).toEqual(content);
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally { await rm(root, cleanup); }
 });
 
 it('supports actual DMG images without wrapping them in a ZIP', async () => {
@@ -53,5 +55,5 @@ it('supports actual DMG images without wrapping them in a ZIP', async () => {
     expect(record.parts[0].name).toBe('stick_ai-macos-x64-lite-picker.dmg.part01');
     const helper=await joinHelper(record,join(root,'parts'),'macos-x64');
     expect(helper).toBe('Join-stick_ai-macos-x64-lite-picker.command');
-  } finally { await rm(root,{recursive:true,force:true}); }
+  } finally { await rm(root, cleanup); }
 });

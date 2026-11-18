@@ -45,7 +45,7 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 
 ## Releases
 
-- Merging to `main` with changes under `src/`, `src-tauri/`, `portable/`, `package*.json` or the desktop workflows starts **Desktop builds** (`.github/workflows/desktop.yml`). Docs-only changes don't.
+- Merging to `main` with changes under `src/`, `src-tauri/`, `portable/`, `package*.json` or the desktop workflows starts **Desktop builds** (`.github/workflows/desktop.yml`). Docs-only and tests-only changes don't: after merging one of those, start `desktop.yml` by hand on `main` if you need a release.
 - Each platform job runs the tests, builds the native app and llama.cpp server, assembles the package and runs a **real Lite tool exchange** (`scripts/smoke-platform.mjs`) before uploading.
 - If all four platforms pass, the `publish` job starts `release.yml` (Windows/Linux complete packages plus model-free archives for all four platforms) and `macos-dmg.yml` (Mac DMGs, then `publish-macos-dmg.yml`).
 - A new push to `main` cancels a Desktop build that's still running (`cancel-in-progress`). Don't merge app changes while a release build you want is running.
