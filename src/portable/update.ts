@@ -5,6 +5,7 @@ import { hashFile, staticFiles, type Manifest } from "./integrity.js";
 import { updatePublicKey } from "./update-key.js";
 import { extractUpdateBundle } from "./update-package.js";
 import { maxUpdateBytes, sameRecord, validateConfig, validateUpdateManifest, verifyFeed, type UpdateAsset, type UpdateConfig, type UpdateFeed, type SignedFeed } from "./update-format.js";
+import { desktopEntry, isSharedLayout } from "./layout.js";
 
 export interface UpdateResult { state: "available" | "current" | "offline" | "authentication" | "unsupported"; message: string; sequence?: number; bytes?: number }
 interface ReleaseAsset { id?: number; name: string; size: number; url?: string }
@@ -43,7 +44,8 @@ async function findHostedUpdate(config: UpdateConfig & { feed: string }, signal:
   const envelope = await jsonResponse(response) as SignedFeed;
   const feed = verifyFeed(envelope, publicKey, config.repository);
   if (feed.sequence <= config.sequence || feed.source === config.source) { return undefined; }
-  const asset = feed.assets.find((item) => item.target === config.target)!;
+  const asset = feed.assets.find((item) => item.target === config.target);
+  if (!asset) { return undefined; }
   // Each build lives in its own folder, so publishing a new one never changes files a stick is downloading.
   const url = new URL(`${feed.sequence}/${asset.name}`, config.feed).href;
   return { feed, envelope, asset, download: { name: asset.name, size: asset.size, url } };
@@ -73,7 +75,8 @@ export async function findUpdate(config: UpdateConfig, token: string, signal: Ab
     const envelope = await jsonResponse(await githubResponse(`${api}/releases/assets/${asset.id}`, token, signal, "application/octet-stream")) as SignedFeed;
     const feed = verifyFeed(envelope, publicKey, config.repository);
     if (feed.sequence <= config.sequence || feed.source === config.source) { continue; }
-    const selected = feed.assets.find((item) => item.target === config.target)!;
+    const selected = feed.assets.find((item) => item.target === config.target);
+    if (!selected) { continue; }
     const download = release.assets.find((item) => item.name === selected.name && Number.isSafeInteger(item.id) && item.size === selected.size);
     if (!download) { throw new Error("Incomplete app update"); }
     if (!latest || feed.sequence > latest.feed.sequence) { latest = { feed, envelope, asset: selected, download }; }
@@ -139,6 +142,9 @@ export async function prepareUpdate(rootPath: string, token: string, signal: Abo
     return work;
   } catch (error) { await rm(work, { recursive: true, force: true }); throw error; }
 }
+async function exists(path: string): Promise<boolean> {
+  try { await lstat(path); return true; } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { return false; } throw error; }
+}
 async function verifyTree(root: string, manifest: Manifest, models: boolean): Promise<void> {
   if (JSON.stringify(JSON.parse(await readFile(join(root, "manifest.json"), "utf8"))) !== JSON.stringify(manifest)) { throw new Error("Changed update manifest"); }
   const records = manifest.files.filter((record) => models || !record.path.startsWith("models/"));
@@ -157,11 +163,13 @@ export async function applyPreparedUpdate(rootPath: string, workPath: string, pu
   if (dirname(root) !== dirname(work) || !basename(work).startsWith(`.${basename(root)}.update-`) || !await safeDirectory(work)) { throw new Error("Unsafe update staging directory"); }
   const lock = join(dirname(root), `.${basename(root)}.update-lock`); await mkdir(lock, { mode: 0o700 });
   const previous = join(work, "previous"), next = join(work, "next"); const moved: string[] = []; let backedUp = false; let installed = false;
+  const oldApps = join(work, "previous-apps"); const replacedApps: string[] = [], placedApps: string[] = [];
   try {
     const config = await readUpdateConfig(root);
     const feed = verifyFeed(JSON.parse(await readFile(join(work, "signed-feed.json"), "utf8")), publicKey, config.repository);
     if (feed.sequence <= config.sequence) { throw new Error("Refusing an older app update"); }
-    const asset = feed.assets.find((item) => item.target === config.target)!;
+    const asset = feed.assets.find((item) => item.target === config.target);
+    if (!asset) { throw new Error("App update does not match this stick"); }
     const bundle = await hashFile(join(work, "download.gz")); if (bundle.sha256 !== asset.sha256 || bundle.size !== asset.size) { throw new Error("Changed update download"); }
     const inspection = join(work, "inspection"); await mkdir(inspection);
     const manifest = await preserveInstalledMax(root, await extractUpdateBundle(join(work, "download.gz"), inspection, config.target, new AbortController().signal));
@@ -177,11 +185,26 @@ export async function applyPreparedUpdate(rootPath: string, workPath: string, pu
       } else if (path !== "models") { await mkdir(join(next, path), { recursive: true }); }
     }
     await verifyTree(next, manifest, true);
+    if (isSharedLayout(root)) {
+      // The apps live beside the Stellan folder: swap them in as well, keeping the old ones for rollback.
+      const apps = [...new Set(manifest.files.map((record) => desktopEntry(record.path)).filter((entry): entry is string => Boolean(entry)))];
+      await mkdir(oldApps);
+      for (const app of apps) {
+        const current = join(dirname(root), app), incoming = join(next, app);
+        if (await exists(current)) { await rename(current, join(oldApps, app)); replacedApps.push(app); }
+        await rename(incoming, current); placedApps.push(app);
+      }
+      const shared = { ...manifest, files: manifest.files.filter((record) => !desktopEntry(record.path)) };
+      await writeFile(join(next, "manifest.json"), JSON.stringify(shared, null, 2) + "\n");
+      await verifyTree(next, shared, true);
+    }
     await rename(next, root); installed = true;
     await writeFile(join(work, "rollback.json"), JSON.stringify({ root, previous, installed: feed.sequence }) + "\n");
     await rm(join(work, "download.gz"));
   } catch (error) {
     if (backedUp && !installed) {
+      for (const app of placedApps.reverse()) { await rm(join(dirname(root), app), { recursive: true, force: true }); }
+      for (const app of replacedApps.reverse()) { await rename(join(oldApps, app), join(dirname(root), app)); }
       for (const path of moved.reverse()) { await rename(join(next, path), join(previous, path)); }
       await rename(previous, root);
     }

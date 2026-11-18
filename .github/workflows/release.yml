@@ -1,4 +1,4 @@
-name: Publish desktop release
+name: Publish stick release
 on:
   workflow_run:
     workflows: ["Desktop builds — Lite + Max"]
@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/share/swift /usr/local/share/powershell /usr/lib/jvm /opt/hostedtoolcache/Python /opt/hostedtoolcache/PyPy /opt/hostedtoolcache/Ruby
           df -h /
-      - name: Publish all four checked desktop downloads
+      - name: Publish the all-devices stick release
         env:
           GH_TOKEN: ${{ github.token }}
           STICK_UPDATE_SIGNING_KEY: ${{ secrets.STICK_UPDATE_SIGNING_KEY }}
@@ -44,4 +44,4 @@ jobs:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           BUILD_RUN: ${{ github.event.workflow_run.id || inputs.build_run }}
-        run: node scripts/publish-release.mjs
+        run: node scripts/publish-stick.mjs

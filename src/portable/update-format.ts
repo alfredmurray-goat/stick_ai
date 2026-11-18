@@ -8,13 +8,16 @@ export const maxUpdateBytes = 512 * 1024 ** 2;
 // GitHub releases. The feed is Ed25519-signed and every bundle is checked by size and SHA-256, so the
 // host only has to be reachable, not trusted.
 export const defaultUpdateFeed = "https://updates.localilabs.com/stick-ai/stick_ai-updates.json";
-export interface UpdateConfig { format: 1; repository: string; target: Target; sequence: number; source: string; feed?: string }
+// A stick made for every computer carries all four platforms; its updates use the "universal" bundle.
+export type UpdateTarget = Target | "universal";
+export const updateTargets: readonly UpdateTarget[] = [...targets, "universal"];
+export interface UpdateConfig { format: 1; repository: string; target: UpdateTarget; sequence: number; source: string; feed?: string }
 export function validFeedUrl(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 500) { return false; }
   try { const url = new URL(value); return url.protocol === "https:" && !url.port && !url.username && !url.password && !url.search && !url.hash && url.pathname.endsWith("/stick_ai-updates.json"); }
   catch { return false; }
 }
-export interface UpdateAsset { target: Target; name: string; sha256: string; size: number }
+export interface UpdateAsset { target: UpdateTarget; name: string; sha256: string; size: number }
 export interface UpdateFeed { format: 1; repository: string; sequence: number; source: string; assets: UpdateAsset[] }
 export interface SignedFeed { payload: string; signature: string }
 export function safeUpdatePath(path: unknown): path is string {
@@ -22,7 +25,7 @@ export function safeUpdatePath(path: unknown): path is string {
 }
 export function validateConfig(value: unknown): UpdateConfig {
   const config = value as UpdateConfig;
-  if (!config || config.format !== 1 || !/^[\w.-]+\/[\w.-]+$/.test(config.repository) || !targets.includes(config.target) || !Number.isSafeInteger(config.sequence) || config.sequence < 0 || typeof config.source !== "string" || (config.feed !== undefined && !validFeedUrl(config.feed))) { throw new Error("Invalid update configuration"); }
+  if (!config || config.format !== 1 || !/^[\w.-]+\/[\w.-]+$/.test(config.repository) || !updateTargets.includes(config.target) || !Number.isSafeInteger(config.sequence) || config.sequence < 0 || typeof config.source !== "string" || (config.feed !== undefined && !validFeedUrl(config.feed))) { throw new Error("Invalid update configuration"); }
   return config;
 }
 export function verifyFeed(envelope: SignedFeed, publicKey: string, repository: string): UpdateFeed {
@@ -30,17 +33,18 @@ export function verifyFeed(envelope: SignedFeed, publicKey: string, repository: 
   const payload = Buffer.from(envelope.payload, "base64"), signature = Buffer.from(envelope.signature, "base64");
   if (payload.toString("base64") !== envelope.payload || signature.length !== 64 || !verify(null, payload, createPublicKey(publicKey), signature)) { throw new Error("Update signature is invalid"); }
   const feed = JSON.parse(payload.toString("utf8")) as UpdateFeed;
-  if (feed.format !== 1 || feed.repository !== repository || !Number.isSafeInteger(feed.sequence) || feed.sequence <= 0 || !/^[a-f0-9]{40}$/.test(feed.source) || !Array.isArray(feed.assets) || feed.assets.length !== targets.length) { throw new Error("Invalid update release"); }
+  if (feed.format !== 1 || feed.repository !== repository || !Number.isSafeInteger(feed.sequence) || feed.sequence <= 0 || !/^[a-f0-9]{40}$/.test(feed.source) || !Array.isArray(feed.assets) || ![targets.length, updateTargets.length].includes(feed.assets.length)) { throw new Error("Invalid update release"); }
   const seen = new Set<string>();
   for (const asset of feed.assets) {
-    if (!targets.includes(asset.target) || seen.has(asset.target) || asset.name !== `stick_ai-update-${asset.target}.gz` || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > maxUpdateBytes) { throw new Error("Invalid update asset"); }
+    if (!updateTargets.includes(asset.target) || seen.has(asset.target) || asset.name !== `stick_ai-update-${asset.target}.gz` || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > maxUpdateBytes) { throw new Error("Invalid update asset"); }
     seen.add(asset.target);
   }
+  if (targets.some((target) => !seen.has(target))) { throw new Error("Invalid update release"); }
   return feed;
 }
-export function validateUpdateManifest(value: unknown, target: Target): Manifest {
+export function validateUpdateManifest(value: unknown, target: UpdateTarget): Manifest {
   const manifest = value as Manifest;
-  if (!manifest || manifest.format !== 1 || !Array.isArray(manifest.targets) || manifest.targets.length !== 1 || manifest.targets[0] !== target || !Array.isArray(manifest.files) || manifest.files.length > 10000 || typeof manifest.nodeRelease !== "string" || typeof manifest.llamaRelease !== "string") { throw new Error("Update does not match this computer"); }
+  if (!manifest || manifest.format !== 1 || !Array.isArray(manifest.targets) || (target === "universal" ? manifest.targets.length !== targets.length || targets.some((item) => !manifest.targets!.includes(item)) : manifest.targets.length !== 1 || manifest.targets[0] !== target) || !Array.isArray(manifest.files) || manifest.files.length > 10000 || typeof manifest.nodeRelease !== "string" || typeof manifest.llamaRelease !== "string") { throw new Error("Update does not match this computer"); }
   const seen = new Set<string>(); let size = 0;
   for (const record of manifest.files) {
     if (!safeUpdatePath(record.path) || seen.has(record.path.toLowerCase()) || !/^[a-f0-9]{64}$/.test(record.sha256) || !Number.isSafeInteger(record.size) || record.size < 0 || typeof record.executable !== "boolean" || record.path === "manifest.json" || ["logs", "app/project", ".stick"].some((prefix) => record.path === prefix || record.path.startsWith(prefix + "/"))) { throw new Error("Unsafe update file"); }
@@ -48,8 +52,15 @@ export function validateUpdateManifest(value: unknown, target: Target): Manifest
     seen.add(record.path.toLowerCase());
     if (!record.path.startsWith("models/")) { size += record.size; if (record.size > maxUpdateBytes || size > 2 * 1024 ** 3) { throw new Error("Update is too large"); } }
   }
-  const desktop = target.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-ai" : target === "windows-x64" ? "Stick AI.exe" : "stick-ai";
-  for (const path of [desktop, "README.txt", target.startsWith("macos-") ? "Start.command" : target === "windows-x64" ? "Start.bat" : "start.sh", `bin/${target}/node${target === "windows-x64" ? ".exe" : ""}`, `bin/${target}/llama-server${target === "windows-x64" ? ".exe" : ""}`, "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]) {
+  const platforms = target === "universal" ? [...targets] : [target];
+  const required = new Set(["README.txt", "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]);
+  for (const platform of platforms) {
+    const windows = platform === "windows-x64";
+    required.add(platform.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-ai" : windows ? "Stick AI.exe" : "stick-ai");
+    required.add(platform.startsWith("macos-") ? "Start.command" : windows ? "Start.bat" : "start.sh");
+    required.add(`bin/${platform}/node${windows ? ".exe" : ""}`); required.add(`bin/${platform}/llama-server${windows ? ".exe" : ""}`);
+  }
+  for (const path of required) {
     if (!seen.has(path.toLowerCase())) { throw new Error("Incomplete update"); }
   }
   return manifest;

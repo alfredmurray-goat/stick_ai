@@ -124,6 +124,17 @@ jobs:
         run: rm -f release-assets/stellan-1-lite-q4_k_m.gguf release-assets/node-*.tar.gz release-assets/node-*.zip
       - name: Verify native startup and real Lite tool exchange
         run: node scripts/smoke-platform.mjs "dist/Stick AI"
+      - name: Archive the Mac app for the universal all-devices build
+        if: runner.os == 'macOS'
+        run: tar -cf "dist/stick_ai-macapp-${{ inputs.name }}.tar" -C "dist/Stick AI" "Stick AI.app"
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: stick_ai-macapp-${{ inputs.name }}
+          path: dist/stick_ai-macapp-${{ inputs.name }}.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
       - name: Build the app update without model weights
         run: node scripts/build-app-update.ts "dist/Stick AI" dist/stick_ai-update-${{ inputs.name }}.gz
       - uses: actions/upload-artifact@v4

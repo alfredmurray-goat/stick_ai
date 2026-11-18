@@ -255,6 +255,17 @@ fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, St
     }
 }
 
+/// The folder holding manifest.json, bin, app and models. A platform package keeps them beside the app;
+/// the all-devices stick keeps every app at the top and everything they share in a "Stellan" folder.
+fn stick_root(executable: &Path) -> PathBuf {
+    for directory in executable.ancestors().skip(1) {
+        if directory.join("manifest.json").is_file() { return directory.to_path_buf(); }
+        let shared = directory.join("Stellan");
+        if shared.join("manifest.json").is_file() { return shared; }
+    }
+    executable.parent().unwrap_or(executable).to_path_buf()
+}
+
 fn main() {
     updates::cleanup_runtime();
     if std::env::args().any(|argument| argument == "--dry-run") {
@@ -265,7 +276,7 @@ fn main() {
     let data_path = data.path().to_path_buf();
     let app = tauri::Builder::default().setup(move |app| {
         let executable = std::env::current_exe()?;
-        let root = executable.ancestors().find(|directory| directory.join("manifest.json").is_file()).unwrap_or(executable.parent().unwrap()).to_path_buf();
+        let root = stick_root(&executable);
         let logs = app.path().app_log_dir()?;
         fs::create_dir_all(&logs)?;
         app.manage(Desktop { runtime: Arc::new(Mutex::new(Runtime::default())), root, logs, temporary: data_path.clone(), settings: app.path().app_config_dir()?.join("updates.json") });

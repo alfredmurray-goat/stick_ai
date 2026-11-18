@@ -175,3 +175,26 @@ it("treats a missing hosted feed as up to date and refuses tampered or off-host 
   expect(() => validateConfig({ ...config, feed: "http://updates.example.com/stick_ai-updates.json" })).toThrow("Invalid update configuration");
   expect(() => validateConfig({ ...config, feed: "https://updates.example.com/other.json" })).toThrow("Invalid update configuration");
 });
+function manifestWith(paths: string[], selected: string[]): Manifest {
+  return { format: 1, nodeRelease: "24.22.1", llamaRelease: "v0.9.0", targets: selected as Manifest["targets"], files: paths.map((path) => ({ path, sha256: "a".repeat(64), size: 1, executable: false })) };
+}
+const shared = ["README.txt", "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"];
+const allDevices = [...shared, "Stick AI.app/Contents/MacOS/stick-ai", "Stick AI.exe", "stick-ai", "Start.command", "Start.bat", "start.sh",
+  ...targets.flatMap((target) => [`bin/${target}/node${target === "windows-x64" ? ".exe" : ""}`, `bin/${target}/llama-server${target === "windows-x64" ? ".exe" : ""}`])];
+it("accepts an all-devices update only when every computer's app and runtimes are present", () => {
+  expect(validateUpdateManifest(manifestWith(allDevices, [...targets]), "universal").files).toHaveLength(allDevices.length);
+  expect(() => validateUpdateManifest(manifestWith(allDevices.filter((path) => path !== "Stick AI.exe"), [...targets]), "universal")).toThrow("Incomplete update");
+  expect(() => validateUpdateManifest(manifestWith(allDevices, ["linux-x64"]), "universal")).toThrow("Update does not match");
+  expect(() => validateUpdateManifest(manifestWith(allDevices, [...targets]), "linux-x64")).toThrow("Update does not match");
+  const config = validateConfig({ format: 1, repository: "alfredmurray-goat/stick_ai", target: "universal", sequence: 1, source: "x" });
+  expect(config.target).toBe("universal");
+});
+it("reads feeds with and without an all-devices bundle but never without the four platform bundles", async () => {
+  const f = await fixture();
+  const universal = { target: "universal" as const, name: "stick_ai-update-universal.gz", sha256: "b".repeat(64), size: 10 };
+  expect(verifyFeed(signed({ ...f.feed, assets: [...f.feed.assets, universal] }), publicKey, f.feed.repository).assets).toHaveLength(5);
+  expect(() => verifyFeed(signed({ ...f.feed, assets: [...f.feed.assets.slice(1), universal] }), publicKey, f.feed.repository)).toThrow("Invalid update release");
+  const config = { ...(await readUpdateConfig(f.root)), target: "universal" as const, feed: hostedFeed };
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json(signed(f.feed))));
+  expect(await findUpdate(config, "", new AbortController().signal, publicKey)).toBeUndefined();
+});

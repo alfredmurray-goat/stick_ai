@@ -9,17 +9,19 @@ import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { hashFile, staticFiles, type Manifest } from "./integrity.js";
 import { updateMagic, validateUpdateManifest } from "./update-format.js";
-import type { Target } from "./platform.js";
+import type { UpdateTarget } from "./update-format.js";
 
-export async function buildUpdateBundle(root: string, target: Target, output: string, liteCompatible = false): Promise<void> {
-  const manifest = validateUpdateManifest(JSON.parse(await readFile(join(root, "manifest.json"), "utf8")), target);
+/** `source` builds from a file list whose files aren't all under `root` (the all-devices stick keeps its apps outside Stellan). */
+export async function buildUpdateBundle(root: string, target: UpdateTarget, output: string, liteCompatible = false, source?: { manifest: Manifest; locate: (path: string) => string }): Promise<void> {
+  const manifest = validateUpdateManifest(source ? structuredClone(source.manifest) : JSON.parse(await readFile(join(root, "manifest.json"), "utf8")), target);
+  const locate = source?.locate ?? ((path: string) => join(root, path));
   if (liteCompatible) { manifest.files = manifest.files.filter((record) => record.path !== "models/stellan-1-max-q4_k_m.gguf"); }
   const index = Buffer.from(JSON.stringify(manifest)); const length = Buffer.alloc(4); length.writeUInt32LE(index.length);
   async function* contents() {
     yield updateMagic; yield length; yield index;
     for (const record of manifest.files) {
       if (record.path.startsWith("models/")) { continue; }
-      const path = join(root, record.path); const info = await lstat(path);
+      const path = locate(record.path); const info = await lstat(path);
       if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) { throw new Error("Unsafe update input"); }
       const actual = await hashFile(path);
       if (actual.size !== record.size || actual.sha256 !== record.sha256) { throw new Error("Changed update input"); }
@@ -28,7 +30,7 @@ export async function buildUpdateBundle(root: string, target: Target, output: st
   }
   await pipeline(Readable.from(contents()), createGzip(), createWriteStream(output, { flags: "wx", mode: 0o600 }));
 }
-export async function extractUpdateBundle(bundle: string, output: string, target: Target, signal: AbortSignal): Promise<Manifest> {
+export async function extractUpdateBundle(bundle: string, output: string, target: UpdateTarget, signal: AbortSignal): Promise<Manifest> {
   const source = createReadStream(bundle, { signal }); const stream = source.pipe(createGunzip());
   source.on("error", (error) => stream.destroy(error));
   const iterator = stream[Symbol.asyncIterator](); let pending = Buffer.alloc(0); let offset = 0;
