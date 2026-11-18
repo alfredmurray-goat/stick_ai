@@ -60,31 +60,27 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 
 ## Download
 
-Stick AI ships preinstalled on a USB stick (launching February 2027 in the EU and May 2027 worldwide). Builds aren't public downloads: each release is kept as a **private draft** on [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases) that only people with write access to this repository can see, and is used to prepare the sticks. Sold sticks get app updates from a private, signed update host instead (see [docs/UPDATES.md](docs/UPDATES.md)). Each release has two kinds of download.
+Stick AI ships preinstalled on a USB stick (launching February 2027 in the EU and May 2027 worldwide). Builds aren't public downloads: each release is kept as a **private draft** on [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases) that only people with write access to this repository can see, and is used to prepare the sticks. Sold sticks get app updates from a private, signed update host instead (see [docs/UPDATES.md](docs/UPDATES.md)). Each build produces **one** release, `Stick AI — all devices — build N`, holding the stick image, its Join helpers, checksums and the signed app updates. See **[docs/STICKS.md](docs/STICKS.md)** for how to make a stick.
 
-| Download | What's inside | Size | Best for |
-| --- | --- | --- | --- |
-| **Complete** (`stick_ai-<platform>`) | The app, runtimes, Lite and Max | Large, split into parts | Plug-and-play on a fresh stick |
-| **Model-free** (`stick_ai-<platform>-model-free`) | The app and runtimes, no model files | Small, one file | You already have the Stellan GGUFs |
+One stick works on every supported computer: the apps for each sit side by side and share a single copy of Lite and Max (about 19 GB, so use a 32 GB stick formatted as exFAT).
 
-| Platform | Open after extracting | You need |
+| Computer | Open on the stick | You need |
 | --- | --- | --- |
-| Apple Silicon Mac | `Stick AI.app` | macOS 13.5+, 8 GB RAM |
-| Intel Mac | `Stick AI.app` | macOS 13.5+, 8 GB RAM |
+| Mac (Apple Silicon or Intel) | `Stick AI.app` (one universal app) | macOS 13.5+, 8 GB RAM |
 | Windows x64 | `Stick AI.exe` | Windows 10+, 8 GB RAM, Edge WebView2 |
 | Linux x64 | `stick-ai` | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GB RAM |
 
-Max needs at least 16 GB RAM. Genuine Mac disk images (DMGs) are published as a separate **Stick AI — Mac DMGs** release.
+Max needs at least 16 GB RAM and runs best with 24 GB or more.
 
 > [!TIP]
-> Complete downloads are split into parts because GitHub limits each file to 2 GB. Put every part and the **Join helper** for your platform in one folder, open the Join helper once, then extract the finished archive. The helper checks every part's checksum for you.
+> The stick image is split into parts because GitHub limits each file to 2 GB. Put every part and the **Join helper** for the computer you're using in one folder and open the helper once: it checks every part and rebuilds `stick_ai-all-devices.tar`.
 
 > [!NOTE]
 > These are unsigned test builds. The first time you open one, macOS Gatekeeper or Windows SmartScreen may ask you to confirm. On a Mac, right-click the app and choose **Open**.
 
 ## Install
 
-1. Download and extract the release for your platform, and keep the extracted folder together.
+1. Plug in the stick (or [make one](docs/STICKS.md)) and open the `Stick AI` folder.
 2. Open **Stick AI** (`Stick AI.app`, `Stick AI.exe` or `stick-ai`).
 3. Click **Open workspace**. Stellan loads on your computer and the workspace opens.
 

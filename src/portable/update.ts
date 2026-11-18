@@ -43,7 +43,8 @@ async function findHostedUpdate(config: UpdateConfig & { feed: string }, signal:
   const envelope = await jsonResponse(response) as SignedFeed;
   const feed = verifyFeed(envelope, publicKey, config.repository);
   if (feed.sequence <= config.sequence || feed.source === config.source) { return undefined; }
-  const asset = feed.assets.find((item) => item.target === config.target)!;
+  const asset = feed.assets.find((item) => item.target === config.target);
+  if (!asset) { return undefined; }
   // Each build lives in its own folder, so publishing a new one never changes files a stick is downloading.
   const url = new URL(`${feed.sequence}/${asset.name}`, config.feed).href;
   return { feed, envelope, asset, download: { name: asset.name, size: asset.size, url } };
@@ -73,7 +74,8 @@ export async function findUpdate(config: UpdateConfig, token: string, signal: Ab
     const envelope = await jsonResponse(await githubResponse(`${api}/releases/assets/${asset.id}`, token, signal, "application/octet-stream")) as SignedFeed;
     const feed = verifyFeed(envelope, publicKey, config.repository);
     if (feed.sequence <= config.sequence || feed.source === config.source) { continue; }
-    const selected = feed.assets.find((item) => item.target === config.target)!;
+    const selected = feed.assets.find((item) => item.target === config.target);
+    if (!selected) { continue; }
     const download = release.assets.find((item) => item.name === selected.name && Number.isSafeInteger(item.id) && item.size === selected.size);
     if (!download) { throw new Error("Incomplete app update"); }
     if (!latest || feed.sequence > latest.feed.sequence) { latest = { feed, envelope, asset: selected, download }; }
@@ -161,7 +163,8 @@ export async function applyPreparedUpdate(rootPath: string, workPath: string, pu
     const config = await readUpdateConfig(root);
     const feed = verifyFeed(JSON.parse(await readFile(join(work, "signed-feed.json"), "utf8")), publicKey, config.repository);
     if (feed.sequence <= config.sequence) { throw new Error("Refusing an older app update"); }
-    const asset = feed.assets.find((item) => item.target === config.target)!;
+    const asset = feed.assets.find((item) => item.target === config.target);
+    if (!asset) { throw new Error("App update does not match this stick"); }
     const bundle = await hashFile(join(work, "download.gz")); if (bundle.sha256 !== asset.sha256 || bundle.size !== asset.size) { throw new Error("Changed update download"); }
     const inspection = join(work, "inspection"); await mkdir(inspection);
     const manifest = await preserveInstalledMax(root, await extractUpdateBundle(join(work, "download.gz"), inspection, config.target, new AbortController().signal));

@@ -9,9 +9,9 @@ import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { hashFile, staticFiles, type Manifest } from "./integrity.js";
 import { updateMagic, validateUpdateManifest } from "./update-format.js";
-import type { Target } from "./platform.js";
+import type { UpdateTarget } from "./update-format.js";
 
-export async function buildUpdateBundle(root: string, target: Target, output: string, liteCompatible = false): Promise<void> {
+export async function buildUpdateBundle(root: string, target: UpdateTarget, output: string, liteCompatible = false): Promise<void> {
   const manifest = validateUpdateManifest(JSON.parse(await readFile(join(root, "manifest.json"), "utf8")), target);
   if (liteCompatible) { manifest.files = manifest.files.filter((record) => record.path !== "models/stellan-1-max-q4_k_m.gguf"); }
   const index = Buffer.from(JSON.stringify(manifest)); const length = Buffer.alloc(4); length.writeUInt32LE(index.length);
@@ -28,7 +28,7 @@ export async function buildUpdateBundle(root: string, target: Target, output: st
   }
   await pipeline(Readable.from(contents()), createGzip(), createWriteStream(output, { flags: "wx", mode: 0o600 }));
 }
-export async function extractUpdateBundle(bundle: string, output: string, target: Target, signal: AbortSignal): Promise<Manifest> {
+export async function extractUpdateBundle(bundle: string, output: string, target: UpdateTarget, signal: AbortSignal): Promise<Manifest> {
   const source = createReadStream(bundle, { signal }); const stream = source.pipe(createGunzip());
   source.on("error", (error) => stream.destroy(error));
   const iterator = stream[Symbol.asyncIterator](); let pending = Buffer.alloc(0); let offset = 0;

@@ -12,8 +12,10 @@ function argument(name: string): string {
 function alive(pid: number): boolean { try { process.kill(pid, 0); return true; } catch (error) { if ((error as NodeJS.ErrnoException).code === "ESRCH") { return false; } throw error; } }
 async function relaunch(root: string, temporary: string, failed = false): Promise<void> {
   const config = await readUpdateConfig(root); const args = ["--cleanup-update", temporary, ...(failed ? ["--update-failed"] : [])];
-  const command = config.target.startsWith("macos-") ? "/usr/bin/open" : join(root, config.target === "windows-x64" ? "Stick AI.exe" : "stick-ai");
-  const child = spawn(command, config.target.startsWith("macos-") ? ["-n", "-a", join(root, "Stick AI.app"), "--args", ...args] : args, { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
+  // An all-devices stick has every app, so reopen the one for this computer rather than the configured target.
+  const mac = process.platform === "darwin";
+  const command = mac ? "/usr/bin/open" : join(root, process.platform === "win32" ? "Stick AI.exe" : "stick-ai");
+  const child = spawn(command, mac ? ["-n", "-a", join(root, "Stick AI.app"), "--args", ...args] : args, { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); }); child.unref();
 }
 export async function updaterMain(): Promise<void> {

@@ -65,8 +65,45 @@ jobs:
       app: stick-ai
       server: bin/llama-server
       executable: bin/node
+  # The all-devices stick has one Mac app, so merge the Intel and Apple Silicon executables into a
+  # universal binary and ad-hoc sign the bundle again (the stick is unsigned like the platform builds).
+  macos-universal:
+    needs: [macos-x64, macos-arm64]
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: stick_ai-macapp-macos-arm64
+          path: arm
+      - uses: actions/download-artifact@v4
+        with:
+          name: stick_ai-macapp-macos-x64
+          path: intel
+      - name: Merge the Intel and Apple Silicon apps
+        run: |
+          set -euo pipefail
+          tar -xf arm/stick_ai-macapp-macos-arm64.tar -C arm
+          tar -xf intel/stick_ai-macapp-macos-x64.tar -C intel
+          mkdir out
+          cp -R "arm/Stick AI.app" "out/Stick AI.app"
+          diff -rq -x stick-ai -x _CodeSignature "arm/Stick AI.app" "intel/Stick AI.app" || echo "Note: bundle resources differ; using the Apple Silicon copy"
+          lipo -create "arm/Stick AI.app/Contents/MacOS/stick-ai" "intel/Stick AI.app/Contents/MacOS/stick-ai" -output "out/Stick AI.app/Contents/MacOS/stick-ai"
+          lipo -verify_arch "out/Stick AI.app/Contents/MacOS/stick-ai" x86_64 arm64
+          codesign --force --deep --sign - "out/Stick AI.app"
+          codesign --verify --deep --strict "out/Stick AI.app"
+          "out/Stick AI.app/Contents/MacOS/stick-ai" --dry-run
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then arch -x86_64 "out/Stick AI.app/Contents/MacOS/stick-ai" --dry-run; else echo "Rosetta unavailable; Intel slice checked by lipo only"; fi
+          tar -cf stick_ai-macapp-universal.tar -C out "Stick AI.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stick_ai-macapp-universal
+          path: stick_ai-macapp-universal.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
   publish:
-    needs: [macos-x64, macos-arm64, windows-x64, linux-x64]
+    needs: [macos-x64, macos-arm64, windows-x64, linux-x64, macos-universal]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     permissions:
@@ -80,4 +117,3 @@ jobs:
           BUILD_RUN: ${{ github.run_id }}
         run: |
           gh workflow run release.yml --ref main -f build_run="$BUILD_RUN"
-          gh workflow run macos-dmg.yml --ref main -f build_run="$BUILD_RUN"
