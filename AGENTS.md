@@ -1,0 +1,68 @@
+# AGENTS.md
+
+Instructions for AI coding agents working in this repository. Humans should start with [CONTRIBUTING.md](CONTRIBUTING.md). For the current state of the project and work in flight, read [HANDOVER.md](HANDOVER.md).
+
+## Commands
+
+```bash
+npm install --ignore-scripts --no-audit --no-fund   # install dev tooling
+npm run check                                       # strict TypeScript, no emit
+npm test                                            # Vitest, the whole suite (~20 s)
+npx vitest run tests/<file>.test.ts                 # one file
+npm run build                                       # compile src/ to dist/
+npm run licenses                                    # regenerate THIRD_PARTY_LICENSES.md (CI fails if it changes)
+cd src-tauri && cargo check                         # native shell; Linux needs libwebkit2gtk-4.1-dev
+```
+
+Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervisor.test.ts` can fail for environment reasons; it passes in CI.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `src/agent/` | Agent loop, context building, history trimming (`boundedToolHistory`), Max delegation |
+| `src/model/` | Model client (`ollama.ts`, OpenAI-compatible streaming) and the tagged protocol parser |
+| `src/tools/` | Tools the model can call, and their schemas |
+| `src/sandbox/` | Safe path resolution and sandboxed shell execution per platform |
+| `src/portable/` | Desktop/USB runtime: `web.ts` (local API + UI server), `engine.ts` (managed llama.cpp), `local-models.ts` (bundled or linked GGUFs), `integrity.ts`, `package.ts`, `update*.ts`, GitHub workspaces, MCP, skills |
+| `src/cli/` | `stick` terminal assistant |
+| `portable/ui/` | Workspace UI: `index.html`, `main.js`, `style.css`, no build step |
+| `src-tauri/` | Rust desktop shell (Tauri 2): start/stop, native file chooser, updates |
+| `scripts/` | Packaging, smoke tests, release publishing |
+| `tests/` | Vitest suite |
+| `docs/` | Guides and README images |
+| `ollama/` | Modelfiles for terminal use with Ollama |
+
+## Rules that must not be broken
+
+- **Never commit model weights.** `.gguf` files are gitignored and downloaded with pinned SHA-256s by `scripts/fetch-platform-assets.mjs` and `scripts/assemble-full-release.mjs`.
+- **The UI runs under a strict CSP** (`default-src 'none'; script-src 'self'; style-src 'self'`). No inline `<script>`, no `style="…"` attributes in HTML, no external URLs. Setting `element.style.x` from JS is allowed. Icons are an inline SVG sprite in `index.html`.
+- **Never render model output with `innerHTML`.** `renderMarkdown` in `main.js` builds DOM nodes with `textContent`.
+- **Keep every element ID that `main.js` uses** when editing `index.html`. `tests/portable-web.test.ts` also expects the text "Start chatting" in the page.
+- **Every file in a package is in its manifest.** `verifyStick` rejects unlisted or changed files. Model files are marked `optional` so model-free downloads pass; a present model must still match its hash.
+- **The prompt cache depends on stable prefixes.** Lite runs with `cache_prompt: true` and `--ctx-checkpoints 1`. Anything that rewrites earlier messages on every step (for example, trimming old tool output a little more each time) forces the server to reprocess the whole conversation. `boundedToolHistory` trims in steps of half the limit for this reason; `tests/responsive.test.ts` guards it.
+- **Approvals stay mandatory.** Writes, edits, shell commands and MCP calls go through the approval callbacks. Don't add bypasses.
+
+## Releases
+
+- Merging to `main` with changes under `src/`, `src-tauri/`, `portable/`, `package*.json` or the desktop workflows starts **Desktop builds** (`.github/workflows/desktop.yml`). Docs-only changes don't.
+- Each platform job runs the tests, builds the native app and llama.cpp server, assembles the package and runs a **real Lite tool exchange** (`scripts/smoke-platform.mjs`) before uploading.
+- If all four platforms pass, the `publish` job starts `release.yml` (Windows/Linux complete packages plus model-free archives for all four platforms) and `macos-dmg.yml` (Mac DMGs, then `publish-macos-dmg.yml`).
+- A new push to `main` cancels a Desktop build that's still running (`cancel-in-progress`). Don't merge app changes while a release build you want is running.
+- To test the real builds without publishing, run `desktop.yml` by hand on your branch: the `publish` job only runs on `main`.
+- The llama.cpp server is cached per platform. Change the cache key in `desktop-platform.yml` when you change its build flags.
+
+## Traps found the hard way
+
+- **Privileged ports.** CI runners aren't root, so a test that binds port 1 fails with `EACCES` on macOS and Linux but passes as root. Use ports above 1024.
+- **Slow runners.** The Intel macOS runner is several times slower. Tests that package or archive need an explicit timeout (`it(..., 30000)`).
+- **llama.cpp web UI assets.** At the pinned commit, a fresh server build downloads web UI assets that no longer match and fails. Builds pass `-DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF`; the app runs with `--no-webui`.
+- **Apple Silicon runners are scarce.** A `macos-arm64` job can sit queued and be cancelled. Re-run it rather than changing code.
+- **Metal on CI.** GitHub's macOS VMs expose a paravirtual Metal device. The engine falls back to the CPU if a GPU start fails, and the smoke test records which ran in `model-smoke.json`. Real Mac performance needs an on-device check.
+- **`origin` branches after a squash merge.** The working branch can hold already-merged commits. Merge `origin/<branch>` into the new work instead of force-pushing, then check the diff against `main` is only your change.
+
+## Style
+
+- Strict TypeScript, ESM. Comments only explain why.
+- Keep user-facing text plain and friendly. Error messages say what to do next.
+- Update `README.md` and the relevant guide in `docs/` when behaviour changes, and the screenshots in `docs/` when the UI changes.

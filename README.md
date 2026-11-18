@@ -157,11 +157,11 @@ npm test
 npm link
 ```
 
-Prepare Stellan in Ollama by placing your verified GGUFs beside the Modelfiles:
+Prepare Stellan in Ollama by placing your verified `stellan-1-lite.gguf` and `stellan-1-max.gguf` in the `ollama/` folder, beside the Modelfiles:
 
 ```sh
-ollama create stellan-1-lite -f Modelfile
-ollama create stellan-1-max -f Modelfile.max
+ollama create stellan-1-lite -f ollama/Modelfile
+ollama create stellan-1-max -f ollama/Modelfile.max
 ollama serve
 ```
 
@@ -270,7 +270,11 @@ npm run licenses
 
 CI runs type checks and the test suite on Ubuntu, macOS and Windows. The [Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) workflow builds all four platforms and runs a real Lite tool exchange on each before anything is published. Source lives in `src/cli`, `src/agent`, `src/tools`, `src/model`, `src/config`, `src/sandbox` and `src/portable`, with the desktop shell in `src-tauri` and the workspace UI in `portable/ui`.
 
-More detail: [DESKTOP.md](DESKTOP.md) (desktop app), [BUILDS.md](BUILDS.md) (packages and releases), [PORTABLE.md](PORTABLE.md) (USB browser launcher), [UPDATES.md](UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](GITHUB_WORKSPACES.md), [MCP_SKILLS.md](MCP_SKILLS.md) and [VERIFICATION.md](VERIFICATION.md) (what has and hasn't been verified).
+More detail: [DESKTOP.md](docs/DESKTOP.md) (desktop app), [BUILDS.md](docs/BUILDS.md) (packages and releases), [PORTABLE.md](docs/PORTABLE.md) (USB browser launcher), [UPDATES.md](docs/UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](docs/GITHUB_WORKSPACES.md), [MCP_SKILLS.md](docs/MCP_SKILLS.md) and [VERIFICATION.md](docs/VERIFICATION.md) (what has and hasn't been verified).
+
+## Contributing
+
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the pieces fit together, how to build and test, and how to open a pull request. AI coding agents should read [AGENTS.md](AGENTS.md), and [HANDOVER.md](HANDOVER.md) covers the current state of the project and what's next.
 
 ## Limits
 
