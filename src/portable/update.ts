@@ -113,7 +113,7 @@ async function safeDirectory(path: string): Promise<boolean> {
 }
 async function preserveInstalledMax(root: string, manifest: Manifest): Promise<Manifest> {
   const current = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
-  const max = current.files.find((record) => record.path === "models/stellan-1-max-q4_k_m.gguf");
+  const max = current.files.find((record) => record.path === "models/stellan-1.0-q4_k_m.gguf");
   if (max && !manifest.files.some((record) => record.path === max.path)) { return { ...manifest, files: [...manifest.files, max] }; }
   return manifest;
 }
@@ -121,7 +121,7 @@ async function compatibleModels(root: string, manifest: Manifest): Promise<void>
   const current = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
   const before = current.files.filter((record) => record.path.startsWith("models/"));
   const after = manifest.files.filter((record) => record.path.startsWith("models/"));
-  if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.path === "models/stellan-1-max-q4_k_m.gguf" && record.optional === true)) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
+  if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.path === "models/stellan-1.0-q4_k_m.gguf" && record.optional === true)) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
   // Model-free copies may have no models folder at all; their GGUFs are linked from elsewhere.
   if (!await safeDirectory(join(root, "models")) && !after.every((record) => record.optional === true)) { throw new Error("The installed models are missing"); }
 }
@@ -186,7 +186,7 @@ export async function applyPreparedUpdate(rootPath: string, workPath: string, pu
     }
     await verifyTree(next, manifest, true);
     if (isSharedLayout(root)) {
-      // The apps live beside the Stellan folder: swap them in as well, keeping the old ones for rollback.
+      // The apps live beside the stellan folder: swap them in as well, keeping the old ones for rollback.
       const apps = [...new Set(manifest.files.map((record) => desktopEntry(record.path)).filter((entry): entry is string => Boolean(entry)))];
       await mkdir(oldApps);
       for (const app of apps) {

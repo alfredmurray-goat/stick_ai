@@ -76,7 +76,7 @@ try {
   await gh("run", "download", runId, "--repo", repo, "--name", "stick_ai-macapp-universal", "--dir", macFolder);
   await exec("tar", ["-xf", join(macFolder, "stick_ai-macapp-universal.tar"), "-C", macFolder]);
   const max = await fetchMaxForRelease(join(temporary, "shared-models"));
-  // The image is the stick's top level: the three apps, "Read me.txt" and the shared Stellan folder.
+  // The image is the stick's top level: the three apps, "Read me.txt" and the shared stellan folder.
   const stick = join(temporary, "stick");
   await assembleUniversalStick(stick, { bases, macApp: join(macFolder, "Stick AI.app"), max }, console.log);
   await rm(join(temporary, "bases"), { recursive: true, force: true }); await rm(macFolder, { recursive: true, force: true });
@@ -84,12 +84,12 @@ try {
 
   // Updates: the four platform bundles from the build plus one for all-devices sticks, in this release and on the update host.
   const universal = join(temporary, "stick_ai-update-universal.gz");
-  await buildUpdateBundle(join(stick, "Stellan"), "universal", universal, true, await universalUpdateSource(stick));
+  await buildUpdateBundle(join(stick, "stellan"), "universal", universal, true, await universalUpdateSource(stick));
   await publishAppUpdate({ repo, runId, source: run.head_sha, artifacts, platforms, temporary, signingKey: process.env.STICK_UPDATE_SIGNING_KEY, gh, tag, ownRelease: false, universal });
   await rm(universal);
 
   const image = join(temporary, "stick_ai-all-devices.tar");
-  await exec("tar", ["-cf", image, "-C", stick, "Stick AI.app", "Stick AI.exe", "stick-ai", "Read me.txt", "Stellan"], { maxBuffer: 1000000 });
+  await exec("tar", ["-cf", image, "-C", stick, "Stick AI.app", "Stick AI.exe", "stick-ai", "Read me.txt", "stellan"], { maxBuffer: 1000000 });
   await rm(stick, { recursive: true, force: true }); await rm(join(temporary, "shared-models"), { recursive: true, force: true });
   const parts = join(temporary, "parts");
   const record = await uploadSplitArchive(image, parts, async (paths) => { await gh("release", "upload", tag, ...paths, "--repo", repo, "--clobber"); });

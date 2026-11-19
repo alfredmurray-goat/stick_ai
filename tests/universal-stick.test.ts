@@ -38,7 +38,7 @@ it("merges the four platform packages into one verified stick with one copy of e
     const output = join(root, "Stick AI");
     const manifest = await assembleUniversalStick(output, { bases, macApp });
     expect(manifest.targets).toEqual([...targets]);
-    const shared = join(output, "Stellan"); const sharedManifest = await verifyStick(shared, true);
+    const shared = join(output, "stellan"); const sharedManifest = await verifyStick(shared, true);
     for (const app of ["Stick AI.app/Contents/MacOS/stick-ai", "Stick AI.exe", "stick-ai", "Read me.txt"]) { expect((await lstat(join(output, app))).isFile()).toBe(true); }
     expect(sharedManifest.files.some((file) => file.path.startsWith("Stick AI"))).toBe(false);
     const paths = manifest.files.map((file) => file.path);
@@ -66,7 +66,7 @@ it("refuses a Mac app that only runs on one kind of Mac", async () => {
     await expect(assembleUniversalStick(join(root, "out"), { bases, macApp })).rejects.toThrow("universal binary");
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 60000);
-it("updates a Stellan-layout stick, replacing the apps beside the shared folder and keeping the models", async () => {
+it("updates a stellan-layout stick, replacing the apps beside the shared folder and keeping the models", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-universal-update-"));
   const env = { id: process.env.GITHUB_RUN_ID, sha: process.env.GITHUB_SHA };
   const key = generateKeyPairSync("ed25519"); const publicKey = key.publicKey.export({ type: "spki", format: "pem" }).toString();
@@ -83,14 +83,14 @@ it("updates a Stellan-layout stick, replacing the apps beside the shared folder 
   }
   try {
     const current = await stick("v1", 1); const next = await stick("v2", 2, "new Windows app");
-    await writeFile(join(current, "Stellan/app/project/keep.txt"), "my project");
-    const bundle = join(root, "stick_ai-update-universal.gz"); await buildUpdateBundle(join(next, "Stellan"), "universal", bundle, true, await universalUpdateSource(next));
+    await writeFile(join(current, "stellan/app/project/keep.txt"), "my project");
+    const bundle = join(root, "stick_ai-update-universal.gz"); await buildUpdateBundle(join(next, "stellan"), "universal", bundle, true, await universalUpdateSource(next));
     const hash = await hashFile(bundle); const bytes = await readFile(bundle);
     const feed: UpdateFeed = { format: 1, repository: "alfredmurray-goat/stick_ai", sequence: 2, source: (2).toString(16).padStart(40, "0"),
       assets: [...targets.map((target) => ({ target, name: `stick_ai-update-${target}.gz`, sha256: "a".repeat(64), size: 1 })), { target: "universal", name: "stick_ai-update-universal.gz", ...hash }] };
     const payload = Buffer.from(JSON.stringify(feed)); const envelope = { payload: payload.toString("base64"), signature: sign(null, payload, key.privateKey).toString("base64") };
     vi.stubGlobal("fetch", vi.fn(async (url: URL) => url.toString().endsWith("/stick_ai-updates.json") ? Response.json(envelope) : url.toString().endsWith("/2/stick_ai-update-universal.gz") ? new Response(bytes) : new Response("missing", { status: 404 })));
-    const shared = join(current, "Stellan"); const lite = (await lstat(join(shared, "models/stellan-1-lite-q4_k_m.gguf"))).ino;
+    const shared = join(current, "stellan"); const lite = (await lstat(join(shared, "models/stellan-1-lite-q4_k_m.gguf"))).ino;
     const work = await prepareUpdate(shared, "", new AbortController().signal, publicKey);
     await applyPreparedUpdate(shared, work, publicKey);
     expect(await readFile(join(current, "Stick AI.exe"), "utf8")).toContain("new Windows app");

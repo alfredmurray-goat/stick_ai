@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { bundledMax, maxRelease } from "../src/portable/max-release.ts";
 const exec = promisify(execFile);
 export async function fetchMaxForRelease(directory) {
-  await mkdir(directory, { recursive: true }); const output = join(directory, "stellan-1-max-q4_k_m.gguf"), temporary = output + ".part";
+  await mkdir(directory, { recursive: true }); const output = join(directory, "stellan-1.0-q4_k_m.gguf"), temporary = output + ".part";
   const file = await open(temporary, "wx", 0o600); await file.close();
   try {
     console.log("Downloading the pinned Max GGUF once for all four complete packages");

@@ -8,7 +8,7 @@ import { llamaRelease, nodeRelease, targets, type Target } from "./platform.js";
 import { desktopApps, desktopEntry, sharedFolder } from "./layout.js";
 
 // One stick for every computer. The output folder is the stick itself:
-//   Stick AI.app (universal Mac)  Stick AI.exe  stick-ai  Read me.txt  Stellan/
+//   Stick AI.app (universal Mac)  Stick AI.exe  stick-ai  Read me.txt  stellan/
 // Stellan holds what every app shares: manifest, app, runtimes per computer, and one copy of each model.
 export interface UniversalInputs {
   /** Extracted, verified platform packages. Lite is moved out of the Linux one. */
@@ -31,7 +31,7 @@ This stick works on Mac, Windows and Linux. Open the app for your computer:
   Windows  Stick AI.exe. If Windows warns you, choose More info, then Run anyway.
   Linux    stick-ai
 
-Everything the apps share, including the AI models, is in the Stellan folder. Keep it next to the apps.
+Everything the apps share, including the AI models, is in the stellan folder. Keep it next to the apps.
 
 Then click Open workspace. Everything runs on this computer; nothing is sent anywhere.
 Lite needs 8 GB of memory. Max needs at least 16 GB and runs best with 24 GB or more.
@@ -107,7 +107,7 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     if (!inputs.max) { manifest.files.push({ ...bundledMax, executable: false, optional: true }); }
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     await verifyStick(staging, !inputs.max, undefined, true);
-    // Move the apps out beside the shared folder. Their files stay out of Stellan's manifest because they
+    // Move the apps out beside the shared folder. Their files stay out of stellan's manifest because they
     // aren't inside it; updates carry them and put them back beside it.
     await mkdir(stick); await rename(staging, join(stick, sharedFolder));
     for (const app of desktopApps) { await rename(join(stick, sharedFolder, app), join(stick, app)); }

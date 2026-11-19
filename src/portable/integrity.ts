@@ -46,12 +46,12 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       try { info = await lstat(path); } catch (error) {
         // Optional model files may be absent (model-free downloads link their own GGUFs);
         // a present model file must still match its recorded hash.
-        if (optionalMax && record.optional && ["models/stellan-1-max-q4_k_m.gguf", "models/stellan-1-lite-q4_k_m.gguf"].includes(record.path) && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
+        if (optionalMax && record.optional && ["models/stellan-1.0-q4_k_m.gguf", "models/stellan-1-lite-q4_k_m.gguf"].includes(record.path) && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
         throw error;
       }
       const resolved = await realpath(path);
       const rel = relative(canonical, resolved);
-      if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 && !(allowBuildModelLinks && record.path === "models/stellan-1-max-q4_k_m.gguf")) { throw new UserError("damaged"); }
+      if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 && !(allowBuildModelLinks && record.path === "models/stellan-1.0-q4_k_m.gguf")) { throw new UserError("damaged"); }
       const actual = await hashFile(path, signal);
       if (actual.sha256 !== record.sha256 || actual.size !== record.size || process.platform !== "win32" && record.executable && !(info.mode & 0o111)) { issues.push(`Changed file: ${record.path}`); }
       } catch (error) { if (signal?.aborted) { throw error; } issues.push(`Missing or unsafe file: ${record.path}: ${String(error)}`); }
