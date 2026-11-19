@@ -15,6 +15,8 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 | [#27](https://github.com/alfredmurray-goat/stick_ai/pull/27) | Model-free downloads for all four platforms (link your own Lite and Max GGUFs), Apple Silicon GPU (Metal) with automatic CPU fallback, and the llama.cpp web-UI build fix. |
 | [#28](https://github.com/alfredmurray-goat/stick_ai/pull/28) | README restyled with screenshots, features and benchmarks. |
 
+- **Web search built in.** Actuent (`https://agents.actuent.ai/api/mcp`) is a built-in MCP server, on by default and connected on first use. Lite has `web_search` and `read_web_page`; results are trimmed by `src/portable/web-search.ts`. Every search is approved. The setting is `webSearch` in `logs/extensions/mcp.json`. Tested live against Actuent on 2026-11-19.
+
 ### In flight
 
 - **Release for #27.** Desktop builds run [44284459765](https://github.com/alfredmurray-goat/stick_ai/actions/runs/44284459765) builds all four platforms. If it passes, it publishes the desktop release (`desktop-44284459765`) and the Mac DMGs. Check that every expected asset is there, including the four `stick_ai-<platform>-model-free` files.

@@ -291,7 +291,8 @@ async function update() {
       if (event.kind === "problem") { showError(event.data); }
       if (event.kind === "approval") {
         const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
-        for (const [label, allow] of [[event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
+        const web = event.data.kind === "web", search = web && event.data.title === "Search the web";
+        for (const [label, allow] of [[web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
@@ -317,11 +318,11 @@ function diffLines(before, after) {
 function approvalCard(data) {
   const card = document.createElement("article"), head = document.createElement("div"), text = document.createElement("div"), title = document.createElement("h3"), sub = document.createElement("span");
   card.className = "approval-card"; card.dataset.approval = data.id; head.className = "approval-head"; sub.className = "approval-sub";
-  const mcp = data.kind === "mcp"; const editing = !mcp && Boolean(data.before);
-  title.textContent = mcp ? `Allow MCP call: ${data.title}?` : `Save changes to ${data.file}?`;
+  const web = data.kind === "web", mcp = data.kind === "mcp" || web; const editing = !mcp && Boolean(data.before);
+  title.textContent = web ? (data.title === "Search the web" ? "Search the web for this?" : "Read this web page?") : mcp ? `Allow MCP call: ${data.title}?` : `Save changes to ${data.file}?`;
   const lines = (value) => value.split("\n").length;
-  sub.textContent = mcp ? "Review the arguments this tool will receive" : `${data.path || data.file} · ${editing ? `replaces ${lines(data.before)} line${lines(data.before) === 1 ? "" : "s"} with ${lines(data.after)}` : `writes ${lines(data.after)} line${lines(data.after) === 1 ? "" : "s"}`}`;
-  text.append(title, sub); head.append(icon(mcp ? "plug" : "shield"), text); card.append(head);
+  sub.textContent = web ? "Only this goes to Actuent. Your code stays on the stick." : mcp ? "Review the arguments this tool will receive" : `${data.path || data.file} · ${editing ? `replaces ${lines(data.before)} line${lines(data.before) === 1 ? "" : "s"} with ${lines(data.after)}` : `writes ${lines(data.after)} line${lines(data.after) === 1 ? "" : "s"}`}`;
+  text.append(title, sub); head.append(icon(web ? "compass" : mcp ? "plug" : "shield"), text); card.append(head);
   if (editing) {
     const diff = document.createElement("div"); diff.className = "diff"; diff.setAttribute("role", "group"); diff.setAttribute("aria-label", "Proposed change");
     for (const [kind, line] of diffLines(data.before, data.after)) { const row = document.createElement("div"); row.className = `diff-line ${kind}`; row.dataset.sign = kind === "add" ? "+" : kind === "del" ? "−" : " "; row.textContent = line || " "; diff.append(row); }
@@ -518,8 +519,8 @@ function renderTool(data) {
   if (!card) {
     if (!toolCards.size) byId("tool-activity").textContent = "";
     card = document.createElement("div"); card.className = "tool-card"; thinkingBreak = true;
-    const badge = document.createElement("span"); badge.className = "tool-icon"; badge.append(icon(({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book"})[data.tool] || "sparkle")); card.append(badge);
-    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill"})[data.tool] || data.tool;
+    const badge = document.createElement("span"); badge.className = "tool-icon"; badge.append(icon(({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass"})[data.tool] || "sparkle")); card.append(badge);
+    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[data.tool] || data.tool;
     const path = document.createElement("span"); path.className = "tool-path"; path.textContent = [".", "./", ""].includes(data.path ?? "") ? data.detail || "Project root" : data.path; for (const [id,name] of mcpNames) path.textContent = path.textContent.replace(id,name);
     card.append(title,path); byId("tool-activity").append(card); toolCards.set(data.step,card); byId("tool-count").textContent = String(toolCards.size);
   }
@@ -618,8 +619,11 @@ async function refreshExtensions() {
   if (native) return;
   try {
     const data = await api("/api/extensions"); byId("mcp-server-list").textContent = ""; byId("skills-list").textContent = "";
-    if (!data.servers.length) byId("mcp-server-list").append(element("p","No servers yet. Add a URL or local program below."));
+    const web = element("article",undefined,"extension-card builtin-card");web.append(element("h4","Web search · Actuent"),element("p",data.webSearch?"on · built in · free":"off","extension-status"),element("p",data.webSearch?"Lite can look things up on the live web: docs, versions, error messages, prices and news. Each search shows you the exact words first; only those go online.":"Lite stays fully offline. Turn this on to let it look things up on the web, with your approval each time."));
+    const webToggle = actionButton(data.webSearch?"Turn off web search":"Turn on web search",async()=>{try{await extensionAction("/api/mcp/web-search",{enabled:!data.webSearch},"mcp-message");byId("mcp-message").textContent=data.webSearch?"Web search is off.":"Web search is on. Searches still ask you first.";await refreshExtensions();}catch{}});webToggle.disabled=extensionBusy;web.append(webToggle);byId("mcp-server-list").append(web);
+    if (!data.servers.some(s=>!s.builtin)) byId("mcp-server-list").append(element("p","No other servers yet. Add a URL or local program below."));
     for (const server of data.servers) {
+      if (server.builtin) { mcpNames.set(server.id,server.name); continue; }
       mcpNames.set(server.id,server.name);const card = element("article",undefined,"extension-card");card.append(element("h4",server.name),element("p",`${server.transport} · ${server.status} · ${server.tools} tools`,"extension-status"),element("pre",server.url || [server.command,...server.args].join(" ")));
       const access = element("details"),summary = element("summary","Session access"),bearer = element("input"),headers = element("input"),env = element("input");
       for (const input of [bearer,headers,env]) {input.type="password";input.autocomplete="off";}bearer.placeholder="Bearer token";headers.placeholder='Secret headers JSON';env.placeholder='Environment JSON';access.append(summary,bearer,headers,env);card.append(access);
