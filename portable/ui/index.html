@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <title>Stick AI · Workspace</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="brand/favicon.png" type="image/png">
 <link rel="stylesheet" href="./style.css">
 <script src="./main.js" defer></script>
 </head>
@@ -45,7 +45,7 @@
 
 <div class="workspace">
 <aside class="sidebar" aria-label="Project sidebar">
-  <a class="brand" href="#" aria-label="Stick AI home"><span class="brand-symbol">s/</span><span>stick<span class="brand-light">ai</span></span><span class="local-badge"><svg class="i"><use href="#i-lock"/></svg>LOCAL</span></a>
+  <a class="brand" href="#" aria-label="Stick AI home"><img class="brand-symbol logo-dark" src="brand/icon-dark.png" alt=""><img class="brand-symbol logo-light" src="brand/icon-light.png" alt=""><span class="brand-word">stick_ai</span><span class="local-badge"><svg class="i"><use href="#i-lock"/></svg>LOCAL</span></a>
   <button id="new-session" class="new-session"><svg class="i"><use href="#i-plus"/></svg> New conversation <kbd>⌘ N</kbd></button>
 
   <div class="sidebar-section-label">WORKSPACE</div>
@@ -75,7 +75,7 @@
 
   <div id="conversation-scroll" class="conversation-scroll">
     <section id="welcome" class="welcome">
-      <div class="welcome-mark">s/</div>
+      <div class="welcome-mark" aria-hidden="true"><img class="mark logo-dark" src="brand/icon-dark.png" alt=""><img class="mark logo-light" src="brand/icon-light.png" alt=""></div>
       <p class="eyebrow">YOUR LOCAL CODING WORKSPACE</p>
       <h1>What will you build?</h1>
       <p class="welcome-subtitle">A conversation, your files, and a little help from Stellan.<br>Everything runs on this computer.</p>
@@ -89,7 +89,7 @@
     </section>
 
     <section id="loading" class="loading-view" hidden>
-      <div class="welcome-mark pulse">s/</div>
+      <div class="welcome-mark pulse" aria-hidden="true"><img class="mark logo-dark" src="brand/icon-dark.png" alt=""><img class="mark logo-light" src="brand/icon-light.png" alt=""></div>
       <h2>Making room for your ideas.</h2>
       <p>Loading Stellan on this computer. Follow the live status on the right.</p>
       <div class="loading-bar" aria-hidden="true"><span></span></div>
@@ -155,7 +155,7 @@
 </div>
 
 <dialog id="settings-dialog" class="settings-dialog">
-  <div class="dialog-heading"><div class="app-tile" aria-hidden="true">s/</div><div><h2>Stick AI</h2><p>Your private coding assistant.</p></div><button id="close-settings" class="icon-button" aria-label="Close settings"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dialog-heading"><div class="app-tile" aria-hidden="true"><img class="tile logo-dark" src="brand/icon-dark.png" alt=""><img class="tile logo-light" src="brand/icon-light.png" alt=""></div><div><h2>Stick AI</h2><p>Your private coding assistant.</p></div><button id="close-settings" class="icon-button" aria-label="Close settings"><svg class="i"><use href="#i-x"/></svg></button></div>
   <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="updates">Updates</button></nav>
 
   <div id="settings-models" class="settings-page">

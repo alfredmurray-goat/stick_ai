@@ -18,7 +18,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 ### In flight
 
 - **Release for #27.** Desktop builds run [44284459765](https://github.com/alfredmurray-goat/stick_ai/actions/runs/44284459765) builds all four platforms. If it passes, it publishes the desktop release (`desktop-44284459765`) and the Mac DMGs. Check that every expected asset is there, including the four `stick_ai-<platform>-model-free` files.
-- **Benchmarks.** Full HumanEval (164 problems) for Lite and Max, and six agentic tasks run through the real app for Lite and for Lite + Max. Lite's 21-problem sample scored 17/21 (81%). The README's Benchmarks section is waiting for the full figures.
+- **Benchmarks.** Lite scored 120/164 (73.2%) on the full HumanEval (in the README). Max and the agentic tasks still need a machine with more than 16 GB of memory (see Known issues).
 
 ## Known issues
 
@@ -29,6 +29,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 - **Slow prompts and Node's fetch.** Node's fetch drops a response that's silent for 300 s. The app now asks the bundled server for `return_progress`, so long prompts stream progress chunks instead of going silent.
 - **App updates come from Cloudflare R2, not GitHub.** Releases are private drafts, so sold sticks check `https://updates.localilabs.com/stick-ai/stick_ai-updates.json` (see [docs/UPDATES.md](docs/UPDATES.md)). Nothing reaches sticks until the owner creates the R2 bucket and custom domain and adds the four `R2_*` secrets. Older releases published before the drafts change are still public until they're deleted or set back to drafts on GitHub.
 - **The all-devices stick is new.** One stick now carries the Mac (universal), Windows and Linux apps at its top level, sharing one `stellan` folder (manifest, app, runtimes and one copy of each model). The desktop app finds `stellan/manifest.json` beside it; updates replace the apps beside `stellan` too (`src/portable/universal.ts`, `scripts/publish-stick.mjs`, `docs/STICKS.md`). The universal Mac app is merged with `lipo` and ad-hoc signed on CI. Test a real stick on an Apple Silicon Mac, an Intel Mac, Windows and Linux before selling.
+- **Releases carry no models.** `stick_ai-all-devices.zip` is the apps plus `stellan/` without models; the owner keeps the official GGUFs in each stick's `stellan/models`. The first start hashes them once (1–3 minutes from USB); later starts trust size + modification time (`logs/verified-models.json`). The app icons are upscaled from a ~450 px source image; replace them with a vector or 2048 px original when one exists.
 - **Lite's chat template is unverified.** The GGUF has none, so the app uses a tested Mistral-v1 formatter.
 - **A stale draft release** (`desktop-42818788142`, untagged) is left over from an earlier failed publish. It isn't visible publicly; delete it when convenient.
 - **Builds are unsigned.** Gatekeeper and SmartScreen prompts on first launch are expected.

@@ -48,10 +48,14 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 - Merging to `main` with changes under `src/`, `src-tauri/`, `portable/`, `package*.json` or the desktop workflows starts **Desktop builds** (`.github/workflows/desktop.yml`). Docs-only and tests-only changes don't: after merging one of those, start `desktop.yml` by hand on `main` if you need a release.
 - Each platform job runs the tests, builds the native app and llama.cpp server, assembles the package and runs a **real Lite tool exchange** (`scripts/smoke-platform.mjs`) before uploading.
 - **Releases stay private.** The publish scripts upload into a draft release and leave it as a draft, which only people with write access can see: the app is sold preinstalled on sticks. Set `STICK_PUBLIC_RELEASES=1` in a publish workflow only if the owner asks for a public release. Sold sticks update from a private Cloudflare R2 host instead (`scripts/update-host.mjs`, `feed` in `app/update-config.json`; see `docs/UPDATES.md`): every successful build is uploaded there automatically when the `R2_*` secrets are set.
-- If all four platforms pass, the `macos-universal` job merges the two Mac apps with `lipo`, and the `publish` job starts `release.yml`. It runs `scripts/publish-stick.mjs`, which publishes **one** draft release per build: the all-devices stick image (`stick_ai-all-devices.tar` parts, Join helpers, checksums) and the signed app updates, including the `universal` one. See `docs/STICKS.md`. The Mac DMG workflows are no longer started automatically.
+- If all four platforms pass, the `macos-universal` job merges the two Mac apps with `lipo`, and the `publish` job starts `release.yml`. It runs `scripts/publish-stick.mjs`, which publishes **one** draft release per build: `stick_ai-all-devices.zip` (the apps and the `stellan` folder **without models**, plus install helpers that merge onto a stick without deleting `stellan/models`), checksums and the signed app updates, including the `universal` one. See `docs/STICKS.md`. The Mac DMG workflows are no longer started automatically.
 - A new push to `main` cancels a Desktop build that's still running (`cancel-in-progress`). Don't merge app changes while a release build you want is running.
 - To test the real builds without publishing, run `desktop.yml` by hand on your branch: the `publish` job only runs on `main`.
 - The llama.cpp server is cached per platform. Change the cache key in `desktop-platform.yml` when you change its build flags.
+
+## Speed
+
+- **Model checks are remembered.** `verifyStick(..., remember = true)` (only the running app passes it) skips re-hashing a model whose size and modification time match its last full check, recorded in `logs/verified-models.json`. Hashing both models took one to three minutes from a USB stick on every start. Programs and app files are still hashed every time. Builds never pass `remember`.
 
 ## Traps found the hard way
 

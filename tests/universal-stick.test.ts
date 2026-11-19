@@ -106,3 +106,22 @@ it("updates a stellan-layout stick, replacing the apps beside the shared folder 
     await rm(root, { recursive: true, force: true });
   }
 }, 120000);
+it("builds the stick without models, and accepts the owner's own model files in stellan/models", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-universal-nomodels-"));
+  try {
+    const bases = await platforms(root);
+    const liteBytes = await readFile(join(bases["linux-x64"], "models/stellan-1-lite-q4_k_m.gguf"));
+    const macApp = join(root, "Universal.app"); await mkdir(join(macApp, "Contents/MacOS"), { recursive: true }); await writeFile(join(macApp, "Contents/MacOS/stick-ai"), fatMachO());
+    const output = join(root, "STICK");
+    const manifest = await assembleUniversalStick(output, { bases, macApp, models: false });
+    const shared = join(output, "stellan");
+    expect((await lstat(join(shared, "models"))).isDirectory()).toBe(true);
+    await expect(lstat(join(shared, "models/stellan-1-lite-q4_k_m.gguf"))).rejects.toThrow();
+    for (const path of ["models/stellan-1-lite-q4_k_m.gguf", "models/stellan-1.0-q4_k_m.gguf"]) { expect(manifest.files.find((file) => file.path === path)?.optional).toBe(true); }
+    await verifyStick(shared, true);
+    // The owner copies their own Lite in: it must be the pinned file.
+    await writeFile(join(shared, "models/stellan-1-lite-q4_k_m.gguf"), liteBytes); await verifyStick(shared, true);
+    await writeFile(join(shared, "models/stellan-1-lite-q4_k_m.gguf"), Buffer.concat([liteBytes, Buffer.from("x")]));
+    await expect(verifyStick(shared, true)).rejects.toThrow(/damaged/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+}, 60000);

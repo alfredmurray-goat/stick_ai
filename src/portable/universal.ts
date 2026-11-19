@@ -17,6 +17,8 @@ export interface UniversalInputs {
   macApp: string;
   /** Max GGUF to hard-link in. Without it the stick records the pinned Max as optional. */
   max?: string;
+  /** false: leave both models out. The stick's own stellan/models/ files are used, checked against the pinned hashes. */
+  models?: boolean;
 }
 const lite = "models/stellan-1-lite-q4_k_m.gguf";
 const desktops: Record<Target, string> = { "macos-arm64": "Stick AI.app", "macos-x64": "Stick AI.app", "windows-x64": "Stick AI.exe", "linux-x64": "stick-ai" };
@@ -87,8 +89,11 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     }
     await cp(inputs.macApp, join(staging, "Stick AI.app"), { recursive: true, preserveTimestamps: true });
     await chmod(join(staging, "Stick AI.app/Contents/MacOS/stick-ai"), 0o755); executable.set("Stick AI.app/Contents/MacOS/stick-ai", true);
-    await placeFile(join(inputs.bases["linux-x64"], lite), join(staging, lite), true);
-    if (inputs.max) { await link(inputs.max, join(staging, bundledMax.path)); }
+    const withModels = inputs.models !== false;
+    const liteRecord = manifests["linux-x64"].files.find((record) => record.path === lite);
+    if (!liteRecord) { throw new Error("The Linux package doesn't record Lite"); }
+    if (withModels) { await placeFile(join(inputs.bases["linux-x64"], lite), join(staging, lite), true); }
+    if (inputs.max && withModels) { await link(inputs.max, join(staging, bundledMax.path)); }
     const linuxConfig = JSON.parse(await readFile(join(inputs.bases["linux-x64"], "app/update-config.json"), "utf8"));
     await writeFile(join(staging, "app/update-config.json"), JSON.stringify({ ...linuxConfig, target: "universal" }) + "\n");
     const hashes = {} as Record<Target, string>;
@@ -104,9 +109,11 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
       const models = path === lite || path === bundledMax.path;
       manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: executable.get(path) ?? false, ...(models ? { optional: true } : {}) });
     }
-    if (!inputs.max) { manifest.files.push({ ...bundledMax, executable: false, optional: true }); }
+    if (!withModels) { manifest.files.push({ ...liteRecord, executable: false, optional: true }); }
+    if (!inputs.max || !withModels) { manifest.files.push({ ...bundledMax, executable: false, optional: true }); }
+    manifest.files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-    await verifyStick(staging, !inputs.max, undefined, true);
+    await verifyStick(staging, !inputs.max || !withModels, undefined, true);
     // Move the apps out beside the shared folder. Their files stay out of stellan's manifest because they
     // aren't inside it; updates carry them and put them back beside it.
     await mkdir(stick); await rename(staging, join(stick, sharedFolder));
@@ -114,7 +121,8 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     const shared: Manifest = { ...manifest, files: manifest.files.filter((record) => !desktopEntry(record.path)) };
     await writeFile(join(stick, sharedFolder, "manifest.json"), JSON.stringify(shared, null, 2) + "\n");
     await writeFile(join(stick, "Read me.txt"), universalReadme);
-    await verifyStick(join(stick, sharedFolder), !inputs.max, undefined, true);
+    await verifyStick(join(stick, sharedFolder), !inputs.max || !withModels, undefined, true);
+    if (!withModels) { await mkdir(join(stick, sharedFolder, "models"), { recursive: true }); }
     await rename(stick, output); return manifest;
   } catch (error) { await rm(staging, { recursive: true, force: true }); await rm(stick, { recursive: true, force: true }); throw error; }
 }

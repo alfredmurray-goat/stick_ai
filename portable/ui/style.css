@@ -4,25 +4,26 @@
   --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
 
-  --bg: #111112;
-  --sidebar: #0b0b0c;
-  --panel: #0d0d0e;
-  --raised: #1c1c1e;
-  --raised-2: #2c2c2e;
-  --input: #1c1c1e;
-  --code-bg: #0a0a0b;
-  --border: #242426;
-  --border-strong: #3a3a3c;
-  --text: #f5f5f7;
-  --muted: #a1a1a6;
-  --faint: #8e8e93;
-  --accent: #ff8a65;
-  --accent-strong: #ffa184;
+  --bg: #0e0c14;
+  --sidebar: #0a0910;
+  --panel: #0c0b11;
+  --raised: #18161f;
+  --raised-2: #252231;
+  --input: #18161f;
+  --code-bg: #09080d;
+  --border: #231f2d;
+  --border-strong: #3a3450;
+  --text: #f4f2f8;
+  --muted: #a7a2b6;
+  --faint: #8f8a9f;
+  --accent: #a07aff;
+  --accent-strong: #b896ff;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(255, 138, 101, .14);
-  --grad: linear-gradient(100deg, #ff9a5c 0%, #ff7a7a 50%, #f5679f 100%);
-  --glow-a: rgba(255, 140, 90, .55);
-  --glow-b: rgba(170, 110, 255, .45);
+  --accent-soft: rgba(150, 105, 255, .16);
+  --grad: linear-gradient(100deg, #6c3cf2 0%, #8b5cff 60%, #a97cff 100%);
+  --amber: #ffb340;
+  --glow-a: rgba(140, 92, 255, .5);
+  --glow-b: rgba(255, 176, 64, .4);
   --green: #63d389;
   --green-soft: rgba(99, 211, 137, .13);
   --red: #ff7b72;
@@ -47,25 +48,26 @@
 
 .light {
   color-scheme: light;
-  --bg: #f5f5f7;
-  --sidebar: #ececee;
-  --panel: #fbfbfd;
+  --bg: #fcf8f5;
+  --sidebar: #f4eee9;
+  --panel: #fffcfa;
   --raised: #ffffff;
-  --raised-2: #f0f0f2;
+  --raised-2: #f1ebf5;
   --input: #ffffff;
-  --code-bg: #f5f5f7;
-  --border: #e3e3e6;
-  --border-strong: #cfcfd4;
-  --text: #1d1d1f;
-  --muted: #5e5e63;
-  --faint: #6e6e73;
-  --accent: #e5603a;
-  --accent-strong: #cc4f2c;
+  --code-bg: #f6f1f4;
+  --border: #ebe3e3;
+  --border-strong: #d6cdd9;
+  --text: #16131e;
+  --muted: #5d5869;
+  --faint: #6c6779;
+  --accent: #6a3be0;
+  --accent-strong: #5a2ecb;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(229, 96, 58, .1);
-  --grad: linear-gradient(100deg, #f5803f 0%, #ef5f63 50%, #de4f8c 100%);
-  --glow-a: rgba(245, 128, 63, .4);
-  --glow-b: rgba(140, 90, 240, .3);
+  --accent-soft: rgba(106, 59, 224, .1);
+  --grad: linear-gradient(100deg, #5b2fd6 0%, #7445f0 60%, #8e62ff 100%);
+  --amber: #e8900c;
+  --glow-a: rgba(110, 66, 230, .32);
+  --glow-b: rgba(255, 160, 40, .3);
   --green: #1f8f4e;
   --green-soft: rgba(31, 143, 78, .1);
   --red: #c9372c;
@@ -182,8 +184,11 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
   color: var(--text); text-decoration: none;
   font-size: 19px; font-weight: 650; letter-spacing: -.6px;
 }
-.brand-symbol { font: 700 21px var(--mono); letter-spacing: -3px; margin-right: 3px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.brand-light { font-weight: 400; color: var(--muted); margin-left: 2px; }
+.brand-symbol { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.brand-word { font: 600 17px var(--mono); letter-spacing: -.4px; }
+.logo-light { display: none !important; }
+.light .logo-dark { display: none !important; }
+.light .logo-light { display: inline-block !important; }
 .local-badge {
   display: inline-flex; align-items: center; gap: 4px;
   margin-left: auto; padding: 3px 6px;
@@ -268,7 +273,8 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
 
 /* Welcome and empty states */
 .welcome, .chat-empty { max-width: 660px; margin: 0 auto; padding: clamp(40px, 11vh, 120px) 0 40px; animation: rise .45s ease both; }
-.welcome-mark { font: 600 48px var(--mono); letter-spacing: -7px; margin-bottom: 20px; line-height: 1.1; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; width: fit-content; padding-right: 8px; }
+.welcome-mark { display: block; margin-bottom: 18px; line-height: 0; width: fit-content; }
+.welcome-mark img { width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 10px 28px var(--glow-a)); }
 .eyebrow { font: 600 10.5px var(--mono); letter-spacing: 1.6px; color: var(--faint); margin: 0 0 14px; }
 h1 { font-family: var(--sans); font-size: clamp(32px, 3.4vw, 46px); font-weight: 700; letter-spacing: -1.4px; line-height: 1.1; margin: 0 0 16px; }
 .welcome-subtitle, .chat-empty > p:not(.eyebrow) { font-size: 15.5px; line-height: 1.7; color: var(--muted); margin: 0 0 28px; }
@@ -307,7 +313,8 @@ h1 { font-family: var(--sans); font-size: clamp(32px, 3.4vw, 46px); font-weight:
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.7 var(--mono); }
 .message { margin: 0 0 28px; animation: rise .25s ease both; }
 .message-label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font: 600 10.5px var(--mono); letter-spacing: 1px; color: var(--faint); }
-.assistant-label::before { content: "s/"; color: var(--accent); font-size: 14px; letter-spacing: -2px; font-weight: 700; }
+.assistant-label::before { content: ""; width: 16px; height: 16px; background: url("brand/icon-dark.png") center / contain no-repeat; }
+.light .assistant-label::before { background-image: url("brand/icon-light.png"); }
 .message.you { display: flex; flex-direction: column; align-items: flex-end; }
 .message.you .message-label { display: none; }
 .message.you pre {
@@ -525,14 +532,8 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .dialog-heading > div:nth-child(2) { flex: 1; }
 .dialog-heading h2 { font-size: 22px; font-weight: 650; letter-spacing: -.3px; margin: 0; }
 .dialog-heading p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
-.app-tile {
-  display: grid; place-items: center; width: 60px; height: 60px; flex-shrink: 0;
-  border-radius: 16px; border: 1px solid var(--border-strong);
-  box-shadow: 0 8px 26px -10px var(--glow-a);
-  font: 700 24px var(--mono); letter-spacing: -3px; color: transparent;
-  background-image: var(--grad), linear-gradient(#000, #000);
-  -webkit-background-clip: text, border-box; background-clip: text, border-box;
-}
+.app-tile { display: grid; place-items: center; width: 60px; height: 60px; flex-shrink: 0; }
+.app-tile img { width: 60px; height: 60px; object-fit: contain; }
 .settings-tabs { position: sticky; top: 0; z-index: 1; display: flex; gap: 2px; margin: 8px 26px 6px; padding: 3px; background: var(--raised); border-radius: 12px; overflow-x: auto; }
 .settings-tabs button { flex: 1; padding: 6px 12px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: background .15s, color .15s; }
 .settings-tabs button:hover { color: var(--text); }
