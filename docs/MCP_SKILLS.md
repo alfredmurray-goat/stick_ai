@@ -4,6 +4,32 @@ Open the coding workspace, then use **MCP servers** or **Skills** in the sidebar
 These features work in Lite and Lite + Max sessions. Direct Max mode generates
 code and can apply an explicitly invoked skill, but does not call tools.
 
+## Web search (built in)
+
+Stick AI comes with [Actuent](https://actuent.ai) built in as an MCP server
+(`https://agents.actuent.ai/api/mcp`, Streamable HTTP, free tier, no key). It
+appears first under **Settings → MCP** and is on by default.
+
+- Lite gets two simple tools: `web_search` (plain-words query) and
+  `read_web_page` (a full https URL). They call Actuent's `actuent_search` and
+  `actuent_get_page`. The rest of Actuent's tools (events, nearby places,
+  compare, and more) are available through `mcp_tools` and `mcp_call` with the
+  server ID `actuent`.
+- **Every search asks first.** The approval card shows exactly the words or the
+  address that will be sent. Nothing else leaves the computer: not your code,
+  files or conversation.
+- It connects on first use, so starting offline shows no error. Offline, a search
+  says that web search needs the internet and Lite carries on without it.
+- Results are trimmed to names, links, snippets, prices and page text (about
+  6 KB at most; a typical search is under 1 KB) before Lite reads them, because
+  a laptop CPU reads long prompts slowly.
+- **Turn web search off** with the button on its card. The choice is saved in
+  `logs/extensions/mcp.json` (`"webSearch": false`). Removing the server does
+  the same thing.
+- Actuent's index is strongest for places, products, prices and events. For
+  programming questions, reading a specific docs page works better than a
+  broad search.
+
 ## MCP
 
 Add a named local **stdio** program, **Streamable HTTP** endpoint, or legacy

@@ -11,7 +11,10 @@ import {McpRpc,McpError} from './mcp-rpc.js';
 import {readExtensionJson,writeExtensionJson} from './extension-store.js';
 import {targetFor,executableName} from './platform.js';
 export {McpError};
-export interface McpServerConfig {id:string;name:string;transport:'stdio'|'http'|'sse';command?:string;args?:string[];url?:string}
+export interface McpServerConfig {id:string;name:string;transport:'stdio'|'http'|'sse';command?:string;args?:string[];url?:string;builtin?:boolean}
+/** Actuent (live web search) is built in: free, no key, and connected on first use so offline starts stay quiet. */
+export const actuentUrl='https://agents.actuent.ai/api/mcp';
+export const actuent:McpServerConfig={id:'actuent',name:'Actuent web search',transport:'http',url:actuentUrl,builtin:true};
 interface Secrets {headers:Record<string,string>;env:Record<string,string>}
 interface Connection {rpc:McpRpc;tools:Tool[];stale:boolean;diagnostic:string}
 function record(value:unknown):value is Record<string,unknown>{return Boolean(value&&typeof value==='object'&&!Array.isArray(value));}
@@ -42,15 +45,18 @@ export function mcpFetch(origin:string,fetcher:typeof fetch=fetch):typeof fetch 
  }) as typeof fetch;
 }
 export class McpServers {
- private configs:McpServerConfig[]=[];private secrets=new Map<string,Secrets>();private connections=new Map<string,Connection>();private errors=new Map<string,string>();private project:string;
+ private configs:McpServerConfig[]=[];private webSearch=true;private secrets=new Map<string,Secrets>();private connections=new Map<string,Connection>();private errors=new Map<string,string>();private project:string;
  constructor(private root:string,project:string,private progress:(server:string,text:string)=>void=()=>{}){this.project=project;}
- async load(){const saved=await readExtensionJson(this.root,'mcp.json');if(saved===undefined)return;if(!record(saved)||saved.format!==1||!Array.isArray(saved.servers)||saved.servers.length>20)throw new McpError('Invalid saved MCP server settings.');this.configs=saved.servers.map(s=>{if(!record(s)||typeof s.id!=='string'||!/^mcp-[a-f0-9-]{36}$/.test(s.id))throw new McpError('Invalid MCP server identity.');return config(s,s.id);});}
- private async save(){await writeExtensionJson(this.root,'mcp.json',{format:1,servers:this.configs});}
- private get(id:string){const result=this.configs.find(c=>c.id===id);if(!result)throw new McpError('Choose a configured MCP server.');return result;}
+ async load(){const saved=await readExtensionJson(this.root,'mcp.json');if(saved===undefined)return;if(!record(saved)||saved.format!==1||!Array.isArray(saved.servers)||saved.servers.length>20)throw new McpError('Invalid saved MCP server settings.');this.webSearch=saved.webSearch!==false;this.configs=saved.servers.map(s=>{if(!record(s)||typeof s.id!=='string'||!/^mcp-[a-f0-9-]{36}$/.test(s.id))throw new McpError('Invalid MCP server identity.');return config(s,s.id);});}
+ private async save(){await writeExtensionJson(this.root,'mcp.json',{format:1,webSearch:this.webSearch,servers:this.configs});}
+ private all(){return this.webSearch?[actuent,...this.configs]:this.configs;}
+ get webSearchEnabled(){return this.webSearch;}
+ async setWebSearch(enabled:boolean){const previous=this.webSearch;this.webSearch=enabled;if(!enabled)await this.disconnect(actuent.id);try{await this.save();}catch(error){this.webSearch=previous;throw error;}}
+ private get(id:string){if(id===actuent.id&&!this.webSearch)throw new McpError('Web search is turned off. Turn it on in Settings → MCP.');const result=this.all().find(c=>c.id===id);if(!result)throw new McpError('Choose a configured MCP server.');return result;}
  private redact(id:string,text:string){const secret=this.secrets.get(id);for(const value of [...Object.values(secret?.headers??{}),...Object.values(secret?.env??{})])for(const part of [value,value.replace(/^Bearer\s+/i,'')])if(part)text=text.replaceAll(part,'[redacted]');return text;}
- view(){return this.configs.map(c=>{const connection=this.connections.get(c.id);return {...c,status:connection?.rpc.ready&&!connection.rpc.closed?'connected':connection&&!connection.rpc.closed?'connecting':'disconnected',tools:connection?.tools.length??0,hasSessionSecrets:Boolean(Object.keys(this.secrets.get(c.id)?.headers??{}).length+Object.keys(this.secrets.get(c.id)?.env??{}).length),error:this.errors.get(c.id)??'',diagnostic:connection?.diagnostic??''};});}
+ view(){return this.all().map(c=>{const connection=this.connections.get(c.id);return {...c,status:connection?.rpc.ready&&!connection.rpc.closed?'connected':connection&&!connection.rpc.closed?'connecting':'disconnected',tools:connection?.tools.length??0,hasSessionSecrets:Boolean(Object.keys(this.secrets.get(c.id)?.headers??{}).length+Object.keys(this.secrets.get(c.id)?.env??{}).length),error:this.errors.get(c.id)??'',diagnostic:connection?.diagnostic??''};});}
  async add(input:unknown){if(this.configs.length>=20)throw new McpError('This app supports up to 20 configured MCP servers.');if(!record(input))throw new McpError('Invalid MCP settings.');const id='mcp-'+randomUUID(),next=config(input,id),secret={headers:stringMap(input.headers),env:stringMap(input.env)};this.configs.push(next);this.secrets.set(id,secret);try{await this.save();}catch(error){this.configs.pop();this.secrets.delete(id);throw error;}return id;}
- async remove(id:string){await this.disconnect(id);this.configs=this.configs.filter(c=>c.id!==id);this.secrets.delete(id);this.errors.delete(id);await this.save();}
+ async remove(id:string){if(id===actuent.id)return this.setWebSearch(false);await this.disconnect(id);this.configs=this.configs.filter(c=>c.id!==id);this.secrets.delete(id);this.errors.delete(id);await this.save();}
  async setSecrets(id:string,input:unknown){this.get(id);if(!record(input))throw new McpError('Invalid secret fields.');const current=this.secrets.get(id)??{headers:{},env:{}};this.secrets.set(id,{headers:input.headers===undefined?current.headers:stringMap(input.headers),env:input.env===undefined?current.env:stringMap(input.env)});}
  async connect(id:string,signal:AbortSignal){
   const selected=this.get(id);await this.disconnect(id);this.errors.delete(id);const secret=this.secrets.get(id)??{headers:{},env:{}};let transport:Transport;
@@ -67,17 +73,19 @@ export class McpServers {
   }
   const connection:Connection={rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')this.progress(selected.name,this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
   this.connections.set(id,connection);
-  try{await connection.rpc.connect(signal);await this.refresh(id,signal);}catch(error){await connection.rpc.close();this.connections.delete(id);const message=signal.aborted?'MCP connection cancelled.':'Could not connect. Check the command, endpoint and session credentials. OAuth-only servers need a provider-issued access token.';this.errors.set(id,message);throw new McpError(message);}
+  try{await connection.rpc.connect(signal);await this.refresh(id,signal);}catch(error){await connection.rpc.close();this.connections.delete(id);const message=signal.aborted?'MCP connection cancelled.':id===actuent.id?'Web search needs an internet connection. Everything else in Stick AI works offline.':'Could not connect. Check the command, endpoint and session credentials. OAuth-only servers need a provider-issued access token.';this.errors.set(id,message);throw new McpError(message);}
  }
  async disconnect(id:string){const current=this.connections.get(id);this.connections.delete(id);if(current)await current.rpc.close();}
  async setProject(project:string){for(const c of this.configs)if(c.transport==='stdio')await this.disconnect(c.id);this.project=project;}
- async close(){await Promise.all(this.configs.map(c=>this.disconnect(c.id)));}
+ async close(){await Promise.all(this.all().map(c=>this.disconnect(c.id)));}
+ /** The built-in server connects on first use; others must be connected in settings. */
+ private async ready(id:string,signal:AbortSignal){this.get(id);const c=this.connections.get(id);if(id===actuent.id&&this.webSearch&&(!c?.rpc.ready||c.rpc.closed))await this.connect(id,signal);return this.connected(id);}
  private connected(id:string){const c=this.connections.get(id);if(!c?.rpc.ready||c.rpc.closed)throw new McpError('Connect this MCP server in settings first.');return c;}
  private async refresh(id:string,signal:AbortSignal){const c=this.connected(id),tools:Tool[]=[];let cursor:string|undefined;const seen=new Set<string>();do{const page=ListToolsResultSchema.parse(await c.rpc.request('tools/list',cursor?{cursor}:{},signal));for(const tool of page.tools){if(seen.has(tool.name)||tool.name.length>128||tools.length>=1000)throw new McpError('Invalid or excessive MCP tool catalog.');seen.add(tool.name);tools.push(tool);}if(page.nextCursor===cursor&&cursor)throw new McpError('MCP tool pagination did not advance.');cursor=page.nextCursor;}while(cursor);c.tools=tools;c.stale=false;}
- catalog(){return this.view().filter(c=>c.status==='connected').map(c=>({id:c.id,name:c.name,tools:c.tools}));}
- async tools(id:string,query:string,signal:AbortSignal){const c=this.connected(id);if(c.stale)await this.refresh(id,signal);return this.redact(id,JSON.stringify(c.tools.filter(t=>!query||t.name.toLowerCase().includes(query.toLowerCase())||(t.description??'').toLowerCase().includes(query.toLowerCase())).slice(0,60).map(t=>({name:t.name,description:t.description??'',inputSchema:t.inputSchema}))).slice(0,30000));}
+ catalog(){return this.view().filter(c=>c.status==='connected'||c.id===actuent.id).map(c=>({id:c.id,name:c.name,tools:c.tools}));}
+ async tools(id:string,query:string,signal:AbortSignal){const c=await this.ready(id,signal);if(c.stale)await this.refresh(id,signal);return this.redact(id,JSON.stringify(c.tools.filter(t=>!query||t.name.toLowerCase().includes(query.toLowerCase())||(t.description??'').toLowerCase().includes(query.toLowerCase())).slice(0,60).map(t=>({name:t.name,description:t.description??'',inputSchema:t.inputSchema}))).slice(0,30000));}
  async call(id:string,name:string,args:unknown,signal:AbortSignal,approve:(label:string,data:unknown,signal:AbortSignal)=>Promise<boolean>){
-  const c=this.connected(id);if(c.stale)await this.refresh(id,signal);const selected=this.get(id);if(!c.tools.some(t=>t.name===name)||!record(args)||Buffer.byteLength(JSON.stringify(args))>65536)throw new McpError('Choose a listed MCP tool and JSON object arguments under 64 KiB.');
+  const c=await this.ready(id,signal);if(c.stale)await this.refresh(id,signal);const selected=this.get(id);if(!c.tools.some(t=>t.name===name)||!record(args)||Buffer.byteLength(JSON.stringify(args))>65536)throw new McpError('Choose a listed MCP tool and JSON object arguments under 64 KiB.');
   if(!await approve(`${selected.name} · ${name}`,args,signal))return 'Denied by user';signal.throwIfAborted();
   const result=CallToolResultSchema.parse(await c.rpc.request('tools/call',{name,arguments:args},signal));
   const text=result.content.map(item=>item.type==='text'?item.text:item.type==='resource'&&'text' in item.resource?item.resource.text:`[${item.type} content returned; the current model accepts text.]`).join('\n');

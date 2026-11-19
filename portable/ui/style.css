@@ -577,6 +577,7 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .extension-card { margin: 12px 0; padding: 14px 16px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); }
 .extension-card h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
 .extension-card p { margin: 4px 0; font-size: 12.5px; }
+.builtin-card { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 .extension-card .extension-status { display: inline-block; font: 600 11px var(--mono); color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 20px; }
 .extension-card pre { margin: 8px 0; padding: 8px 10px; font: 11.5px/1.6 var(--mono); max-height: 140px; overflow: auto; background: var(--code-bg); border-radius: 6px; }
 .extension-card .secondary { margin: 8px 6px 0 0; font-size: 12px; padding: 6px 11px; }

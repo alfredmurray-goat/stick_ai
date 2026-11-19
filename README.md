@@ -34,6 +34,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
 - **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
 - **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch.
+- **Web search, built in.** Lite can look things up on the live web with [Actuent](https://actuent.ai): docs, versions, error messages, prices, events and news. It's free, needs no account, and every search shows you the exact words before anything goes online. Turn it off in Settings → MCP.
 - **MCP servers and skills.** Connect local or remote MCP tool servers and reusable SKILL.md workflows. Every MCP call asks first.
 - **Signed app updates.** The app checks for signed updates and installs them without re-downloading your models.
 
@@ -120,7 +121,7 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 
 - **Inference is offline.** Prompts, code and answers stay on your computer. The model server listens only on an authenticated local connection.
 - **No telemetry.** There are no analytics or cloud fallbacks.
-- **What does use the network.** The app checks GitHub for signed app updates (you can turn this off), GitHub workspaces talk to GitHub when you connect them, and remote MCP servers receive only the calls you approve.
+- **What does use the network.** The app checks GitHub for signed app updates (you can turn this off), GitHub workspaces talk to GitHub when you connect them, web search sends only the search words or page address you approve to Actuent (never your code or files), and remote MCP servers receive only the calls you approve.
 - **Integrity checks.** Every app file is checked against a recorded SHA-256 before starting. A changed file is reported, not run.
 
 ## How it works
