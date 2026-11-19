@@ -14,7 +14,7 @@ export async function publishAppUpdate({ repo, runId, source, artifacts, platfor
   // With ownRelease false the files go into a release the caller created (the single all-devices release),
   // and the caller writes its notes. `universal` is a local all-devices bundle added to the signed feed.
   const prefix = feedKey(feedUrl).replace(/stick_ai-updates\.json$/, "");
-  if (!host) { console.log("R2 update host is not configured (R2_* secrets); sold sticks won't receive this update."); }
+  if (!host) { console.log("R2 update host is not configured (CLOUDFLARE_API_TOKEN secret and R2_ACCOUNT_ID variable); sold sticks won't receive this update."); }
   let existing;
   try { existing = JSON.parse(await gh("release", "view", tag, "--repo", repo, "--json", "isDraft")); }
   catch (error) { if (!/release not found|HTTP 404/i.test(String(error.stderr))) { throw error; } }

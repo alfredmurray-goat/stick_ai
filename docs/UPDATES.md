@@ -12,10 +12,16 @@ Each build is uploaded to its own folder (`stick-ai/RUN_ID/stick_ai-update-PLATF
 
 ### Setting up the update host (once)
 
-1. In Cloudflare, create an **R2** bucket (for example `stick-ai-updates`).
-2. In the bucket's **Settings → Custom Domains**, connect `updates.localilabs.com`. The domain must be on Cloudflare DNS.
-3. Under **R2 → Manage API tokens**, create a token with **Object Read & Write** for that bucket only.
-4. In GitHub, under **Settings → Secrets and variables → Actions**, add `R2_ACCOUNT_ID` (the 32-character account ID), `R2_BUCKET`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`.
+1. In Cloudflare, open **R2 Object Storage** and create a bucket called `stick-ai-updates`.
+2. In the bucket's **Settings → Custom Domains**, connect `updates.localilabs.com`. The domain must be on Cloudflare DNS in the same account.
+3. Under **R2 → Manage API tokens → Create API token**, give it **Object Read & Write**, limited to `stick-ai-updates`. Copy the **token value** (the long one at the top, not the Access Key ID or Secret).
+4. In GitHub, under **Settings → Secrets and variables → Actions**:
+   - **Secrets** tab: add `CLOUDFLARE_API_TOKEN` with that token value.
+   - **Variables** tab: add `R2_ACCOUNT_ID` with your 32-character Cloudflare account ID (shown on the R2 overview page). It isn't secret.
+
+The publisher turns the token into R2 upload keys as Cloudflare documents (the access key ID is the token's ID; the secret is the SHA-256 of the token). The older four-secret setup (`R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) still works. A bucket with another name needs an `R2_BUCKET` variable.
+
+To check it without waiting for a new build, run **Publish stick release** (`release.yml`) by hand with the run ID of a Desktop build from the last day: the log should end with "Sold sticks will now update to build …", and the feed URL above should then download.
 
 Every successful build on `main` then goes out to sold sticks automatically. Without these secrets, publishing still works but skips the host, and the log says so.
 
