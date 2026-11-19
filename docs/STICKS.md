@@ -4,25 +4,22 @@ Every build that passes on `main` publishes one **private draft** release, **Sti
 
 ## What you need
 
-- A USB stick of **32 GB or more**. USB 3 makes the models load much faster.
-- The stick formatted as **exFAT**. FAT32 can't hold files over 4 GB, and Max is 14 GB. exFAT works on Mac, Windows and Linux.
+- A USB stick of **32 GB or more**, formatted as **exFAT** (Max is a 14 GB file, too big for FAT32). USB 3 loads the models much faster.
   - Mac: Disk Utility → select the stick → Erase → Format **ExFAT**, Scheme **GUID Partition Map**.
   - Windows: right-click the stick in File Explorer → Format → File system **exFAT**.
-- About 40 GB of free space on your computer while you prepare the first stick.
+- The two models in **`stellan/models`** on the stick, named exactly `stellan-1-lite-q4_k_m.gguf` (Lite) and `stellan-1.0-q4_k_m.gguf` (Max). Releases don't include them: copy them once, and every later release reuses them. They must be the official files; the app checks them against their SHA-256 on the first start.
 
 ## Steps
 
-1. Open the newest **Stick AI — all devices** draft and download every `stick_ai-all-devices.tar.partNN` file into one folder, plus the Join helper for your computer:
-   - Mac: `Join-stick_ai-all-devices.command.zip`. Unzip it and double-click the `.command` file (right-click → Open the first time).
-   - Windows: `Join-stick_ai-all-devices.bat`. Double-click it.
-   - Linux: `Join-stick_ai-all-devices.sh.zip`. Unzip it and run `sh Join-stick_ai-all-devices.sh`.
+1. Open the newest **Stick AI — all devices** draft and download **`stick_ai-all-devices.zip`** (a few hundred MB). Unzip it.
+2. Open the helper for your computer:
+   - Mac: **Install on stick (Mac).command** (right-click → Open the first time), then drag the stick from the Finder sidebar into its window and press Return.
+   - Windows: **Install on stick (Windows).bat**, then type the stick's drive letter.
+   - Linux: `sh install-on-stick.sh "/media/$USER/STICK_AI"`.
 
-   The helper checks every part against its SHA-256 and builds `stick_ai-all-devices.tar` (about 19 GB). Keep this file: you can extract it onto as many sticks as you like.
-2. Extract it onto the stick. The three apps, `Read me.txt` and the `stellan` folder land at the top of the stick:
-   - Mac: `tar -xf stick_ai-all-devices.tar -C "/Volumes/STICK AI"`
-   - Windows (Command Prompt): `tar -xf stick_ai-all-devices.tar -C E:\` (your stick's drive letter)
-   - Linux: `tar -xf stick_ai-all-devices.tar -C "/media/$USER/STICK AI"`
-3. Test it: open `Stick AI.app` (Mac), `Stick AI.exe` (Windows) or `stick-ai` (Linux) and click **Open workspace**.
+   It copies the apps and the `stellan` folder onto the stick by merging: files are added or replaced, nothing is deleted, so `stellan/models` stays as it is. It then tells you if a model is missing.
+   Don't drag `stellan` onto the stick in Finder instead: Finder's **Replace** deletes the folder on the stick, models included.
+3. Test it: open `Stick AI.app` (Mac), `Stick AI.exe` (Windows) or `stick-ai` (Linux) and click **Open workspace**. The first start checks both models in full (about a minute or two from a USB stick); later starts remember that and skip it.
 4. Eject the stick properly before unplugging it.
 
 ## What's on the stick
@@ -34,7 +31,7 @@ STICK AI (the USB stick)
 ├── stick-ai         Linux
 ├── Read me.txt
 └── stellan/         everything the apps share
-    ├── models/      Stellan-1 Lite and Max, stored once
+    ├── models/      stellan-1-lite-q4_k_m.gguf and stellan-1.0-q4_k_m.gguf, stored once
     ├── bin/         Node.js and the llama.cpp server for each computer
     ├── app/         the assistant (and app/project, your saved work)
     ├── manifest.json  SHA-256 of every file in stellan; the app refuses to start if one changed
@@ -49,4 +46,4 @@ The stick checks for app updates at `updates.localilabs.com` (see [UPDATES.md](U
 
 1. Each platform job in **Desktop builds** packages and tests its own app, including a real Lite tool exchange.
 2. The `macos-universal` job merges the Intel and Apple Silicon Mac apps into one universal binary with `lipo`, ad-hoc signs it again and checks that it starts.
-3. **Publish stick release** (`scripts/publish-stick.mjs`) merges the four packages with `assembleUniversalStick` (`src/portable/universal.ts`), adds Max once, verifies every file, builds the all-devices update, and uploads the image in 2 GB parts with Join helpers and checksums. Nothing becomes public unless `STICK_PUBLIC_RELEASES=1`.
+3. **Publish stick release** (`scripts/publish-stick.mjs`) merges the four packages with `assembleUniversalStick` (`src/portable/universal.ts`, `models: false`), verifies every file, builds the all-devices update, and uploads `stick_ai-all-devices.zip` with the install helpers (`scripts/stick-installers.mjs`) and checksums. Nothing becomes public unless `STICK_PUBLIC_RELEASES=1`.

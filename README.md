@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.png">
+  <img src="docs/brand/logo-light.png" alt="stick_ai" height="150">
+</picture>
+
 <img src="docs/hero.png" alt="The Stick AI workspace: a file tree on the left, a formatted answer with a code block in the middle, and live thinking and tool activity on the right" width="820">
 
 # Stick AI
@@ -12,7 +17,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
 [![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
 [![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
-[![HumanEval sample](https://img.shields.io/badge/HumanEval%20sample-Lite%2081%25-FF8A65)](#benchmarks)
+[![HumanEval](https://img.shields.io/badge/HumanEval-Lite%2073.2%25-7C4DFF)](#benchmarks)
 [![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -49,18 +54,18 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 
 | Benchmark | What it measures | Stellan-1 Lite |
 | --- | --- | --- |
-| **HumanEval, 21-problem sample** | Writing a Python function that passes hidden unit tests | **17 / 21 (81%)**, pass@1 |
+| **HumanEval, all 164 problems** | Writing a Python function that passes hidden unit tests | **120 / 164 (73.2%)**, pass@1 |
 
-- **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The sample is every 8th problem of the 164 (`HumanEval/0, 8, 16, … 160`).
-- **Read it as an estimate.** 21 problems is a small sample, so the 95% confidence interval is roughly **60% to 92%**. A full 164-problem run will replace this figure.
+- **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The 95% confidence interval is about **66% to 79%**.
+- **Against the 2023 flagships.** OpenAI reported [67.0% for GPT-4](https://arxiv.org/abs/2303.08774) and Anthropic [71.2% for Claude 2](https://www.anthropic.com/news/claude-2), each with its own prompts and settings. Today's newest cloud models score 95% or more.
 - **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
-- **Max and agentic tasks.** Coding results for Max, and agentic results for Lite and Lite + Max on real multi-step tasks in the app, are being measured and will be added here.
+- **Max.** Max needs more memory than the 16 GB benchmark machine could give it without reading the model from disk on every token, so its score will be measured on a larger machine.
 
 **Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 
 ## Download
 
-Stick AI ships preinstalled on a USB stick (launching February 2027 in the EU and May 2027 worldwide). Builds aren't public downloads: each release is kept as a **private draft** on [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases) that only people with write access to this repository can see, and is used to prepare the sticks. Sold sticks get app updates from a private, signed update host instead (see [docs/UPDATES.md](docs/UPDATES.md)). Each build produces **one** release, `Stick AI — all devices — build N`, holding the stick image, its Join helpers, checksums and the signed app updates. See **[docs/STICKS.md](docs/STICKS.md)** for how to make a stick.
+Stick AI ships preinstalled on a USB stick (launching February 2027 in the EU and May 2027 worldwide). Builds aren't public downloads: each release is kept as a **private draft** on [GitHub Releases](https://github.com/alfredmurray-goat/stick_ai/releases) that only people with write access to this repository can see, and is used to prepare the sticks. Sold sticks get app updates from a private, signed update host instead (see [docs/UPDATES.md](docs/UPDATES.md)). Each build produces **one** release, `Stick AI — all devices — build N`: a small `stick_ai-all-devices.zip` with the apps and the `stellan` folder (no models; the stick's own `stellan/models` are used), install helpers, checksums and the signed app updates. See **[docs/STICKS.md](docs/STICKS.md)** for how to make a stick.
 
 One stick works on every supported computer: the three apps sit at the top of the stick and share one `stellan` folder with a single copy of Lite and Max (about 19 GB, so use a 32 GB stick formatted as exFAT).
 
@@ -73,7 +78,7 @@ One stick works on every supported computer: the three apps sit at the top of th
 Max needs at least 16 GB RAM and runs best with 24 GB or more.
 
 > [!TIP]
-> The stick image is split into parts because GitHub limits each file to 2 GB. Put every part and the **Join helper** for the computer you're using in one folder and open the helper once: it checks every part and rebuilds `stick_ai-all-devices.tar`.
+> Use the **Install on stick** helper from the zip rather than dragging folders: it merges onto the stick and never deletes `stellan/models`.
 
 > [!NOTE]
 > These are unsigned test builds. The first time you open one, macOS Gatekeeper or Windows SmartScreen may ask you to confirm. On a Mac, right-click the app and choose **Open**.

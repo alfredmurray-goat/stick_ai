@@ -1,16 +1,17 @@
-// Publishes ONE private draft release per build: the all-devices stick image (Mac, Windows and Linux on one
-// stick, sharing one copy of Lite and Max), its Join helpers, checksums and the signed app updates.
+// Publishes ONE private draft release per build: a small zip with the all-devices stick files (Mac, Windows
+// and Linux apps plus the shared stellan folder, without models) and install helpers, checksums and the
+// signed app updates. Sticks already carry the models in stellan/models; the apps use them from there.
 // Releases stay drafts, visible only to people with write access, unless STICK_PUBLIC_RELEASES=1.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { successfulDesktopBuild } from "./release-build.mjs";
 import { publishAppUpdate } from "./publish-app-update.mjs";
-import { fetchMaxForRelease } from "./assemble-full-release.mjs";
-import { joinHelper } from "./release-parts.mjs";
-import { uploadSplitArchive } from "./upload-release-parts.mjs";
+import { writeInstallers } from "./stick-installers.mjs";
 import { assembleUniversalStick, universalUpdateSource } from "../dist/portable/universal.js";
 import { buildUpdateBundle } from "../dist/portable/update-package.js";
 
@@ -28,29 +29,25 @@ const date = new Date().toISOString().slice(0, 10);
 const tag = `stick-${runId}`; const temporary = await mkdtemp(join(tmpdir(), "stick-release-"));
 const notes = `# Stick AI: all devices, build ${runId}
 
-**One stick for Mac (Apple Silicon and Intel), Windows and Linux.** The three apps sit at the top of the stick; everything they share, including one copy of Stellan-1 Lite and Max, is in the \`Stellan\` folder. Private draft: only people with write access to this repository can see it.
+**One download for every stick:** the apps for Mac (Apple Silicon and Intel), Windows and Linux, and the shared \`stellan\` folder. **No model files**: the apps use the ones already on the stick in \`stellan/models\`. Private draft: only people with write access to this repository can see it.
 
-## Make a stick
+## Put it on a stick
 
-1. Use a USB stick of **32 GB or more**, formatted as **exFAT** (Max is a 14 GB file, too big for FAT32). Name it \`STICK AI\`.
-2. Download **every** \`stick_ai-all-devices.tar.partNN\` file into one folder, plus the Join helper for the computer you're using:
-   - Mac: \`Join-stick_ai-all-devices.command.zip\`, unzip it, then double-click \`Join-stick_ai-all-devices.command\` (right-click → Open the first time).
-   - Windows: double-click \`Join-stick_ai-all-devices.bat\`.
-   - Linux: \`Join-stick_ai-all-devices.sh.zip\`, unzip it, then run \`sh Join-stick_ai-all-devices.sh\`.
-   The helper checks every part and creates \`stick_ai-all-devices.tar\` (about 19 GB).
-3. Extract it onto the stick. The apps and the \`Stellan\` folder land at the top of the stick:
-   - Mac: \`tar -xf stick_ai-all-devices.tar -C "/Volumes/STICK AI"\`
-   - Windows (Command Prompt): \`tar -xf stick_ai-all-devices.tar -C E:\\\` (use your stick's letter)
-   - Linux: \`tar -xf stick_ai-all-devices.tar -C /media/$USER/STICK\\ AI\`
-4. Check the stick: open the app for the computer (\`Stick AI.app\`, \`Stick AI.exe\` or \`stick-ai\`) and click **Open workspace**.
+1. The stick: **exFAT**, 32 GB or more, with the models in \`stellan/models\` named exactly \`stellan-1-lite-q4_k_m.gguf\` and \`stellan-1.0-q4_k_m.gguf\`.
+2. Download **\`stick_ai-all-devices.zip\`** and unzip it.
+3. Open the helper for your computer and follow it:
+   - Mac: **Install on stick (Mac).command** (right-click → Open the first time), then drag the stick into its window.
+   - Windows: **Install on stick (Windows).bat**, then type the stick's drive letter.
+   - Linux: \`sh install-on-stick.sh /media/$USER/STICK_AI\`
+4. The helper copies the apps and the \`stellan\` folder onto the stick **without deleting anything**, so your models stay put, and tells you if a model is missing. Don't drag \`stellan\` onto the stick in Finder: "Replace" would delete the models.
+5. Open the app for the computer (\`Stick AI.app\`, \`Stick AI.exe\` or \`stick-ai\`) and click **Open workspace**. The first start checks the models in full once; later starts skip that.
 
 ## Files
 
 | File | What it is |
 | --- | --- |
-| \`stick_ai-all-devices.tar.part01\` … | The stick image, split into 2 GB parts |
-| \`Join-stick_ai-all-devices.*\` | Joins and checks the parts (Mac, Windows, Linux) |
-| \`RELEASE_CHECKSUMS.json\` | SHA-256 of the image and every part |
+| \`stick_ai-all-devices.zip\` | The apps, the \`stellan\` folder (without models) and the install helpers |
+| \`RELEASE_CHECKSUMS.json\` | SHA-256 of the zip |
 | \`stick_ai-update-*.gz\`, \`stick_ai-updates.json\` | Signed app updates, also sent to sold sticks through the update host |
 
 Source: ${run.head_sha}. Built ${date}. [Build checks](https://github.com/${repo}/actions/runs/${runId}).
@@ -61,7 +58,7 @@ try {
   try { existing = JSON.parse(await gh("release", "view", tag, "--repo", repo, "--json", "isDraft")); } catch (error) { if (!/release not found|HTTP 404/i.test(String(error.stderr))) { throw error; } }
   if (!existing) { await gh("release", "create", tag, "--repo", repo, "--target", run.head_sha, "--title", `Stick AI — all devices — build ${runId} (${date})`, "--draft", "--prerelease", "--notes-file", notesFile); }
 
-  // Extract the four verified platform packages. Only the Linux copy of Lite is kept; the stick shares it.
+  // Extract the four verified platform packages. Their Lite copies are dropped: the stick brings its own models.
   const bases = {};
   for (const platform of ["linux-x64", "windows-x64", "macos-arm64", "macos-x64"]) {
     const folder = join(temporary, "bases", platform); await mkdir(folder, { recursive: true });
@@ -70,15 +67,15 @@ try {
     if (archive.endsWith(".tar.gz")) { await exec("tar", ["-xzf", join(folder, archive), "-C", folder]); } else { await exec("unzip", ["-q", join(folder, archive), "-d", folder]); }
     await rm(join(folder, archive));
     bases[platform] = join(folder, "Stick AI");
-    if (platform !== "linux-x64") { await rm(join(bases[platform], "models/stellan-1-lite-q4_k_m.gguf"), { force: true }); }
+    await rm(join(bases[platform], "models/stellan-1-lite-q4_k_m.gguf"), { force: true });
   }
   const macFolder = join(temporary, "macapp"); await mkdir(macFolder);
   await gh("run", "download", runId, "--repo", repo, "--name", "stick_ai-macapp-universal", "--dir", macFolder);
   await exec("tar", ["-xf", join(macFolder, "stick_ai-macapp-universal.tar"), "-C", macFolder]);
-  const max = await fetchMaxForRelease(join(temporary, "shared-models"));
-  // The image is the stick's top level: the three apps, "Read me.txt" and the shared stellan folder.
-  const stick = join(temporary, "stick");
-  await assembleUniversalStick(stick, { bases, macApp: join(macFolder, "Stick AI.app"), max }, console.log);
+  // stick_ai/ is the stick's top level: the three apps, "Read me.txt" and the shared stellan folder.
+  const download = join(temporary, "download"); await mkdir(download);
+  const stick = join(download, "stick_ai");
+  await assembleUniversalStick(stick, { bases, macApp: join(macFolder, "Stick AI.app"), models: false }, console.log);
   await rm(join(temporary, "bases"), { recursive: true, force: true }); await rm(macFolder, { recursive: true, force: true });
   console.log("Assembled and verified the all-devices stick");
 
@@ -88,19 +85,15 @@ try {
   await publishAppUpdate({ repo, runId, source: run.head_sha, artifacts, platforms, temporary, signingKey: process.env.STICK_UPDATE_SIGNING_KEY, gh, tag, ownRelease: false, universal });
   await rm(universal);
 
-  const image = join(temporary, "stick_ai-all-devices.tar");
-  await exec("tar", ["-cf", image, "-C", stick, "Stick AI.app", "Stick AI.exe", "stick-ai", "Read me.txt", "stellan"], { maxBuffer: 1000000 });
-  await rm(stick, { recursive: true, force: true }); await rm(join(temporary, "shared-models"), { recursive: true, force: true });
-  const parts = join(temporary, "parts");
-  const record = await uploadSplitArchive(image, parts, async (paths) => { await gh("release", "upload", tag, ...paths, "--repo", repo, "--clobber"); });
-  await rm(image, { force: true });
-  for (const platform of ["macos-arm64", "linux-x64", "windows-x64"]) {
-    const helper = await joinHelper(record, parts, platform);
-    // Zip the shell helpers so their "can run" permission survives the download.
-    const asset = platform === "windows-x64" ? helper : `${helper}.zip`;
-    if (asset !== helper) { await exec("zip", ["-j", join(parts, asset), join(parts, helper)]); }
-    await gh("release", "upload", tag, join(parts, asset), "--repo", repo, "--clobber");
-  }
+  await writeInstallers(download);
+  const zip = join(temporary, "stick_ai-all-devices.zip");
+  // -y keeps the Mac app's internal links; Info-ZIP also keeps the "can run" permissions.
+  await exec("zip", ["-q", "-r", "-y", zip, "stick_ai", "Install on stick (Mac).command", "Install on stick (Windows).bat", "install-on-stick.sh", "How to install.txt"], { cwd: download, maxBuffer: 1000000 });
+  await rm(download, { recursive: true, force: true });
+  const hash = createHash("sha256"); for await (const chunk of createReadStream(zip)) { hash.update(chunk); }
+  const record = { name: "stick_ai-all-devices.zip", size: (await stat(zip)).size, sha256: hash.digest("hex") };
+  console.log(`stick_ai-all-devices.zip: ${(record.size / 1024 ** 2).toFixed(0)} MB`);
+  await gh("release", "upload", tag, zip, "--repo", repo, "--clobber");
   const checksums = join(temporary, "RELEASE_CHECKSUMS.json");
   await writeFile(checksums, JSON.stringify({ source: run.head_sha, run: runId, archives: [record] }, null, 2) + "\n");
   await gh("release", "upload", tag, checksums, "--repo", repo, "--clobber");

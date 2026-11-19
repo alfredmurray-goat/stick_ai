@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { lstat, readFile, readdir, realpath } from "node:fs/promises";
+import { lstat, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { Sandbox } from "../sandbox/paths.js";
 import { UserError, llamaRelease, nodeRelease, targets, type Target } from "./platform.js";
@@ -23,11 +23,23 @@ export async function staticFiles(root: string, prefix = ""): Promise<string[]> 
   }
   return result.sort();
 }
-export async function verifyStick(root: string, optionalMax = false, signal?: AbortSignal, allowBuildModelLinks = false): Promise<Manifest> {
+// Hashing both models (about 18 GB) on every start took one to three minutes from a USB stick. A model
+// file whose size and modification time match its last full check is trusted; anything else (programs,
+// app files, a model that changed) is hashed every time. The cache lives in logs/, outside the manifest.
+const cacheName = "logs/verified-models.json";
+const cacheMin = 64 * 1024 ** 2;
+type VerifiedModels = Record<string, { sha256: string; size: number; mtimeMs: number }>;
+async function readVerified(root: string): Promise<VerifiedModels> {
+  try { const value = JSON.parse(await readFile(join(root, cacheName), "utf8")); return value && typeof value === "object" && !Array.isArray(value) ? value as VerifiedModels : {}; }
+  catch { return {}; }
+}
+/** `remember` is for the running app only: builds must never ship a "models already checked" note. */
+export async function verifyStick(root: string, optionalMax = false, signal?: AbortSignal, allowBuildModelLinks = false, remember = false): Promise<Manifest> {
   try {
     const canonical = await realpath(root);
     const box = await Sandbox.create(root);
     await box.path("logs", true); await box.path("app/project", true);
+    const verified = remember ? await readVerified(root) : {}; const nowVerified: VerifiedModels = {};
     const manifestInfo = await lstat(join(root, "manifest.json"));
     if (!manifestInfo.isFile() || manifestInfo.isSymbolicLink() || manifestInfo.nlink !== 1 || manifestInfo.size > 4000000) { throw new UserError("damaged"); }
     const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
@@ -52,7 +64,10 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       const resolved = await realpath(path);
       const rel = relative(canonical, resolved);
       if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 && !(allowBuildModelLinks && record.path === "models/stellan-1.0-q4_k_m.gguf")) { throw new UserError("damaged"); }
-      const actual = await hashFile(path, signal);
+      const known = verified[record.path];
+      const reuse = record.path.startsWith("models/") && record.size >= cacheMin && known && known.sha256 === record.sha256 && known.size === info.size && known.mtimeMs === info.mtimeMs;
+      const actual = reuse ? { sha256: record.sha256, size: info.size } : await hashFile(path, signal);
+      if (record.path.startsWith("models/") && record.size >= cacheMin && actual.sha256 === record.sha256 && actual.size === record.size) { nowVerified[record.path] = { sha256: actual.sha256, size: actual.size, mtimeMs: info.mtimeMs }; }
       if (actual.sha256 !== record.sha256 || actual.size !== record.size || process.platform !== "win32" && record.executable && !(info.mode & 0o111)) { issues.push(`Changed file: ${record.path}`); }
       } catch (error) { if (signal?.aborted) { throw error; } issues.push(`Missing or unsafe file: ${record.path}: ${String(error)}`); }
     }
@@ -61,6 +76,10 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       if (!expected.has(path)) { issues.push(`Unlisted or missing file: ${path}`); }
     }
     if (issues.length) { const error = new UserError("damaged"); error.message = `damaged: ${issues.join("; ")}`; throw error; }
+    if (remember && JSON.stringify(nowVerified) !== JSON.stringify(verified)) {
+      // Best effort: a read-only stick still starts, it just checks the models in full next time too.
+      try { const temporary = join(root, `${cacheName}.${process.pid}.tmp`); await writeFile(temporary, JSON.stringify(nowVerified) + "\n"); await rename(temporary, join(root, cacheName)); } catch {}
+    }
     return manifest;
   } catch (error) { if (error instanceof UserError) { throw error; } const failure = new UserError("damaged"); failure.message = `damaged: ${String(error)}`; throw failure; }
 }

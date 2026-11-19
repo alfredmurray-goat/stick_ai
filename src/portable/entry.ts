@@ -84,7 +84,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
     };
     if (desktop) {
       await launchDesktop({
-        verify: async () => { await verifyStick(root, true, lifetime.signal); },
+        verify: async () => { await verifyStick(root, true, lifetime.signal, false, true); },
         prepare,
         startLite: async () => { await app!.start(initialModel); },
         waitHealthy: async () => { if (engine?.active !== initialModel) { throw new UserError("loading"); } },
@@ -93,7 +93,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         cleanup: async () => {}
       }, lifetime.signal);
     } else {
-      await verifyStick(root, true, lifetime.signal); await prepare();
+      await verifyStick(root, true, lifetime.signal, false, true); await prepare();
       await openBrowser(app!.url).catch(() => { throw new UserError("browser"); });
     }
     report("Running privately on this computer. Close this window to stop.");
