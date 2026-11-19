@@ -3,214 +3,195 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stick AI · Your private coding assistant on a USB stick</title>
-  <meta name="description" content="Stick AI is a private coding assistant on a €15 USB stick. It beat GPT-4 (2023) and Claude 2 (2023) on the HumanEval coding test and runs entirely on your own computer. Launching February 2027 in the EU and May 2027 worldwide.">
-  <meta name="theme-color" content="#111112">
+  <title>stick_ai · A private coding assistant on a USB stick</title>
+  <meta name="description" content="stick_ai is a €15 USB stick with a private coding assistant. It beat GPT-4 (2023) and Claude 2 (2023) on the HumanEval coding test and runs entirely on your own computer. EU orders from February 2027, worldwide from May 2027.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0e0c14" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fcf8f5" media="(prefers-color-scheme: light)">
   <link rel="canonical" href="https://stick-ai.localilabs.com/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Stick AI · Your private coding assistant on a USB stick">
-  <meta property="og:description" content="Plug it in, open it, ask. Stellan reads your code, plans the work and asks before changing anything. Nothing leaves your computer.">
+  <meta property="og:title" content="stick_ai · Your code never leaves the stick">
+  <meta property="og:description" content="A private coding assistant on a €15 USB stick. Plug it in, open it, ask. Nothing is sent anywhere.">
   <meta property="og:url" content="https://stick-ai.localilabs.com/">
-  <meta property="og:image" content="https://stick-ai.localilabs.com/img/hero.jpg">
+  <meta property="og:image" content="https://stick-ai.localilabs.com/img/brand/logo-dark.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon-light.png" type="image/png" media="(prefers-color-scheme: light)">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="#top" aria-label="Stick AI home">
-      <img src="/favicon.svg" alt="" width="28" height="28">
-      <span>Stick AI</span>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="bar">
+    <a class="mark" href="#top" aria-label="stick_ai home">
+      <picture><source srcset="/img/brand/icon-light.png" media="(prefers-color-scheme: light)"><img src="/img/brand/icon-dark.png" alt="" width="34" height="35"></picture>
+      <span>stick_ai</span>
     </a>
     <nav aria-label="Main">
-      <a href="#features">Features</a>
-      <a href="#how">How it works</a>
-      <a href="#benchmarks">Benchmarks</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#setup">Setup</a>
-      <a href="#faq">FAQ</a>
+      <a href="#session">./how</a>
+      <a href="#bench">./benchmarks</a>
+      <a href="#specs">./specs</a>
+      <a href="#price">./price</a>
+      <a href="#faq">./faq</a>
     </nav>
-    <a class="pill small" href="#pricing">Pre-order soon</a>
+    <span class="status"><i aria-hidden="true"></i>not on sale yet</span>
   </header>
 
-  <main id="top">
-    <section class="hero">
-      <p class="badge"><span class="dot" aria-hidden="true"></span>Not launched yet · EU shipping from February 2027 · Worldwide from May 2027</p>
-      <h1>Your private coding assistant,<br><span class="grad">on a USB stick.</span></h1>
-      <p class="lede">Plug it in, open it, ask. Stellan reads your project, plans the work and asks before it changes a single line. It runs entirely on your computer, with no cloud, no account and nothing sent anywhere.</p>
-      <div class="cta">
-        <a class="pill" href="#pricing">See launch pricing</a>
-        <a class="pill ghost" href="#how">See how it works</a>
-      </div>
-      <picture class="shot hero-shot">
-        <source srcset="/img/hero.webp" type="image/webp">
-        <img src="/img/hero.jpg" width="1600" height="1000" alt="The Stick AI workspace: a file tree on the left, a conversation with Stellan in the middle and a live activity panel on the right">
-      </picture>
-    </section>
-
-    <section id="features" class="section">
-      <h2>Everything stays on your desk</h2>
-      <p class="sub">A real coding assistant that works offline, on the computer you already have.</p>
-      <div class="grid">
-        <article class="card">
-          <h3>Fully private</h3>
-          <p>The AI runs on your own computer. Your code and your questions never leave it. No sign-up, no subscription, no telemetry.</p>
-        </article>
-        <article class="card">
-          <h3>Asks before it acts</h3>
-          <p>Every file change shows the exact before-and-after lines. Nothing is written, edited or run until you click <strong>Allow</strong>.</p>
-        </article>
-        <article class="card">
-          <h3>Two models, one flow</h3>
-          <p><strong>Stellan-1 Lite</strong> explores your project and uses tools. <strong>Stellan-1 Max</strong> steps in to write bigger pieces of code on computers with more memory.</p>
-        </article>
-        <article class="card">
-          <h3>Watch it think</h3>
-          <p>A live activity panel shows Stellan's reasoning, every file it reads and every search it runs, as it happens. Stop it at any time.</p>
-        </article>
-        <article class="card">
-          <h3>Fast follow-ups</h3>
-          <p>Stellan remembers the conversation instead of re-reading it, so a follow-up step went from about 95 seconds to about 5 in our tests.</p>
-        </article>
-        <article class="card">
-          <h3>Mac, Windows and Linux</h3>
-          <p>One stick works on Apple Silicon and Intel Macs, Windows and Linux. On M-series Macs, Lite uses the graphics chip for extra speed.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="section split">
-      <div>
-        <h2>You stay in charge</h2>
-        <p class="sub left">Stellan proposes, you decide. Approval cards show precisely what will change, line by line, with <strong>Keep my file</strong> always one click away.</p>
-        <ul class="ticks">
-          <li>Writes, edits and terminal commands always need your approval</li>
-          <li>Works on a project folder you choose, and nowhere else</li>
-          <li>Connect GitHub, MCP tools and skills when you want them</li>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="kicker">// a private coding assistant on a usb stick</p>
+        <h1>Your code never leaves <span class="nowrap"><em>the&nbsp;stick.</em><span class="cursor" aria-hidden="true"></span></span></h1>
+        <p class="lede">Plug it in, open it, ask. Stellan reads your project, plans the change and waits for your yes before it touches a line. The AI runs on your own computer. There's no account, no cloud and no server to send anything to.</p>
+        <div class="actions">
+          <a class="btn" href="#price">€15 · see the launch</a>
+          <a class="btn ghost" href="#session">watch it work ↓</a>
+        </div>
+        <ul class="facts" aria-label="At a glance">
+          <li><b>73.2%</b> HumanEval</li>
+          <li><b>0 bytes</b> sent anywhere</li>
+          <li><b>Mac · Win · Linux</b> one stick</li>
         </ul>
       </div>
-      <picture class="shot">
-        <source srcset="/img/approval.webp" type="image/webp">
-        <img src="/img/approval.jpg" width="1600" height="1000" loading="lazy" alt="An approval card showing the exact lines Stellan wants to change, with Keep my file and Allow changes buttons">
-      </picture>
+      <figure class="specimen">
+        <div class="bench-plate">
+          <picture>
+            <source srcset="/img/brand/logo-light.png" media="(prefers-color-scheme: light)">
+            <img src="/img/brand/logo-dark.png" alt="The stick_ai USB stick: a dark stick with a glowing violet edge, a small terminal face on its cap and stick_ai printed on its side" width="425" height="520">
+          </picture>
+        </div>
+        <figcaption><span>fig. 1</span> stick_ai, 32&nbsp;GB · not actual size</figcaption>
+      </figure>
     </section>
 
-    <section id="how" class="section">
-      <h2>Three steps. That's it.</h2>
-      <ol class="steps">
-        <li><span class="num">1</span><h3>Plug in the stick</h3><p>Everything is on it: the app, the AI models and the engine that runs them.</p></li>
-        <li><span class="num">2</span><h3>Open Stick AI</h3><p>Click <strong>Open workspace</strong>. Stellan loads into your computer's memory, straight from the stick.</p></li>
-        <li><span class="num">3</span><h3>Ask</h3><p>"Why is this test failing?" "Add dark mode." Stellan reads, plans and asks before changing anything.</p></li>
-      </ol>
+    <section class="session" id="session" aria-labelledby="session-title">
+      <div class="session-copy">
+        <p class="kicker">// how it works</p>
+        <h2 id="session-title">It asks before it acts.</h2>
+        <ol class="steps">
+          <li><span>01</span><div><b>Plug in, open.</b> The app for your computer is right on the stick. Nothing to install.</div></li>
+          <li><span>02</span><div><b>Ask in plain words.</b> Stellan explores the project you choose, and only that project.</div></li>
+          <li><span>03</span><div><b>Say yes or no.</b> Every edit and command shows the exact lines first. Your file stays as it was until you allow it.</div></li>
+        </ol>
+      </div>
+      <div class="term" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
+        <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
+<pre><span class="dim">$</span> stick_ai open ~/projects/shop
+<span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes sent</span>
+
+<span class="you">you ›</span> why does checkout crash when the cart is empty?
+
+<span class="ai">stellan ›</span> <span class="dim">reading src/cart.ts … src/checkout.ts …</span>
+<span class="ai">stellan ›</span> found it: average() divides by items.length,
+          which is 0 for an empty cart.
+
+<span class="dim">┌ edit</span> src/checkout.ts
+<span class="dim">│</span> <span class="del">- const avg = total / items.length;</span>
+<span class="dim">│</span> <span class="add">+ const avg = items.length ? total / items.length : 0;</span>
+<span class="dim">└</span> <span class="ask">Allow changes? [y/N]</span> <span class="cursor small" aria-hidden="true"></span></pre>
+      </div>
     </section>
 
-    <section id="benchmarks" class="section">
-      <h2>Better than GPT-4 and Claude 2 at coding. <span class="grad">On your laptop.</span></h2>
-      <p class="sub">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT&#8209;4 and Claude&nbsp;2, which were OpenAI's and Anthropic's best models until November 2023. With 7.3 billion parameters, it's about 99.6% smaller than GPT&#8209;4's estimated 1.8 trillion, and it runs on your own computer with no data centre involved.</p>
+    <section class="bench" id="bench" aria-labelledby="bench-title">
+      <p class="kicker">// benchmarks</p>
+      <h2 id="bench-title">Better than GPT-4 and Claude 2 at coding. <em>On your laptop.</em></h2>
+      <p class="lede narrow">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. With 7.3 billion parameters, it's about 99.6% smaller than GPT-4's estimated 1.8 trillion.</p>
       <div class="bars" role="table" aria-label="HumanEval pass@1 scores">
-        <div class="bar-row us" role="row"><span class="bar-name" role="cell">Stellan-1 Lite <small>7.3B parameters · on your laptop</small></span><span class="bar" role="cell"><span class="fill w732"></span></span><span class="bar-val" role="cell">73.2%</span></div>
-        <div class="bar-row" role="row"><span class="bar-name" role="cell">Claude 2 <small>Anthropic's best, Jul–Nov 2023</small><small>Size never published</small></span><span class="bar" role="cell"><span class="fill w712"></span></span><span class="bar-val" role="cell">71.2%</span></div>
-        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-4 <small>OpenAI's best, Mar–Nov 2023</small><small>~1.8T parameters (estimate)</small></span><span class="bar" role="cell"><span class="fill w670"></span></span><span class="bar-val" role="cell">67.0%</span></div>
-        <div class="bar-row" role="row"><span class="bar-name" role="cell">GPT-3.5 <small>OpenAI · 2022 · cloud</small></span><span class="bar" role="cell"><span class="fill w481"></span></span><span class="bar-val" role="cell">48.1%</span></div>
+        <div class="row us" role="row"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="blocks" aria-hidden="true">█████████████████████████████░░░░░░░░░░░</span><span role="cell" class="score">73.2</span><span role="cell" class="note">7.3B params · your laptop</span></div>
+        <div class="row" role="row"><span role="cell" class="name">claude 2</span><span role="cell" class="blocks" aria-hidden="true">████████████████████████████░░░░░░░░░░░░</span><span role="cell" class="score">71.2</span><span role="cell" class="note">Anthropic's best, Jul–Nov 2023 · size unpublished</span></div>
+        <div class="row" role="row"><span role="cell" class="name">gpt-4</span><span role="cell" class="blocks" aria-hidden="true">███████████████████████████░░░░░░░░░░░░░</span><span role="cell" class="score">67.0</span><span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (est.)</span></div>
+        <div class="row" role="row"><span role="cell" class="name">gpt-3.5</span><span role="cell" class="blocks" aria-hidden="true">███████████████████░░░░░░░░░░░░░░░░░░░░░</span><span role="cell" class="score">48.1</span><span role="cell" class="note">OpenAI, 2022</span></div>
       </div>
-      <div class="stats">
-        <div class="stat"><span class="big grad">99.6%</span><span>smaller than GPT-4 (by its estimated 1.8 trillion parameters), and it scores higher on HumanEval.</span></div>
-        <div class="stat"><span class="big grad">4.1 GB</span><span>Stellan-1 Lite's whole model. It fits on the stick and runs on an ordinary computer with 8 GB of memory.</span></div>
-        <div class="stat"><span class="big grad">~5 s</span><span>for a follow-up step, down from ~95 s, thanks to the conversation cache.</span></div>
-        <div class="stat"><span class="big grad">0</span><span>bytes of your code sent to anyone. There is no server to send it to.</span></div>
+      <div class="numbers">
+        <div><b>99.6%</b><span>smaller than GPT-4 by its estimated size, and it scores higher</span></div>
+        <div><b>~5 s</b><span>for a follow-up step, down from ~95 s, because it remembers the conversation</span></div>
+        <div><b>4.1 GB</b><span>Lite's whole model. Runs on an ordinary computer with 8 GB of memory</span></div>
       </div>
-      <details class="method">
+      <details class="fine">
         <summary>How we measured, and the small print</summary>
-        <p><strong>Stellan-1 Lite:</strong> all 164 HumanEval problems, pass@1 with greedy decoding (temperature 0), each answer run against the official hidden tests. It runs on the CPU of a 4-core computer with the app's own settings: 120 of 164 passed.</p>
-        <p><strong>Other models:</strong> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
-        <p><strong>Model sizes:</strong> Stellan-1 Lite has 7.29 billion parameters, counted from its model file. OpenAI has never published GPT-4's size; ~1.8 trillion is the most widely cited estimate, from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">July 2023 SemiAnalysis report</a>, so "99.6% smaller" (7.29B ÷ 1.8T ≈ 0.4%) is based on that estimate. Anthropic has never published Claude 2's size and there is no reliable estimate, so we don't give one.</p>
-        <p><strong>To be clear:</strong> today's newest cloud models from OpenAI and Anthropic score 95% or more on this test and are far larger. Stick AI is about getting 2023-flagship-level coding help privately, offline, on your own machine. Stellan-1 Max's scores are still being measured.</p>
+        <p><b>Stellan-1 Lite:</b> all 164 HumanEval problems, pass@1, greedy decoding (temperature 0), each answer run against the official hidden tests, on a 4-core CPU with the app's own settings: 120 of 164 passed.</p>
+        <p><b>Other models:</b> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
+        <p><b>Model sizes:</b> Stellan-1 Lite has 7.29 billion parameters, counted from its model file. OpenAI has never published GPT-4's size; ~1.8 trillion is the most widely cited estimate, from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">July 2023 SemiAnalysis report</a>, so "99.6% smaller" (7.29B ÷ 1.8T ≈ 0.4%) rests on that estimate. Anthropic has never published Claude 2's size and there's no reliable estimate, so we don't give one.</p>
+        <p><b>To be clear:</b> today's newest cloud models from OpenAI and Anthropic score 95% or more on this test and are far larger. stick_ai gives you 2023-flagship-level coding help, privately, offline, on your own machine. Stellan-1 Max's score is still being measured.</p>
       </details>
     </section>
 
-    <section id="pricing" class="section">
-      <h2>Launch pricing</h2>
-      <p class="sub">Stick AI isn't on sale yet. Orders open for EU delivery in <strong>February 2027</strong> and worldwide in <strong>May 2027</strong>.</p>
-      <div class="prices">
-        <article class="price-card featured">
-          <p class="tag">The stick</p>
-          <h3>Stick AI</h3>
-          <!-- PRICE: the launch price per stick (EU price includes VAT) -->
-          <p class="amount">€15</p>
-          <p class="ship">per stick, including VAT · $17 outside the EU</p>
-          <p class="ship">+ shipping, calculated at checkout</p>
-          <ul class="ticks">
-            <li>USB stick with the app, Stellan-1 Lite and Stellan-1 Max preinstalled</li>
-            <li>Works on Mac (Apple Silicon and Intel), Windows and Linux</li>
-            <li>No subscription, no account, nothing to install</li>
-          </ul>
-          <span class="pill disabled" aria-disabled="true">Launching February 2027</span>
-        </article>
+    <section class="specs" id="specs" aria-labelledby="specs-title">
+      <div class="label">
+        <div class="label-head"><span>SPEC SHEET</span><span>stick_ai · rev 1</span></div>
+        <h2 id="specs-title" class="sr">Specifications</h2>
+        <dl>
+          <div><dt>Models</dt><dd>Stellan-1 Lite (7.3B) · Stellan-1 Max (23.6B)</dd></div>
+          <div><dt>Runs on</dt><dd>macOS 13.5+ (Apple Silicon &amp; Intel) · Windows 10/11 · Linux x64</dd></div>
+          <div><dt>Memory</dt><dd>Lite: 8 GB · Max: 16 GB minimum, 24 GB+ recommended</dd></div>
+          <div><dt>Internet</dt><dd>Not needed. Not used.</dd></div>
+          <div><dt>Stick</dt><dd>32 GB USB, exFAT, everything preinstalled</dd></div>
+          <div><dt>Approvals</dt><dd>Every edit, command and tool call</dd></div>
+          <div><dt>Subscription</dt><dd>None. Buy it once.</dd></div>
+        </dl>
+        <div class="barcode" aria-hidden="true"></div>
       </div>
-      <div class="ship-dates">
-        <div><strong>🇪🇺 European Union</strong><span>Orders and shipping from February 2027</span></div>
-        <div><strong>🌍 Rest of the world</strong><span>Orders and shipping from May 2027</span></div>
-      </div>
-      <p class="note">Shipping is paid by the customer and is added at checkout, based on where you live. Prices may change before launch.</p>
-    </section>
-
-    <section id="setup" class="section">
-      <h2>Ready the moment it arrives</h2>
-      <p class="sub">Everything comes preinstalled on the stick: the app, both Stellan models and the engine that runs them. There's nothing to download.</p>
-      <ol class="install-steps">
-        <li>Plug the stick into your computer and open <strong>Stick AI</strong>.</li>
-        <li>The first time, your computer may ask you to confirm, because the app isn't signed yet. On a Mac, right-click the app and choose <strong>Open</strong>; on Windows, choose <strong>More info → Run anyway</strong>.</li>
-        <li>Click <strong>Open workspace</strong>, choose a project folder and start chatting.</li>
-      </ol>
-      <div class="req">
-        <div><strong>Lite</strong><span>8 GB of memory or more</span></div>
-        <div><strong>Max</strong><span>16 GB minimum, 24 GB or more recommended</span></div>
-        <div><strong>Computers</strong><span>Mac (Apple Silicon or Intel), Windows 10/11, Linux (64-bit)</span></div>
+      <div class="tree-wrap">
+        <p class="kicker">// what's on it</p>
+        <h3>One stick, every computer.</h3>
+        <p>The app for each computer sits at the top. Everything they share, including one copy of each model, lives in <code>stellan/</code>.</p>
+<pre class="tree" aria-label="The folders on the stick">STICK_AI/
+├── <b>Stick AI.app</b>     <span>mac (apple silicon + intel)</span>
+├── <b>Stick AI.exe</b>     <span>windows</span>
+├── <b>stick-ai</b>         <span>linux</span>
+└── stellan/
+    ├── models/
+    │   ├── stellan-1-lite-q4_k_m.gguf
+    │   └── stellan-1.0-q4_k_m.gguf
+    ├── app/  bin/      <span>the engine, per computer</span>
+    └── manifest.json   <span>every file, checked</span></pre>
       </div>
     </section>
 
-    <section id="faq" class="section">
-      <h2>Questions</h2>
-      <div class="faq">
-        <details>
-          <summary>When can I buy it?</summary>
-          <p>Stick AI isn't launched yet. Orders open in February 2027 with shipping across the European Union, and in May 2027 for the rest of the world.</p>
-        </details>
-        <details>
-          <summary>How much is it?</summary>
-          <p>€15 per stick in the EU, including VAT, and $17 in the rest of the world, plus shipping. It's a one-off price: there's no subscription.</p>
-        </details>
-        <details>
-          <summary>Is it really better than GPT-4 and Claude 2, and smaller?</summary>
-          <p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023, when GPT-4 Turbo and Claude 2.1 replaced them. Stellan-1 Lite has 7.3 billion parameters, about 99.6% fewer than GPT-4's estimated 1.8 trillion (OpenAI has never confirmed GPT-4's size). Today's newest cloud models score higher still. What makes Stick AI different is that it runs privately, on your own computer.</p>
-        </details>
-        <details>
-          <summary>Do I pay for shipping?</summary>
-          <p>Yes. Shipping is added at checkout and depends on where the stick is going.</p>
-        </details>
-        <details>
-          <summary>Does it need the internet?</summary>
-          <p>No. Stellan runs entirely on your computer. You only need the internet if you choose to connect GitHub.</p>
-        </details>
-        <details>
-          <summary>Does the AI get copied onto my computer?</summary>
-          <p>No. The models stay on the stick. While the app is open, they're read into your computer's memory, like playing a film straight off a USB drive, and nothing is installed on your disk.</p>
-        </details>
-        <details>
-          <summary>Is there a subscription?</summary>
-          <p>No. You buy the stick once and it's yours. No account, no monthly fee.</p>
-        </details>
-        <details>
-          <summary>Which computers does it work on?</summary>
-          <p>Macs with Apple Silicon or Intel, Windows 10 and 11 (64-bit) and 64-bit Linux. Lite needs 8 GB of memory; Max needs at least 16 GB, and runs best with 24 GB or more.</p>
-        </details>
+    <section class="price" id="price" aria-labelledby="price-title">
+      <div class="tag">
+        <span class="hole" aria-hidden="true"></span>
+        <p class="kicker">// launch price</p>
+        <h2 id="price-title" class="sr">Price</h2>
+        <p class="amount">€15</p>
+        <p class="per">per stick, VAT included · <b>$17</b> outside the EU</p>
+        <p class="ship">+ shipping, calculated at checkout</p>
+        <ul>
+          <li>The stick with the app, Lite and Max ready to go</li>
+          <li>Mac, Windows and Linux on the same stick</li>
+          <li>No subscription, no account</li>
+        </ul>
       </div>
+      <div class="stamps">
+        <p class="kicker">// not on sale yet</p>
+        <h3>Ships from</h3>
+        <div class="stamp eu"><span>EU</span><b>FEB 2027</b><small>orders &amp; shipping</small></div>
+        <div class="stamp world"><span>WORLD</span><b>MAY 2027</b><small>orders &amp; shipping</small></div>
+        <p class="small">Shipping is paid by the customer and added at checkout, based on where you live. Prices may change before launch.</p>
+      </div>
+    </section>
+
+    <section class="faq" id="faq" aria-labelledby="faq-title">
+      <p class="kicker">// questions</p>
+      <h2 id="faq-title">Questions.</h2>
+      <details><summary>When can I buy it?</summary><p>It isn't on sale yet. Orders open in February 2027 with shipping across the European Union, and in May 2027 for the rest of the world.</p></details>
+      <details><summary>How much is it?</summary><p>€15 per stick in the EU, VAT included, and $17 in the rest of the world, plus shipping. It's a one-off price: no subscription.</p></details>
+      <details><summary>Is it really better than GPT-4 and Claude 2?</summary><p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023. Today's newest cloud models score higher still. What makes stick_ai different is that it runs privately, on your own computer.</p></details>
+      <details><summary>Does it need the internet?</summary><p>No. Stellan runs entirely on your computer. You only need the internet if you choose to connect GitHub.</p></details>
+      <details><summary>Does the AI get copied onto my computer?</summary><p>No. The models stay on the stick. While the app is open they're read into your computer's memory, like playing a film straight off a USB drive. Nothing is installed.</p></details>
+      <details><summary>Which computers does it work on?</summary><p>Macs with Apple Silicon or Intel (macOS 13.5 or newer), Windows 10 and 11 (64-bit) and 64-bit Linux. Lite needs 8 GB of memory; Max needs at least 16 GB and runs best with 24 GB or more.</p></details>
+      <details><summary>Do I pay for shipping?</summary><p>Yes. Shipping is added at checkout and depends on where the stick is going.</p></details>
     </section>
   </main>
 
-  <footer class="footer">
-    <p><strong>Stick AI</strong> by Localilabs · Private, offline coding help.</p>
-    <p class="muted">© 2026 Localilabs. Not yet launched: details and prices may change before launch.</p>
+  <footer class="foot">
+    <p class="giant" aria-hidden="true">stick_ai</p>
+    <div class="foot-row">
+      <p>stick_ai by Localilabs · private, offline coding help</p>
+      <p>© 2026 Localilabs. Not yet launched: details and prices may change.</p>
+    </div>
   </footer>
 </body>
 </html>

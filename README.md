@@ -1,6 +1,6 @@
 # Stick AI website
 
-The landing page for Stick AI. Plain HTML and CSS: no build step, no JavaScript, no third-party requests.
+The landing page for stick_ai. Plain HTML and CSS: no build step, no JavaScript, no third-party requests (fonts are self-hosted under their OFL licences in `fonts/`).
 
 ## Deploy on Vercel
 
@@ -13,4 +13,4 @@ The landing page for Stick AI. Plain HTML and CSS: no build step, no JavaScript,
 
 - Prices: search `index.html` for `PRICE:`.
 - Launch dates: search for `February 2027` and `May 2027`.
-- Screenshots live in `img/` (WebP plus a JPEG fallback), made from the app repo's `docs/` images.
+- Logos live in `img/brand/` (dark and light versions; the page swaps them with the system theme).
