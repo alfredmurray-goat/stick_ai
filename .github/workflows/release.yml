@@ -39,8 +39,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           STICK_UPDATE_SIGNING_KEY: ${{ secrets.STICK_UPDATE_SIGNING_KEY }}
           # Private update host for sold sticks (Cloudflare R2). Without these, updates stay GitHub drafts only.
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          # Either one CLOUDFLARE_API_TOKEN secret with R2 write access, or R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY.
+          # The account ID isn't secret: an Actions variable is enough.
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID || vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET || vars.R2_BUCKET || 'stick-ai-updates' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           BUILD_RUN: ${{ github.event.workflow_run.id || inputs.build_run }}
