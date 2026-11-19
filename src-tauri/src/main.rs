@@ -256,11 +256,11 @@ fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, St
 }
 
 /// The folder holding manifest.json, bin, app and models. A platform package keeps them beside the app;
-/// the all-devices stick keeps every app at the top and everything they share in a "Stellan" folder.
+/// the all-devices stick keeps every app at the top and everything they share in a "stellan" folder.
 fn stick_root(executable: &Path) -> PathBuf {
     for directory in executable.ancestors().skip(1) {
         if directory.join("manifest.json").is_file() { return directory.to_path_buf(); }
-        let shared = directory.join("Stellan");
+        let shared = directory.join("stellan");
         if shared.join("manifest.json").is_file() { return shared; }
     }
     executable.parent().unwrap_or(executable).to_path_buf()

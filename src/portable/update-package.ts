@@ -15,7 +15,7 @@ import type { UpdateTarget } from "./update-format.js";
 export async function buildUpdateBundle(root: string, target: UpdateTarget, output: string, liteCompatible = false, source?: { manifest: Manifest; locate: (path: string) => string }): Promise<void> {
   const manifest = validateUpdateManifest(source ? structuredClone(source.manifest) : JSON.parse(await readFile(join(root, "manifest.json"), "utf8")), target);
   const locate = source?.locate ?? ((path: string) => join(root, path));
-  if (liteCompatible) { manifest.files = manifest.files.filter((record) => record.path !== "models/stellan-1-max-q4_k_m.gguf"); }
+  if (liteCompatible) { manifest.files = manifest.files.filter((record) => record.path !== "models/stellan-1.0-q4_k_m.gguf"); }
   const index = Buffer.from(JSON.stringify(manifest)); const length = Buffer.alloc(4); length.writeUInt32LE(index.length);
   async function* contents() {
     yield updateMagic; yield length; yield index;

@@ -32,7 +32,7 @@ npm run build:stick -- \
   --desktop-linux-x64 /assets/linux-x64/stick-ai \
   --desktop-licenses /assets/desktop-licenses \
   --lite /assets/stellan-1-lite-q4_k_m.gguf \
-  --max /assets/stellan-1-max-q4_k_m.gguf
+  --max /assets/stellan-1.0-q4_k_m.gguf
 ```
 
 The output is `dist/stick_ai_stick/`. `--out` overrides it; an existing output is never overwritten. `--support-macos-arm64`, `--support-macos-x64`, `--support-windows-x64` and `--support-linux-x64` optionally copy a directory of audited DLLs, dylibs, shared libraries and their licences next to the corresponding executable. Source links are dereferenced; output links are forbidden. Every sidecar is hashed. Static/self-contained builds are simplest; stock release archives may need sidecars. Use only redistributable CPU builds for this profile; GPU offload is explicitly zero to reduce driver cache writes and GPU requirements. The OS minimum and CPU instruction requirements are those of the supplied executables, not just their 64-bit header.
@@ -48,7 +48,7 @@ The output is `dist/stick_ai_stick/`. `--out` overrides it; an existing output i
 | `bin/windows-x64/llama-server.exe`, `bin/linux-x64/llama-server` | Windows and Linux servers |
 | `bin/<platform>/node` or `node.exe` | Required portable Node runtime; no installed Node is used |
 | `models/stellan-1-lite-q4_k_m.gguf` | Default Lite model, expected approximately 4.5 GB |
-| `models/stellan-1-max-q4_k_m.gguf` | Max model, expected approximately 14 GB |
+| `models/stellan-1.0-q4_k_m.gguf` | Max model, expected approximately 14 GB |
 | `app/launcher.cjs`, `app/stick-verify.cjs`, `app/ui/` | Built JavaScript and local UI |
 | `app/project/` | The buyer's editable project files |
 | `LICENSES/` | MIT, Apache 2.0, upstream llama.cpp MIT, Node release licences, NOTICE, THIRD_PARTY_LICENSES and model provenance |

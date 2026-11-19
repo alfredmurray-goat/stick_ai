@@ -48,7 +48,7 @@ export function validateUpdateManifest(value: unknown, target: UpdateTarget): Ma
   const seen = new Set<string>(); let size = 0;
   for (const record of manifest.files) {
     if (!safeUpdatePath(record.path) || seen.has(record.path.toLowerCase()) || !/^[a-f0-9]{64}$/.test(record.sha256) || !Number.isSafeInteger(record.size) || record.size < 0 || typeof record.executable !== "boolean" || record.path === "manifest.json" || ["logs", "app/project", ".stick"].some((prefix) => record.path === prefix || record.path.startsWith(prefix + "/"))) { throw new Error("Unsafe update file"); }
-    if (record.path.startsWith("models/") && !["models/stellan-1-lite-q4_k_m.gguf", "models/stellan-1-max-q4_k_m.gguf"].includes(record.path)) { throw new Error("Unexpected model file"); }
+    if (record.path.startsWith("models/") && !["models/stellan-1-lite-q4_k_m.gguf", "models/stellan-1.0-q4_k_m.gguf"].includes(record.path)) { throw new Error("Unexpected model file"); }
     seen.add(record.path.toLowerCase());
     if (!record.path.startsWith("models/")) { size += record.size; if (record.size > maxUpdateBytes || size > 2 * 1024 ** 3) { throw new Error("Update is too large"); } }
   }

@@ -34,7 +34,7 @@ export function portableModels(bytes: number, maxPresent: boolean): string[] {
 }
 export function modelFile(model: string): string {
   if (model === "stellan-1-lite") { return "models/stellan-1-lite-q4_k_m.gguf"; }
-  if (model === "stellan-1-max") { return "models/stellan-1-max-q4_k_m.gguf"; }
+  if (model === "stellan-1-max") { return "models/stellan-1.0-q4_k_m.gguf"; }
   throw new UserError("damaged");
 }
 export function executableName(target: Target, node = false): string {

@@ -44,8 +44,8 @@ it("retains the 16 GiB threshold even with weights selected", async () => {
   expect((await localModelStatus(f.root, 16 * GiB)).eligible).toBe(true);
 });
 it("falls back to included Max when an external selection is removed, keeping both files intact", async () => {
-  const f = await fixture(); await mkdir(join(f.root, "models")); const bundled = join(f.root, "models/stellan-1-max-q4_k_m.gguf"); await writeFile(bundled, f.bytes);
-  await writeFile(join(f.root, "manifest.json"), JSON.stringify({ files: [{ path: "models/stellan-1-max-q4_k_m.gguf" }] }));
+  const f = await fixture(); await mkdir(join(f.root, "models")); const bundled = join(f.root, "models/stellan-1.0-q4_k_m.gguf"); await writeFile(bundled, f.bytes);
+  await writeFile(join(f.root, "manifest.json"), JSON.stringify({ files: [{ path: "models/stellan-1.0-q4_k_m.gguf" }] }));
   await linkMaxFile(f.root, f.model); expect((await resolveLocalMax(f.root))?.source).toBe("linked");
   await unlinkMaxFile(f.root); expect((await resolveLocalMax(f.root))?.source).toBe("bundled");
   expect(await readFile(f.model)).toEqual(f.bytes); expect(await readFile(bundled)).toEqual(f.bytes);

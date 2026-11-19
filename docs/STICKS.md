@@ -18,7 +18,7 @@ Every build that passes on `main` publishes one **private draft** release, **Sti
    - Linux: `Join-stick_ai-all-devices.sh.zip`. Unzip it and run `sh Join-stick_ai-all-devices.sh`.
 
    The helper checks every part against its SHA-256 and builds `stick_ai-all-devices.tar` (about 19 GB). Keep this file: you can extract it onto as many sticks as you like.
-2. Extract it onto the stick. The three apps, `Read me.txt` and the `Stellan` folder land at the top of the stick:
+2. Extract it onto the stick. The three apps, `Read me.txt` and the `stellan` folder land at the top of the stick:
    - Mac: `tar -xf stick_ai-all-devices.tar -C "/Volumes/STICK AI"`
    - Windows (Command Prompt): `tar -xf stick_ai-all-devices.tar -C E:\` (your stick's drive letter)
    - Linux: `tar -xf stick_ai-all-devices.tar -C "/media/$USER/STICK AI"`
@@ -33,17 +33,17 @@ STICK AI (the USB stick)
 ├── Stick AI.exe     Windows
 ├── stick-ai         Linux
 ├── Read me.txt
-└── Stellan/         everything the apps share
+└── stellan/         everything the apps share
     ├── models/      Stellan-1 Lite and Max, stored once
     ├── bin/         Node.js and the llama.cpp server for each computer
     ├── app/         the assistant (and app/project, your saved work)
-    ├── manifest.json  SHA-256 of every file in Stellan; the app refuses to start if one changed
+    ├── manifest.json  SHA-256 of every file in stellan; the app refuses to start if one changed
     └── Start.command, Start.bat, start.sh, README.txt, LICENSES/
 ```
 
-Each app looks for a `Stellan` folder beside it (a platform package keeps the same files next to its app instead). Keep `Stellan` next to the apps.
+Each app looks for a `stellan` folder beside it (a platform package keeps the same files next to its app instead). Keep `stellan` next to the apps.
 
-The stick checks for app updates at `updates.localilabs.com` (see [UPDATES.md](UPDATES.md)). All-devices sticks download the `universal` update: it replaces the files in `Stellan` and the three apps beside it (keeping the old ones until it has finished), so an update never removes another computer's app, your work or the models.
+The stick checks for app updates at `updates.localilabs.com` (see [UPDATES.md](UPDATES.md)). All-devices sticks download the `universal` update: it replaces the files in `stellan` and the three apps beside it (keeping the old ones until it has finished), so an update never removes another computer's app, your work or the models.
 
 ## How the release is built
 
