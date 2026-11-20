@@ -54,7 +54,7 @@ it("continues delegating beyond five calls and still requires delegation for lat
 });
 it.each([8, 16, 21.9])("falls back below 22 GiB (%s GB)", async (amount) => {
   const code = vi.fn(async () => "code"); const delegate = createDelegate({ totalBytes: amount * GiB, noSwap: false, available: true, code }, vi.fn());
-  expect(await delegate(request, new AbortController().signal)).toBe("Code specialist needs a computer with 24 GB of memory. Writing the code here instead.");
+  expect(await delegate(request, new AbortController().signal)).toBe("Code specialist needs a computer with 24 GB of memory to help automatically. Writing the code here instead.");
   expect(code).not.toHaveBeenCalled();
 });
 it("no-swap refuses delegation and lets Lite write", async () => {

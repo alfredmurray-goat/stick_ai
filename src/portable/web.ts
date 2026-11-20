@@ -7,6 +7,7 @@ import { friendlyError, type FriendlyError } from "./errors.js";
 import { GitHubWorkspaces } from "./github-workspace.js";
 import { GitHubError } from "./github-client.js";
 import { McpServers, McpError, actuent } from "./mcp.js";
+import { maxRecommendedBytes } from "../config/models.js";
 import { compactWebResult } from "./web-search.js";
 import { Skills, SkillError, parseSkill } from "./skills.js";
 import { workspaceToolSchemas } from "../tools/schema.js";
@@ -138,7 +139,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max"), events: events.filter((event) => event.id > after) }); return;
+        send(response, 200, { phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active, progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: !options.noSwap && !faster && engine.active === "stellan-1-lite" && options.choices.includes("stellan-1-max") && options.bytes >= maxRecommendedBytes, events: events.filter((event) => event.id > after) }); return;
       }
       if (request.method === "GET" && url.pathname === "/api/extensions") { send(response, 200, {servers:mcp.view(),webSearch:mcp.webSearchEnabled,skills:await skills.scan(),problem:extensionProblem}); return; }
       if (request.method === "GET" && url.pathname === "/api/skills/preview") { try { send(response,200,await skills.preview(url.searchParams.get("id")??"")); } catch(error) { send(response,400,{error:error instanceof SkillError?error.message:"The skill could not be read."}); } return; }

@@ -26,7 +26,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 ## Features
 
 - **Fully local.** Stellan runs on your own computer through a bundled llama.cpp server. No account, no cloud, no telemetry.
-- **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code when your computer has 24 GB of memory or more. Use them together, Lite on its own, or Max directly.
+- **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code. Lite + Max work together automatically with 24 GB of memory or more; on 16 GB you can still choose Max, with a warning that it may be very slow. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
 - **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
 - **Readable answers.** Replies render with headings, lists, tables and code blocks with a Copy button.
@@ -76,7 +76,7 @@ One stick works on every supported computer: the three apps sit at the top of th
 | Windows x64 | `Stick AI.exe` | Windows 10+, 8 GB RAM, Edge WebView2 |
 | Linux x64 | `stick-ai` | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GB RAM |
 
-Max needs a computer with 24 GB of memory or more. On 16 GB it loads but keeps re-reading its 14.3 GB file from disk and is far too slow to use, so the app only offers Lite there.
+Max works best with 24 GB of memory or more. On 16 GB you can still choose it (Settings → Models → Max directly), but the app warns first: there it keeps re-reading its 14.3 GB file from disk and a reply can take many minutes or seem stuck. On 16 GB the app uses Lite by default and never switches Max on by itself.
 
 > [!TIP]
 > Use the **Install on stick** helper from the zip rather than dragging folders: it merges onto the stick and never deletes `stellan/models`.
@@ -185,7 +185,7 @@ stick run "Inspect this repository and fix its failing tests"
 - Writes, edits and every shell command need your approval. `--yes` skips approval for that one run. Non-interactive runs deny changes unless `--yes` is given.
 - `/exit` exits, `/clear` deletes the current history and `/history` shows it. Ctrl+C cancels the active request, approval or command and keeps the chat open. A cancelled one-shot run exits with status 1, and reaching the step limit exits with status 2.
 - `.stick/config.json` holds `model`, `baseUrl` and `maxSteps` (1 to 1000). `STICK_MODEL` and `STICK_BASE_URL` override them. Only `localhost`, `127.0.0.1` and `::1` are accepted unless you pass `--allow-remote`, which sends prompts and tool results to that endpoint.
-- Max is locked on computers with less than 24 GB (below 22 GiB of total RAM reported, to allow for memory the firmware and graphics keep). `--force-max` overrides it for one run, with a warning that Max may be very slow or crash. `stick doctor` shows total memory and the lock status without loading a model.
+- Max is locked on computers with less than 16 GB (below 15 GiB of total RAM reported, to allow for memory the firmware and graphics keep). From 16 GB it can be chosen, with a warning below 24 GB (22 GiB reported) that it may be very slow. `--force-max` overrides the lock for one run, with a warning that Max may be very slow or crash. `stick doctor` shows total memory and the lock status without loading a model.
 - Files must be UTF-8 and at most 1 MiB. Search returns up to 200 matching lines and skips `.git`, `.stick` and `node_modules`. There is no execution or inactivity deadline; use Cancel or Ctrl+C.
 - History is appended to `.stick/history.jsonl`, and one session per project is enforced with `.stick/session.lock`. History stores source contents in plain text, so keep `.stick` out of version control.
 
@@ -251,7 +251,7 @@ The first message in a conversation has to be read in full, which can take a min
 <details>
 <summary><b>Max is unavailable</b></summary>
 
-Max needs a computer with 24 GB of memory or more, and a Max GGUF that is bundled or linked. On a smaller computer, use Lite.
+Max needs at least 16 GB of memory (24 GB recommended) and a Max GGUF that is bundled or linked. On 16 GB it can be very slow, so the app warns first; on less, use Lite.
 
 </details>
 
@@ -300,7 +300,7 @@ Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the p
 - **Review what it writes.** Stellan can make mistakes. In stricter tests it mis-copied long random identifiers.
 - **Lite's chat template.** The supplied Lite GGUF has no embedded template, so the app uses a tested Mistral-v1 formatter. The original training template is unverified.
 - **Unsigned builds.** Gatekeeper, SmartScreen, clean-machine launch and physical USB performance still need manual checks.
-- **Memory is total, not free.** The 8 GB and 24 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
+- **Memory is total, not free.** The 8 GB, 16 GB and 24 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
 
 ## Licences
 

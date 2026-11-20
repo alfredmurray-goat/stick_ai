@@ -36,6 +36,7 @@ async function main(): Promise<void> {
   if (ram.warning) { console.error(ram.warning); }
   if (command === "init") { await initConfig(box); stdout.write("Created .stick/config.json\n"); return; }
   const config = await loadConfig(box, remote);
+  if (config.model === "stellan-1-max" && ram.maxSlow && !ram.maxLocked) { console.error(ram.slowMessage); }
   if (command === "doctor") {
     stdout.write(clean(JSON.stringify({ platform: backend.platform, backend: backend.name, isolated: backend.isolated, shell: backend.shell, cwd: box.root, warning: backend.warning ?? null, ram, selectedModel: config.model, selectedModelAllowed: config.model !== "stellan-1-max" || !ram.maxLocked }, null, 2)) + "\n");
     return;

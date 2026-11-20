@@ -10,20 +10,20 @@ import { Ollama } from "../src/model/ollama.js";
 const roots: string[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 describe("RAM lock", () => {
-  it.each([[8, true], [16, true], [21.9, true], [22, false], [24, false]] as const)("checks %s GiB", (amount, locked) => {
+  it.each([[8, true], [14.9, true], [15, false], [16, false], [24, false]] as const)("checks %s GiB", (amount, locked) => {
     const ram = ramStatus(amount * GiB);
     expect(ram.maxLocked).toBe(locked);
     expect(modelChoices(ram)[1]?.disabled).toBe(locked);
     expect(modelChoices(ram)[0]?.disabled).toBe(false);
     expect(assertModelAllowed("stellan-1-lite", ram)).toBe("stellan-1-lite");
     if (locked) {
-      expect(() => assertModelAllowed("stellan-1-max", ram)).toThrow("needs a computer with 24 GB of memory or more");
+      expect(() => assertModelAllowed("stellan-1-max", ram)).toThrow("needs a computer with at least 16 GB of memory");
       expect(() => pickModel("2", "stellan-1-lite", ram)).toThrow("This one has");
     } else { expect(pickModel("2", "stellan-1-lite", ram)).toBe("stellan-1-max"); }
   });
   it("uses the exact byte threshold rather than a rounded display", () => {
-    expect(ramStatus(22 * GiB - 1).maxLocked).toBe(true);
-    expect(ramStatus(22 * GiB).maxLocked).toBe(false);
+    expect(ramStatus(15 * GiB - 1).maxLocked).toBe(true);
+    expect(ramStatus(15 * GiB).maxLocked).toBe(false);
   });
   it("force-max unlocks Max with a warning", () => {
     const ram = ramStatus(8 * GiB, true);
@@ -33,12 +33,12 @@ describe("RAM lock", () => {
   it("shows a grey disabled Max entry with the required message", () => {
     const text = renderModelPicker(ramStatus(8 * GiB), true);
     expect(text).toContain("\x1b[90m2. Stellan-1 Max");
-    expect(text).toContain("Stellan-1 Max needs a computer with 24 GB of memory or more. This one has 8 GB.");
+    expect(text).toContain("Stellan-1 Max needs a computer with at least 16 GB of memory (24 GB recommended). This one has 8 GB.");
     expect(renderModelPicker(ramStatus(8 * GiB), false)).not.toContain("\x1b[");
   });
   it("refuses a locked direct client before making a model request", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
-    expect(() => new Ollama("stellan-1-max", "http://localhost:11434", false, ramStatus(8 * GiB))).toThrow("needs a computer with 24 GB");
+    expect(() => new Ollama("stellan-1-max", "http://localhost:11434", false, ramStatus(8 * GiB))).toThrow("needs a computer with at least 16 GB");
     expect(fetch).not.toHaveBeenCalled();
   });
   it("does not silently downgrade a locked STICK_MODEL override", async () => {
@@ -46,7 +46,7 @@ describe("RAM lock", () => {
     vi.stubEnv("STICK_MODEL", "stellan-1-max");
     const config = await loadConfig(await Sandbox.create(root), false);
     expect(config.model).toBe("stellan-1-max");
-    expect(() => assertModelAllowed(config.model, ramStatus(8 * GiB))).toThrow("needs a computer with 24 GB");
+    expect(() => assertModelAllowed(config.model, ramStatus(8 * GiB))).toThrow("needs a computer with at least 16 GB");
   });
   it("defaults to Lite and migrates the old stored model name", async () => {
     const root = await mkdtemp(join(tmpdir(), "stick-models-")); roots.push(root);
