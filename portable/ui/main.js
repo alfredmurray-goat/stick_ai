@@ -390,12 +390,18 @@ function showLocalModels(status) {
   byId("unlink-lite").hidden = lite.source !== "linked";
   if (lite.path) { byId("lite-path").value = lite.path; }
   if (!liteReady) { byId("lite-selection").open = true; }
-  byId("assistant-mode").querySelector('[value="max"]').disabled = !(status.available && status.eligible);
-  byId("assistant-mode").querySelector('[value="auto"]').textContent = status.available && status.eligible ? "Lite + Max (recommended)" : "Lite (Max unavailable on this computer)";
+  const usable = status.available && status.eligible, slow = usable && status.slow;
+  byId("assistant-mode").querySelector('[value="max"]').disabled = !usable;
+  byId("assistant-mode").querySelector('[value="max"]').textContent = slow ? "Max directly (code only, very slow on this computer)" : "Max directly (code only)";
+  byId("assistant-mode").querySelector('[value="auto"]').textContent = slow ? "Lite (recommended on this computer)" : usable ? "Lite + Max (recommended)" : "Lite (Max unavailable on this computer)";
+  maxSlowMessage = slow ? status.slowMessage : ""; showMaxWarning();
   byId("unlink-max").hidden = status.source !== "linked";
   if (status.path) { byId("max-path").value = status.path; }
   if (!(status.available && status.eligible) && byId("assistant-mode").value === "max") { byId("assistant-mode").value = "auto"; }
 }
+let maxSlowMessage = "";
+function showMaxWarning() { const box = byId("max-warning"); box.textContent = maxSlowMessage; box.hidden = !maxSlowMessage || byId("assistant-mode").value !== "max"; }
+byId("assistant-mode").addEventListener("change", showMaxWarning);
 async function setLocalModel(action, path, model = "max") {
   const ids = [`browse-${model}`, `link-${model}`, `unlink-${model}`];
   byId("start").disabled = true;

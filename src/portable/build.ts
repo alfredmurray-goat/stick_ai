@@ -97,7 +97,7 @@ export const userReadme = `YOUR PRIVATE ASSISTANT
 
 Open the desktop folder, open the folder for your computer, and double-click Stick AI on Mac, stick-ai.exe on Windows, or stick-ai on Linux. Click Start.
 
-Everything runs on this computer. Lite starts automatically. On computers with 24 GB of memory or more, a larger assistant can help with coding, one model at a time.
+Everything runs on this computer. Lite starts automatically. On computers with 24 GB of memory or more, a larger assistant can help with coding, one model at a time (on 16 GB you can choose it, but it may be very slow).
 
 Keep the stick connected. Close the app before safely ejecting it.
 

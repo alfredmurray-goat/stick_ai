@@ -1,4 +1,4 @@
-import { maxMinimumBytes } from "../config/models.js";
+import { GiB, maxMinimumBytes, maxRecommendedBytes, maxSlowWarning } from "../config/models.js";
 import { constants } from "node:fs";
 import { lstat, open, readFile, realpath, mkdir, rename, rm, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
@@ -13,7 +13,7 @@ interface ModelLink { format: 1; path: string; relative: boolean; size: number; 
 export interface LocalModel { path: string; source: "linked" | "bundled"; name: string }
 export type LocalMax = LocalModel;
 export interface LiteStatus { available: boolean; name?: string; path?: string; source?: string; message: string }
-export interface LocalModelStatus { available: boolean; eligible: boolean; totalBytes: number; name?: string; path?: string; source?: string; message: string; lite: LiteStatus }
+export interface LocalModelStatus { available: boolean; eligible: boolean; slow: boolean; slowMessage: string; totalBytes: number; name?: string; path?: string; source?: string; message: string; lite: LiteStatus }
 export class LocalModelError extends Error {}
 const label = { lite: "Lite", max: "Max" } as const;
 const configName = (kind: ModelKind): string => `${kind}-model.json`;
@@ -88,13 +88,13 @@ async function liteStatus(root: string): Promise<LiteStatus> {
   } catch (error) { return { available: false, source: "linked", message: error instanceof LocalModelError ? error.message : "The Lite model could not be read. Choose the file again." }; }
 }
 export async function localModelStatus(root: string, bytes = totalmem()): Promise<LocalModelStatus> {
-  const lite = await liteStatus(root); const eligible = bytes >= maxMinimumBytes;
+  const lite = await liteStatus(root); const eligible = bytes >= maxMinimumBytes; const slow = eligible && bytes < maxRecommendedBytes; const slowMessage = slow ? maxSlowWarning(Math.floor(bytes / GiB * 100) / 100) : "";
   try {
     const model = await resolveLocalMax(root);
     const maxText = model ? model.source === "bundled" ? "Max is included" : `Max linked: ${model.name}` : "";
     const message = !lite.available ? lite.message
-      : model ? eligible ? `${lite.message} ${maxText}. Lite + Max is ready.` : `${lite.message} ${maxText}. Max needs a computer with 24 GB of memory or more; use Lite on this one.`
+      : model ? eligible ? slow ? `${lite.message} ${maxText}, but it may be very slow on this computer (24 GB of memory recommended). Lite is the default here.` : `${lite.message} ${maxText}. Lite + Max is ready.` : `${lite.message} ${maxText}. Max needs at least 16 GB of memory; use Lite on this computer.`
       : `${lite.message} Choose the Max GGUF already on your stick to enable Max in this same app.`;
-    return { available: Boolean(model), eligible, totalBytes: bytes, ...(model ? { name: model.name, path: model.path, source: model.source } : {}), message, lite };
-  } catch (error) { return { available: false, eligible, totalBytes: bytes, source: "linked", message: error instanceof LocalModelError ? error.message : "The Max model could not be read. Choose the file again or continue with Lite.", lite }; }
+    return { available: Boolean(model), eligible, slow, slowMessage, totalBytes: bytes, ...(model ? { name: model.name, path: model.path, source: model.source } : {}), message, lite };
+  } catch (error) { return { available: false, eligible, slow, slowMessage, totalBytes: bytes, source: "linked", message: error instanceof LocalModelError ? error.message : "The Max model could not be read. Choose the file again or continue with Lite.", lite }; }
 }

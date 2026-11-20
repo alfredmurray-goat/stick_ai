@@ -38,10 +38,11 @@ it("shows an unavailable or changed file without preventing Lite use", async () 
   expect((await localModelStatus(f.root, 32 * GiB)).message).toContain("changed");
   await rm(f.model); const status = await localModelStatus(f.root, 32 * GiB); expect(status.available).toBe(false); expect(status.message).toContain("missing");
 });
-it("retains the 22 GiB threshold (24 GB computers) even with weights selected", async () => {
+it("allows Max from 15 GiB (16 GB computers) with a slowness warning below 22 GiB", async () => {
   const f = await fixture(); await linkMaxFile(f.root, f.model);
-  for (const bytes of [8 * GiB, 16 * GiB, 22 * GiB - 1]) { const status = await localModelStatus(f.root, bytes); expect(status.available).toBe(true); expect(status.eligible).toBe(false); }
-  expect((await localModelStatus(f.root, 22 * GiB)).eligible).toBe(true);
+  for (const bytes of [8 * GiB, 15 * GiB - 1]) { const status = await localModelStatus(f.root, bytes); expect(status.available).toBe(true); expect(status.eligible).toBe(false); }
+  const sixteen = await localModelStatus(f.root, 16 * GiB); expect(sixteen.eligible).toBe(true); expect(sixteen.slow).toBe(true); expect(sixteen.slowMessage).toMatch(/very slow/);
+  const big = await localModelStatus(f.root, 22 * GiB); expect(big.eligible).toBe(true); expect(big.slow).toBe(false); expect(big.slowMessage).toBe("");
 });
 it("falls back to included Max when an external selection is removed, keeping both files intact", async () => {
   const f = await fixture(); await mkdir(join(f.root, "models")); const bundled = join(f.root, "models/stellan-1.0-q4_k_m.gguf"); await writeFile(bundled, f.bytes);
