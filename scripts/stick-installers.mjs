@@ -71,8 +71,9 @@ export const windowsInstaller = [
   'set "DRIVE=%DRIVE::=%"',
   'set "DRIVE=%DRIVE:\\=%"',
   'if /i "%DRIVE%"=="C" (echo C is your computer\'s main drive, not a stick. Open this helper again and type the stick\'s letter. & pause & exit /b 1)',
-  'if not exist "%DRIVE%:\\" (echo That drive wasn\'t found. & pause & exit /b 1)',
-  'robocopy "%SRC%" "%DRIVE%:\\" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP',
+  'if not exist %DRIVE%:\\ (echo That drive wasn\'t found. & pause & exit /b 1)',
+  // Not "D:\\": a backslash before a closing quote escapes the quote and garbles every argument after it.
+  'robocopy "%SRC%" %DRIVE%:\\ /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP',
   "if errorlevel 8 (echo Copying failed. Check the stick has space and isn't locked. & pause & exit /b 1)",
   `set "MISSING="`,
   `if not exist "%DRIVE%:\\stellan\\models\\${lite}" set "MISSING=%MISSING% ${lite}"`,

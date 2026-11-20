@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { macInstaller, writeInstallers } from "../scripts/stick-installers.mjs";
+import { macInstaller, windowsInstaller, writeInstallers } from "../scripts/stick-installers.mjs";
 const run = promisify(execFile);
 
 it.skipIf(process.platform === "win32")("copies the apps onto a stick without touching the models already there", async () => {
@@ -67,4 +67,10 @@ it.skipIf(process.platform === "win32")("asks again instead of quitting when not
     const code = await new Promise((resolve) => child.on("exit", resolve));
     expect(code).toBe(1); expect(stdout.match(/Try again/g)).toHaveLength(3); expect(stdout).toContain("No stick chosen");
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it("never ends a quoted Windows path with a backslash, which escapes the quote", () => {
+  // robocopy "SRC" "D:\" read the closing quote as text and copied to a garbled destination on a tester's PC.
+  for (const line of windowsInstaller.split("\r\n")) { expect(line).not.toMatch(/\\"(\s|$)/); }
+  expect(windowsInstaller).toContain('robocopy "%SRC%" %DRIVE%:\\ /E');
 });

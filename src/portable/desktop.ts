@@ -1,3 +1,4 @@
+import { liteMinimumBytes } from "../config/models.js";
 import { totalmem } from "node:os";
 import { portableModels, targetFor } from "./platform.js";
 
@@ -19,9 +20,9 @@ export async function launchDesktop(driver: DesktopDriver, signal: AbortSignal, 
   } catch (error) { await stop(); throw error; }
 }
 export function desktopDryRun(root: string, platform = process.platform, arch = process.arch, bytes = totalmem()): string[] {
-  const target = targetFor(platform, arch); const models = bytes < 8 * 1024 ** 3 ? [] : portableModels(bytes, true);
+  const target = targetFor(platform, arch); const models = bytes < liteMinimumBytes ? [] : portableModels(bytes, true);
   return [
-    bytes < 8 * 1024 ** 3 ? "Memory check would stop launch: this computer needs at least 8 GB; the following actions are a preview only." : "Memory check permits Lite startup.",
+    bytes < liteMinimumBytes ? "Memory check would stop launch: this computer needs at least 8 GB; the following actions are a preview only." : "Memory check permits Lite startup.",
     `Select ${target} under ${root}; show the welcome screen with one Start button.`,
     `Check memory; default to Lite; Max is ${models.length === 2 ? "available" : "locked"}.`,
     "Verify SHA256 hashes of the runtime, app, model and server before execution.",

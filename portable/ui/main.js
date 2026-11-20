@@ -32,6 +32,9 @@ function showError(problem = {}) {
   errorAction = problem.action || "Retry";
   byId("error-action").textContent = errorAction;
   byId("error").hidden = false;
+  // On the welcome screen the card sits below the fold; a failed start must never look like nothing happened.
+  requestAnimationFrame(() => byId("error").scrollIntoView({ block: "center", behavior: "smooth" }));
+  toast(byId("error-message").textContent);
 }
 function progress(view, busy) {
   working = busy; byId("progress").hidden = !busy; document.body.classList.toggle("working", busy);
