@@ -1,7 +1,10 @@
 import { totalmem } from "node:os";
 
 export const GiB = 1024 ** 3;
-export const maxMinimumBytes = 16 * GiB;
+// Max is a 14.3 GB file. On a 16 GB machine it loads but keeps re-reading itself from disk and produced no
+// answer in 20 minutes, so it needs a 24 GB computer. Those report a little under 24 GiB once firmware and
+// integrated graphics take their share, hence 22 GiB.
+export const maxMinimumBytes = 22 * GiB;
 export const modelNames = ["stellan-1-lite", "stellan-1-max"] as const;
 export type ModelName = typeof modelNames[number];
 export interface RamStatus {
@@ -17,7 +20,7 @@ export function ramStatus(totalBytes = totalmem(), forceMax = false): RamStatus 
   const totalGB = Math.floor(totalBytes / GiB * 100) / 100;
   return {
     totalBytes, totalGB, maxLocked: totalBytes < maxMinimumBytes && !forceMax, forceMax,
-    lockMessage: `Stellan-1 Max needs 16GB RAM or more. Your Mac has ${totalGB} GB.`,
+    lockMessage: `Stellan-1 Max needs a computer with 24 GB of memory or more. This one has ${totalGB} GB.`,
     warning: forceMax ? "Warning: --force-max is enabled. Stellan-1 Max may be very slow or crash." : null
   };
 }

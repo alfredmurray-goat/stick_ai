@@ -36,7 +36,7 @@ This stick works on Mac, Windows and Linux. Open the app for your computer:
 Everything the apps share, including the AI models, is in the stellan folder. Keep it next to the apps.
 
 Then click Open workspace. Everything runs on this computer; nothing is sent anywhere.
-Lite needs 8 GB of memory. Max needs at least 16 GB and runs best with 24 GB or more.
+Lite needs 8 GB of memory. Max needs 24 GB of memory or more.
 
 Keep the stick connected while you work, and close the app before ejecting it.
 Start.command, Start.bat and start.sh are fallbacks for technical users.

@@ -21,7 +21,7 @@ it("Lite delegates, receives Max code, applies it and alone finishes", async () 
   const code = vi.fn(async () => "export function greet() { return 1; }");
   const execute = vi.fn(async (_call: Call, _signal: AbortSignal) => "Wrote 37 bytes to greet.ts");
   const messages: Message[] = [];
-  await runAgent({ task: "Make greet", messages, model, tools: { execute }, specialist: { totalBytes: 16 * GiB, noSwap: false, available: true, code }, maxSteps: 10, signal: new AbortController().signal, emit: vi.fn(), log: vi.fn(), save: async () => {} });
+  await runAgent({ task: "Make greet", messages, model, tools: { execute }, specialist: { totalBytes: 24 * GiB, noSwap: false, available: true, code }, maxSteps: 10, signal: new AbortController().signal, emit: vi.fn(), log: vi.fn(), save: async () => {} });
   expect(code).toHaveBeenCalledWith("Write greet", "TypeScript", expect.any(AbortSignal));
   expect(execute).toHaveBeenCalledOnce();
   expect(execute.mock.calls[0]?.[0].function.name).toBe("write_file");
@@ -45,27 +45,27 @@ it("restores Lite even if Max fails", async () => {
 });
 it("continues delegating beyond five calls and still requires delegation for later writes", async () => {
   const code = vi.fn(async () => "code"); const report = vi.fn();
-  const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: false, available: true, code }, report);
+  const delegate = createDelegate({ totalBytes: 24 * GiB, noSwap: false, available: true, code }, report);
   for (let i = 0; i < 7; i++) { await delegate(request, new AbortController().signal); }
   expect(code).toHaveBeenCalledTimes(7);
   expect(report.mock.calls.flat().join(" ")).toContain("Code specialist call 7.");
   delegate.applied();
   expect(delegate.requiresDelegation({ ...request, function: { name: "write_file", arguments: "{}" } })).toBe(true);
 });
-it.each([8, 15.9])("falls back below 16 GB (%s GB)", async (amount) => {
+it.each([8, 16, 21.9])("falls back below 22 GiB (%s GB)", async (amount) => {
   const code = vi.fn(async () => "code"); const delegate = createDelegate({ totalBytes: amount * GiB, noSwap: false, available: true, code }, vi.fn());
-  expect(await delegate(request, new AbortController().signal)).toBe("Code specialist needs 16 GB RAM. Writing the code here instead.");
+  expect(await delegate(request, new AbortController().signal)).toBe("Code specialist needs a computer with 24 GB of memory. Writing the code here instead.");
   expect(code).not.toHaveBeenCalled();
 });
 it("no-swap refuses delegation and lets Lite write", async () => {
-  const code = vi.fn(async () => "code"); const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: true, available: true, code }, vi.fn());
+  const code = vi.fn(async () => "code"); const delegate = createDelegate({ totalBytes: 24 * GiB, noSwap: true, available: true, code }, vi.fn());
   expect(await delegate(request, new AbortController().signal)).toContain("--no-swap");
   expect(code).not.toHaveBeenCalled();
   expect(delegate.requiresDelegation({ ...request, function: { name: "write_file", arguments: "{}" } })).toBe(false);
 });
 
 it("requires delegation before a new file and a larger or function edit", async () => {
-  const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: false, available: true, code: async () => "code" }, vi.fn());
+  const delegate = createDelegate({ totalBytes: 24 * GiB, noSwap: false, available: true, code: async () => "code" }, vi.fn());
   const file: Call = { ...request, function: { name: "write_file", arguments: '{"path":"new.ts","content":"x"}' } };
   expect(delegate.requiresDelegation(file)).toBe(true);
   expect(delegate.requiresDelegation({ ...request, function: { name: "edit_file", arguments: JSON.stringify({ old: "x", new: "function newFunction() {}" }) } })).toBe(true);
@@ -86,7 +86,7 @@ it("does not reload Lite after a cancelled delegation", async () => {
 
 it("lets Lite continue a task when Max fails to load instead of forcing repeated failed delegations", async () => {
   const code = vi.fn(async () => { throw new Error("model failed to load"); });
-  const delegate = createDelegate({ totalBytes: 16 * GiB, noSwap: false, available: true, code }, vi.fn());
+  const delegate = createDelegate({ totalBytes: 24 * GiB, noSwap: false, available: true, code }, vi.fn());
   const write: Call = { ...request, function: { name: "write_file", arguments: "{}" } };
   expect(delegate.requiresDelegation(write)).toBe(true);
   expect(await delegate(request, new AbortController().signal)).toContain("write the remaining code here with Lite");

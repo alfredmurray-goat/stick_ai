@@ -1,4 +1,4 @@
-import { GiB } from "../config/models.js";
+import { maxMinimumBytes } from "../config/models.js";
 import { errorText } from "../model/types.js";
 import type { Call } from "../model/types.js";
 
@@ -17,7 +17,7 @@ export function createDelegate(specialist: Specialist, report: (text: string) =>
   let used = 0; let approvedCode = false; let unavailable = false;
   const delegate = async (call: Call, signal: AbortSignal): Promise<string> => {
     signal.throwIfAborted();
-    if (specialist.totalBytes < 16 * GiB) { return "Code specialist needs 16 GB RAM. Writing the code here instead."; }
+    if (specialist.totalBytes < maxMinimumBytes) { return "Code specialist needs a computer with 24 GB of memory. Writing the code here instead."; }
     if (specialist.noSwap) { return "Code specialist is disabled by --no-swap. Write the code here instead."; }
     if (!specialist.available) { return "Code specialist is not available in this session. Write the code here instead."; }
     if (unavailable) { return "Max failed in this task. Write the remaining code here with Lite."; }
@@ -39,7 +39,7 @@ export function createDelegate(specialist: Specialist, report: (text: string) =>
   };
   return Object.assign(delegate, {
     requiresDelegation(call: Call): boolean {
-      if (!specialist.available || specialist.noSwap || specialist.totalBytes < 16 * GiB || unavailable || approvedCode) { return false; }
+      if (!specialist.available || specialist.noSwap || specialist.totalBytes < maxMinimumBytes || unavailable || approvedCode) { return false; }
       if (call.function.name === "write_file") { return true; }
       if (call.function.name !== "edit_file") { return false; }
       const args = JSON.parse(call.function.arguments) as { old?: string; new?: string };
