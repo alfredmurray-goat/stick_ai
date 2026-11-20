@@ -33,7 +33,7 @@ it("runs command hooks with the event on standard input, filters by tool, saves 
   const root = await mkdtemp(join(tmpdir(), "stick-hooks-"));
   try {
     const guard = join(root, "guard.mjs"), slow = join(root, "slow.mjs");
-    await writeFile(guard, String.raw`let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s);if(e.tool_input&&e.tool_input.path==='.env'){console.error('Keep .env private');process.exit(2)}console.log('Seen '+e.hook_event_name+' in '+e.cwd.split(/[\/]/).pop()+' via '+process.env.STICK_HOOK_EVENT)})`);
+    await writeFile(guard, String.raw`let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s);if(e.tool_input&&e.tool_input.path==='.env'){console.error('Keep .env private');process.exit(2)}console.log('Seen '+e.hook_event_name+' in '+e.cwd.split(String.fromCharCode(92)).join('/').split('/').pop()+' via '+process.env.STICK_HOOK_EVENT)})`);
     await writeFile(slow, "setTimeout(()=>{},10000)");
     const hooks = new Hooks(root, root);
     await hooks.add({ name: "Guard", event: "PreToolUse", matcher: "read_file|edit_file", type: "command", command: node(guard) });
