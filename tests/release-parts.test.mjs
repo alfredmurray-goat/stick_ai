@@ -24,7 +24,11 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     };
     await writeFile(join(output, record.parts[0].name), "tampered"); await expect(run()).rejects.toThrow();
     await expect(readFile(join(output, record.name))).rejects.toThrow();
-    await writeFile(join(output, record.parts[0].name), combined.subarray(0, record.parts[0].size));
+    // Windows (and its virus scanner) can still hold the part the failed join just read for a moment after it exits.
+    for (let attempt = 0; ; attempt++) {
+      try { await writeFile(join(output, record.parts[0].name), combined.subarray(0, record.parts[0].size)); break; }
+      catch (error) { if (attempt >= 50 || !["EBUSY", "EPERM"].includes(error.code)) throw error; await new Promise((resolve) => setTimeout(resolve, 100)); }
+    }
     await run(); expect(await readFile(join(output, record.name))).toEqual(content);
   } finally { await rm(root, cleanup); }
 }, 30000);

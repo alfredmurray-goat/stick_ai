@@ -36,6 +36,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch.
 - **Web search, built in.** Lite can look things up on the live web with [Actuent](https://actuent.ai): docs, versions, error messages, prices, events and news. It's free, needs no account, and every search shows you the exact words before anything goes online. Turn it off in Settings → MCP.
 - **MCP servers and skills.** Connect local or remote MCP tool servers and reusable SKILL.md workflows. Every MCP call asks first.
+- **Hooks.** Like Claude Code's hooks: run your own command, or notify another app on your computer, when you send a message, before or after Stellan uses a tool, when it needs your approval, or when it finishes. A hook can stop a message or tool call, or add notes for Stellan, but it can never approve anything for you. See [HOOKS.md](docs/HOOKS.md).
 - **Signed app updates.** The app checks for signed updates and installs them without re-downloading your models.
 
 <table>
@@ -292,7 +293,7 @@ npm run licenses
 
 CI runs type checks and the test suite on Ubuntu, macOS and Windows. The [Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml) workflow builds all four platforms and runs a real Lite tool exchange on each before anything is published. Source lives in `src/cli`, `src/agent`, `src/tools`, `src/model`, `src/config`, `src/sandbox` and `src/portable`, with the desktop shell in `src-tauri` and the workspace UI in `portable/ui`.
 
-More detail: [DESKTOP.md](docs/DESKTOP.md) (desktop app), [BUILDS.md](docs/BUILDS.md) (packages and releases), [PORTABLE.md](docs/PORTABLE.md) (USB browser launcher), [UPDATES.md](docs/UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](docs/GITHUB_WORKSPACES.md), [MCP_SKILLS.md](docs/MCP_SKILLS.md) and [VERIFICATION.md](docs/VERIFICATION.md) (what has and hasn't been verified).
+More detail: [DESKTOP.md](docs/DESKTOP.md) (desktop app), [BUILDS.md](docs/BUILDS.md) (packages and releases), [PORTABLE.md](docs/PORTABLE.md) (USB browser launcher), [UPDATES.md](docs/UPDATES.md) (signed updates), [GITHUB_WORKSPACES.md](docs/GITHUB_WORKSPACES.md), [MCP_SKILLS.md](docs/MCP_SKILLS.md), [HOOKS.md](docs/HOOKS.md) and [VERIFICATION.md](docs/VERIFICATION.md) (what has and hasn't been verified).
 
 ## Contributing
 
