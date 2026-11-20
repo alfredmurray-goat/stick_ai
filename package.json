@@ -1,4 +1,7 @@
 {
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "vercel-build": "echo 'Static site in public/: nothing to build'"
+  }
 }
