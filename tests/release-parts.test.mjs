@@ -17,8 +17,9 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     const combined = Buffer.concat(await Promise.all(record.parts.map((part) => readFile(join(output, part.name))))); expect(combined).toEqual(content);
     const platform = process.platform === "win32" ? "windows-x64" : "linux-x64";
     const helper = await joinHelper(record, output, platform); const execute = promisify(execFile);
+    // Each join starts PowerShell and hashes every part; a busy Windows build runner has needed over 10 s for one.
     const run = async () => {
-      const result = process.platform === "win32" ? execute(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `\"\"${join(output, helper)}\"\"`], { windowsVerbatimArguments: true, timeout: 10000 }) : execute(join(output, helper), [], { timeout: 10000 });
+      const result = process.platform === "win32" ? execute(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `\"\"${join(output, helper)}\"\"`], { windowsVerbatimArguments: true, timeout: 45000 }) : execute(join(output, helper), [], { timeout: 45000 });
       if (process.platform === "win32") { result.child.stdin.end("\r\n"); }
       return result.catch(error => { console.error("Join diagnostic", error.stdout, error.stderr); throw error; });
     };
@@ -31,7 +32,7 @@ it("splits a release below the per-file limit and rejoins it after checking ever
     }
     await run(); expect(await readFile(join(output, record.name))).toEqual(content);
   } finally { await rm(root, cleanup); }
-}, 30000);
+}, 120000);
 it("refuses oversized parts and unsafe release names", async () => {
   await expect(splitArchive("stick_ai-test.zip", "unused", 2 * 1024 ** 3)).rejects.toThrow("Invalid");
   await expect(splitArchive("untrusted$.zip", "unused", 100)).rejects.toThrow("Unsafe");
