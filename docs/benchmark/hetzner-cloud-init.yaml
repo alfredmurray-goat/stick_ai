@@ -1,0 +1,32 @@
+#cloud-config
+# Paste into Hetzner's "Cloud config" box when creating the server (see docs/BENCHMARKS.md).
+# Replace the two PASTE_… values. The server registers as a one-job GitHub runner, runs the
+# "Max benchmark" workflow, then DELETES ITSELF so it can't keep billing. Hard stop: 16 hours.
+package_update: true
+packages: [build-essential, cmake, git, curl, jq, python3]
+write_files:
+  - path: /root/stick-bench.sh
+    permissions: "0700"
+    content: |
+      #!/bin/bash
+      set -u
+      RUNNER_TOKEN="PASTE_GITHUB_RUNNER_TOKEN"
+      HCLOUD_TOKEN="PASTE_HETZNER_API_TOKEN"
+      # Whatever happens (finished, failed, timed out), delete this server afterwards.
+      delete_me() {
+        id=$(curl -s http://169.254.169.254/hetzner/v1/metadata/instance-id)
+        curl -s -X DELETE -H "Authorization: Bearer $HCLOUD_TOKEN" "https://api.hetzner.cloud/v1/servers/$id"
+      }
+      trap delete_me EXIT
+      useradd -m runner
+      cd /home/runner
+      version=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | jq -r .tag_name | tr -d v)
+      curl -sL -o runner.tgz "https://github.com/actions/runner/releases/download/v$version/actions-runner-linux-x64-$version.tar.gz"
+      tar xzf runner.tgz && rm runner.tgz && chown -R runner: /home/runner
+      ./bin/installdependencies.sh
+      sudo -u runner ./config.sh --unattended --ephemeral --url https://github.com/alfredmurray-goat/stick_ai \
+        --token "$RUNNER_TOKEN" --labels max-bench --name hetzner-max-bench
+      # One job, then the runner exits. 16 h covers waiting, the download, the build and the test.
+      sudo -u runner timeout 16h ./run.sh
+runcmd:
+  - [bash, /root/stick-bench.sh]
