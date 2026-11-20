@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { macInstaller, writeInstallers } from "../scripts/stick-installers.mjs";
@@ -39,7 +39,9 @@ it.skipIf(process.platform === "win32")("reads a stick path dragged into Termina
 it.skipIf(process.platform === "win32")("installs on the stick it was unzipped onto when you just press Return", async () => {
   const root = await mkdtemp(join(tmpdir(), "stick-installer-volume-"));
   try {
-    const volumes = join(root, "Volumes"), stick = join(volumes, "STICK_AI"), download = join(stick, "stick_ai-all-devices"), bin = join(root, "bin");
+    // Reach the folders through a symlink, as macOS does for its temp folder (/var -> /private/var).
+    const real = join(root, "real"), linked = join(root, "linked"); await mkdir(real); await symlink(real, linked);
+    const volumes = join(linked, "Volumes"), stick = join(volumes, "STICK_AI"), download = join(stick, "stick_ai-all-devices"), bin = join(root, "bin");
     await mkdir(join(download, "stick_ai/stellan/app"), { recursive: true }); await writeFile(join(download, "stick_ai/stellan/app/launcher.cjs"), "new app");
     await mkdir(join(stick, "stellan/models"), { recursive: true }); await writeFile(join(stick, "stellan/models/stellan-1-lite-q4_k_m.gguf"), "my lite");
     await writeInstallers(download);

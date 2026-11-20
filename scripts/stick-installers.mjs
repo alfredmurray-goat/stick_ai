@@ -19,8 +19,9 @@ export const macInstaller = `#!/bin/sh
 cd -P "$(dirname "$0")" || exit 1
 SRC="$PWD/stick_ai"
 [ -d "$SRC" ] || { echo "Keep this file next to the stick_ai folder from the download."; exit 1; }
-# STICK_VOLUMES only exists so tests can stand in for /Volumes.
-VOLUMES="\${STICK_VOLUMES:-/Volumes}"
+# STICK_VOLUMES only exists so tests can stand in for /Volumes. Resolve it like $PWD (cd -P), so
+# folders reached through a symlink (macOS /var -> /private/var) still match.
+VOLUMES=$(cd -P "\${STICK_VOLUMES:-/Volumes}" 2>/dev/null && pwd || echo /Volumes)
 # Unzipped straight onto the stick? Then that stick is the obvious target.
 HERE=""
 case "$PWD/" in "$VOLUMES"/*/*) HERE="$VOLUMES/$(printf '%s' "\${PWD#"$VOLUMES"/}" | cut -d/ -f1)";; esac
