@@ -112,11 +112,32 @@
       <p class="kicker">// benchmarks</p>
       <h2 id="bench-title">Better than GPT-4 and Claude 2 at coding. <em>On your laptop.</em></h2>
       <p class="lede narrow">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. With 7.3 billion parameters, it's about 99.6% smaller than GPT-4's estimated 1.8 trillion.</p>
-      <div class="bars" role="table" aria-label="HumanEval pass@1 scores">
-        <div class="row us" role="row"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="blocks" aria-hidden="true">█████████████████████████████░░░░░░░░░░░</span><span role="cell" class="score">73.2</span><span role="cell" class="note">7.3B params · your laptop</span></div>
-        <div class="row" role="row"><span role="cell" class="name">claude 2</span><span role="cell" class="blocks" aria-hidden="true">████████████████████████████░░░░░░░░░░░░</span><span role="cell" class="score">71.2</span><span role="cell" class="note">Anthropic's best, Jul–Nov 2023 · size unpublished</span></div>
-        <div class="row" role="row"><span role="cell" class="name">gpt-4</span><span role="cell" class="blocks" aria-hidden="true">███████████████████████████░░░░░░░░░░░░░</span><span role="cell" class="score">67.0</span><span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (est.)</span></div>
-        <div class="row" role="row"><span role="cell" class="name">gpt-3.5</span><span role="cell" class="blocks" aria-hidden="true">███████████████████░░░░░░░░░░░░░░░░░░░░░</span><span role="cell" class="score">48.1</span><span role="cell" class="note">OpenAI, 2022</span></div>
+      <div class="chart" role="table" aria-label="HumanEval pass@1 scores, higher is better">
+        <div class="axis" aria-hidden="true"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+        <div class="col s481" role="row">
+          <span class="plot" aria-hidden="true"><span class="val">48.1</span><span class="bar"></span></span>
+          <span role="cell" class="name">gpt-3.5</span>
+          <span role="cell" class="score">48.1%</span>
+          <span role="cell" class="note">OpenAI, 2022</span>
+        </div>
+        <div class="col s670" role="row">
+          <span class="plot" aria-hidden="true"><span class="val">67.0</span><span class="bar"></span></span>
+          <span role="cell" class="name">gpt-4</span>
+          <span role="cell" class="score">67.0%</span>
+          <span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (est.)</span>
+        </div>
+        <div class="col s712" role="row">
+          <span class="plot" aria-hidden="true"><span class="val">71.2</span><span class="bar"></span></span>
+          <span role="cell" class="name">claude 2</span>
+          <span role="cell" class="score">71.2%</span>
+          <span role="cell" class="note">Anthropic's best, Jul–Nov 2023 · size unpublished</span>
+        </div>
+        <div class="col us s732" role="row">
+          <span class="plot" aria-hidden="true"><span class="val">73.2</span><span class="bar"></span></span>
+          <span role="cell" class="name">stellan-1 lite</span>
+          <span role="cell" class="score">73.2%</span>
+          <span role="cell" class="note">7.3B params · your laptop</span>
+        </div>
       </div>
       <div class="numbers">
         <div><b>99.6%</b><span>smaller than GPT-4 by its estimated size, and it scores higher</span></div>

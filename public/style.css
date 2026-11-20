@@ -158,16 +158,6 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 
 /* Benchmarks */
 .bench h2 { max-width: 15em; }
-.bars { margin-top: 44px; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); padding: 10px 0; overflow-x: auto; }
-.bars .row { display: grid; grid-template-columns: 150px auto 64px 1fr; gap: 18px; align-items: center; padding: 12px 24px; font: 400 14px var(--mono); min-width: 760px; }
-.bars .row + .row { border-top: 1px dashed var(--line-soft); }
-.bars .name { color: var(--muted); }
-.bars .blocks { color: var(--faint); letter-spacing: -.5px; opacity: .8; }
-.bars .score { font-weight: 700; text-align: right; }
-.bars .note { color: var(--faint); font-size: 12.5px; }
-.bars .us .name, .bars .us .score { color: var(--text); }
-.bars .us .blocks { color: var(--violet-hi); opacity: 1; text-shadow: 0 0 14px color-mix(in srgb, var(--violet) 60%, transparent); }
-.bars .us .score { color: var(--amber); }
 .numbers { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 28px; border-top: 1px solid var(--line); }
 .numbers div { padding: 22px 24px 0 0; display: grid; gap: 6px; color: var(--muted); font-size: .98rem; }
 .numbers div + div { padding-left: 24px; border-left: 1px solid var(--line); }
@@ -276,7 +266,6 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 @keyframes fade { from { opacity: 0; } }
 @keyframes float { 50% { transform: translateY(-10px) rotate(-2deg); } }
 @keyframes breathe { 50% { opacity: .9; transform: scale(1.08); } }
-@keyframes fill { from { clip-path: inset(0 100% 0 0); } }
 @keyframes type { from { opacity: 0; } }
 @keyframes ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
 
@@ -300,9 +289,9 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .btn:not(.ghost)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%); transform: translateX(-120%); transition: transform .6s ease; pointer-events: none; }
 .btn:not(.ghost):hover::after { transform: translateX(120%); }
 
-/* Scroll: sections rise in as they come into view; the demo types itself out; the bars fill. */
+/* Scroll: sections rise in as they come into view and the demo types itself out. */
 @supports (animation-timeline: view()) {
-  section > .kicker, section > h2, .feature-grid article, .numbers > div, .label, .tree-wrap, .tag, .stamps, .faq details, .bars, .fine, .session-copy .steps li {
+  section > .kicker, section > h2, .feature-grid article, .numbers > div, .label, .tree-wrap, .tag, .stamps, .faq details, .fine, .session-copy .steps li {
     animation: rise linear both; animation-timeline: view(); animation-range: entry 0% cover 22%;
   }
   .feature-grid article:nth-child(2), .numbers > div:nth-child(2), .steps li:nth-child(2) { animation-range: entry 8% cover 26%; }
@@ -321,6 +310,40 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .term .ln:nth-of-type(9) { animation-range: cover 23.8% cover 26.0%; }
   .term .ln:nth-of-type(10) { animation-range: cover 26.0% cover 28.2%; }
   .term .ln:nth-of-type(11) { animation-range: cover 28.2% cover 30.4%; }
-  .bars .blocks { animation: fill linear both; animation-timeline: view(); animation-range: entry 30% cover 40%; }
-  .bars .score { animation: fade linear both; animation-timeline: view(); animation-range: entry 60% cover 42%; }
+}
+
+/* Benchmarks: a column chart, shortest to tallest, on a 0–100 scale. */
+.chart { --h: 300px; position: relative; display: grid; grid-template-columns: 44px repeat(4, 1fr); gap: 0 18px; align-items: start; margin-top: 44px; padding: 28px 24px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); }
+.chart .axis { grid-row: 1; grid-column: 1; height: var(--h); display: flex; flex-direction: column; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); text-align: right; }
+.chart .axis span { line-height: 0; }
+/* Faint gridlines at 0, 25, 50, 75 and 100 behind the bars. */
+.chart::before { content: ""; position: absolute; left: 86px; right: 24px; top: 28px; height: var(--h); background: repeating-linear-gradient(to top, var(--line-soft) 0 1px, transparent 1px calc(var(--h) / 4)); border-top: 1px solid var(--line-soft); pointer-events: none; }
+.col { display: grid; grid-template-rows: var(--h) auto auto auto; text-align: center; min-width: 0; position: relative; }
+.col .plot { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: var(--h); }
+.col .bar { width: min(72px, 70%); height: calc(var(--h) * var(--score) / 100); border-radius: 8px 8px 2px 2px; background: linear-gradient(to top, #3a3450, #6f6889); transform-origin: bottom; }
+.col .val { font: 700 15px var(--mono); color: var(--muted); margin-bottom: 8px; }
+.col .name { margin-top: 14px; font: 400 13.5px var(--mono); color: var(--muted); }
+.col .score { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.col .note { margin-top: 4px; font: 400 11.5px/1.45 var(--mono); color: var(--faint); }
+.col.us .bar { background: linear-gradient(to top, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 34px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
+.col.us .val { color: var(--amber); font-size: 18px; }
+.col.us .name { color: var(--text); font-weight: 700; }
+.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; }
+@media (max-width: 620px) {
+  .chart { --h: 220px; grid-template-columns: 30px repeat(4, 1fr); gap: 0 8px; padding: 22px 12px 18px; }
+  .chart::before { left: 50px; right: 12px; top: 22px; }
+  .col .bar { width: 78%; }
+  .col .name { font-size: 11.5px; }
+  .col .note { display: none; }
+}
+@keyframes grow { from { transform: scaleY(0); } }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.8); } }
+@supports (animation-timeline: view()) {
+  .col .bar { animation: grow cubic-bezier(.2, .8, .2, 1) both; animation-timeline: --chart; }
+  .col .val { animation: pop ease-out both; animation-timeline: --chart; }
+  .chart { view-timeline: --chart block; }
+  .col:nth-of-type(2) .bar { animation-range: entry 40% cover 38%; } .col:nth-of-type(2) .val { animation-range: cover 34% cover 40%; }
+  .col:nth-of-type(3) .bar { animation-range: entry 55% cover 42%; } .col:nth-of-type(3) .val { animation-range: cover 38% cover 44%; }
+  .col:nth-of-type(4) .bar { animation-range: entry 70% cover 46%; } .col:nth-of-type(4) .val { animation-range: cover 42% cover 48%; }
+  .col:nth-of-type(5) .bar { animation-range: entry 85% cover 52%; } .col:nth-of-type(5) .val { animation-range: cover 48% cover 55%; }
 }
