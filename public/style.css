@@ -312,38 +312,37 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .term .ln:nth-of-type(11) { animation-range: cover 28.2% cover 30.4%; }
 }
 
-/* Benchmarks: a column chart, shortest to tallest, on a 0–100 scale. */
-.chart { --h: 300px; position: relative; display: grid; grid-template-columns: 44px repeat(4, 1fr); gap: 0 18px; align-items: start; margin-top: 44px; padding: 28px 24px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); }
-.chart .axis { grid-row: 1; grid-column: 1; height: var(--h); display: flex; flex-direction: column; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); text-align: right; }
-.chart .axis span { line-height: 0; }
-/* Faint gridlines at 0, 25, 50, 75 and 100 behind the bars. */
-.chart::before { content: ""; position: absolute; left: 86px; right: 24px; top: 28px; height: var(--h); background: repeating-linear-gradient(to top, var(--line-soft) 0 1px, transparent 1px calc(var(--h) / 4)); border-top: 1px solid var(--line-soft); pointer-events: none; }
-.col { display: grid; grid-template-rows: var(--h) auto auto auto; text-align: center; min-width: 0; position: relative; }
-.col .plot { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: var(--h); }
-.col .bar { width: min(72px, 70%); height: calc(var(--h) * var(--score) / 100); border-radius: 8px 8px 2px 2px; background: linear-gradient(to top, #3a3450, #6f6889); transform-origin: bottom; }
-.col .val { font: 700 15px var(--mono); color: var(--muted); margin-bottom: 8px; }
-.col .name { margin-top: 14px; font: 400 13.5px var(--mono); color: var(--muted); }
-.col .score { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.col .note { margin-top: 4px; font: 400 11.5px/1.45 var(--mono); color: var(--faint); }
-.col.us .bar { background: linear-gradient(to top, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 34px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
-.col.us .val { color: var(--amber); font-size: 18px; }
-.col.us .name { color: var(--text); font-weight: 700; }
+/* Benchmarks: bars on a 0–100 scale that grow from left to right, Stellan finishing last. */
+.chart { --label: 230px; margin-top: 44px; padding: 26px 28px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); display: grid; gap: 16px; }
+.chart .row { display: grid; grid-template-columns: var(--label) 1fr; gap: 20px; align-items: center; }
+.label-cell { display: grid; gap: 2px; min-width: 0; }
+.chart .name { font: 400 14px var(--mono); color: var(--muted); }
+.chart .note { font: 400 11.5px/1.4 var(--mono); color: var(--faint); }
+.chart .score { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+/* The track carries faint gridlines at 25, 50 and 75. */
+.track { position: relative; height: 34px; border-radius: 8px; background: linear-gradient(90deg, transparent calc(25% - 1px), var(--line-soft) calc(25% - 1px) 25%, transparent 25% calc(50% - 1px), var(--line-soft) calc(50% - 1px) 50%, transparent 50% calc(75% - 1px), var(--line-soft) calc(75% - 1px) 75%, transparent 75%), color-mix(in srgb, var(--ink) 60%, transparent); }
+.chart .bar { position: absolute; inset: 0 auto 0 0; width: calc(var(--score) * 1%); display: flex; align-items: center; justify-content: flex-end; border-radius: 8px; background: linear-gradient(90deg, #3a3450, #6f6889); transform-origin: left; }
+.chart .val { padding-right: 12px; font: 700 14px var(--mono); color: #fff; }
+.chart .us .name { color: var(--text); font-weight: 700; }
+.chart .us .bar { background: linear-gradient(90deg, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 30px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
+.chart .us .val { color: var(--amber); font-size: 16px; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
+.chart .axis { margin-left: calc(var(--label) + 20px); display: flex; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); }
 .s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; }
 @media (max-width: 620px) {
-  .chart { --h: 220px; grid-template-columns: 30px repeat(4, 1fr); gap: 0 8px; padding: 22px 12px 18px; }
-  .chart::before { left: 50px; right: 12px; top: 22px; }
-  .col .bar { width: 78%; }
-  .col .name { font-size: 11.5px; }
-  .col .note { display: none; }
+  .chart { --label: 0px; padding: 20px 14px 16px; gap: 12px; }
+  .chart .row { grid-template-columns: 1fr; gap: 6px; }
+  .chart .note { display: none; }
+  .chart .axis { margin-left: 0; }
 }
-@keyframes grow { from { transform: scaleY(0); } }
-@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.8); } }
+@keyframes grow { from { transform: scaleX(0); } }
+@keyframes pop { from { opacity: 0; } }
 @supports (animation-timeline: view()) {
-  .col .bar { animation: grow cubic-bezier(.2, .8, .2, 1) both; animation-timeline: --chart; }
-  .col .val { animation: pop ease-out both; animation-timeline: --chart; }
   .chart { view-timeline: --chart block; }
-  .col:nth-of-type(2) .bar { animation-range: entry 40% cover 38%; } .col:nth-of-type(2) .val { animation-range: cover 34% cover 40%; }
-  .col:nth-of-type(3) .bar { animation-range: entry 55% cover 42%; } .col:nth-of-type(3) .val { animation-range: cover 38% cover 44%; }
-  .col:nth-of-type(4) .bar { animation-range: entry 70% cover 46%; } .col:nth-of-type(4) .val { animation-range: cover 42% cover 48%; }
-  .col:nth-of-type(5) .bar { animation-range: entry 85% cover 52%; } .col:nth-of-type(5) .val { animation-range: cover 48% cover 55%; }
+  .chart .bar { animation: grow cubic-bezier(.2, .8, .2, 1) both; animation-timeline: --chart; }
+  .chart .val { animation: pop ease-out both; animation-timeline: --chart; }
+  /* Lowest score first, Stellan last. */
+  .chart .s481 .bar { animation-range: entry 30% cover 32%; } .chart .s481 .val { animation-range: cover 28% cover 34%; }
+  .chart .s670 .bar { animation-range: entry 45% cover 36%; } .chart .s670 .val { animation-range: cover 32% cover 38%; }
+  .chart .s712 .bar { animation-range: entry 60% cover 40%; } .chart .s712 .val { animation-range: cover 36% cover 42%; }
+  .chart .s732 .bar { animation-range: entry 75% cover 46%; } .chart .s732 .val { animation-range: cover 42% cover 48%; }
 }
