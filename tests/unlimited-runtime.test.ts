@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
 vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn(async () => {}),
+  writeFile: vi.fn(async () => {}), mkdir: vi.fn(async () => undefined), rm: vi.fn(async () => {}),
   readFile: vi.fn(async () => { throw Object.assign(new Error("absent"), { code: "ENOENT" }); })
 }));
 vi.mock("../src/portable/local-models.js", () => ({ resolveLocalModel: vi.fn(async (_root: string, kind: string) => ({ path: `/external/${kind === "max" ? "Max" : "Lite"}.gguf`, name: `${kind === "max" ? "Max" : "Lite"}.gguf`, source: "linked" })) }));

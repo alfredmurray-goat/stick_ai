@@ -3,7 +3,7 @@ import { writeSync } from "node:fs";
 import { type ServerStatus } from "./progress.js";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { totalmem } from "node:os";
@@ -18,14 +18,25 @@ import { executableName, UserError, type Target } from "./platform.js";
 export interface Switchable {
   stop(): Promise<void>;
   start(model: ModelName, signal: AbortSignal): Promise<void>;
+  /** Saves Lite's prompt cache before the swap; false if it couldn't. */
+  saveLiteCache?(): Promise<boolean>;
+  /** Loads it back after Lite restarts so the conversation isn't read again. */
+  restoreLiteCache?(): Promise<boolean>;
 }
+// Only one model fits in memory, so Max replaces Lite while it writes code. Restarting Lite used to lose its
+// prompt cache and make it re-read the whole conversation (2,020 tokens took 81 s on 4 CPU cores). Saving
+// Lite's slot first and restoring it afterwards left 48 tokens to read (3 s); save and restore took ~0.25 s each.
 export async function codeWithSwap(engine: Switchable, code: () => Promise<string>, signal: AbortSignal, report: (text: string) => void): Promise<string> {
   report("Switching to the coding model...");
+  const saved = await engine.saveLiteCache?.().catch(() => false) ?? false;
   await engine.stop();
   try { await engine.start("stellan-1-max", signal); return await code(); }
   finally {
     await engine.stop();
-    if (!signal.aborted) { await engine.start("stellan-1-lite", signal); }
+    if (!signal.aborted) {
+      await engine.start("stellan-1-lite", signal);
+      if (saved) { await engine.restoreLiteCache?.().catch(() => false); }
+    }
   }
 }
 // Lite keeps its prompt cache so each agent step only processes the new tokens.
@@ -106,6 +117,8 @@ export class ManagedEngine implements Switchable {
     if (!selected) { throw new UserError("nomodel"); }
     const reservation = await reservePort(this.port, this.port); await reservation.release();
     const keyFile = join(this.temp, "server-key"); await writeFile(keyFile, this.key, { mode: 0o600 });
+    // Lite's slot is saved here (the computer's temp folder, not the stick) while Max runs; see codeWithSwap.
+    const slots = join(this.temp, "slots"); if (model === "stellan-1-lite") { await mkdir(slots, { recursive: true, mode: 0o700 }); }
     const env = cleanEnvironment(this.temp, process.platform);
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
@@ -114,7 +127,7 @@ export class ManagedEngine implements Switchable {
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", selected.path, "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
-      "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model), ...templateArgs
+      "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model), ...templateArgs, ...(model === "stellan-1-lite" ? ["--slot-save-path", slots] : [])
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
     this.onProcess?.(child.pid ?? null);
@@ -150,6 +163,19 @@ export class ManagedEngine implements Switchable {
       await Promise.race([closed, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Model process did not stop")), 5000).unref())]);
     }
     this.child = null; this.active = null; this.onProcess?.(null);
+  }
+  private async slotAction(action: "save" | "restore"): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/slots/0?action=${action}`, { method: "POST", redirect: "error", headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ filename: "lite-cache.bin" }), signal: AbortSignal.timeout(120000) });
+      await response.body?.cancel(); return response.ok;
+    } catch (error) { this.log(error); return false; }
+  }
+  async saveLiteCache(): Promise<boolean> { return this.active === "stellan-1-lite" && this.child ? this.slotAction("save") : false; }
+  async restoreLiteCache(): Promise<boolean> {
+    const restored = this.active === "stellan-1-lite" && this.child ? await this.slotAction("restore") : false;
+    // The file is about half a gigabyte; it's only needed for this one swap.
+    await rm(join(this.temp, "slots", "lite-cache.bin"), { force: true }).catch(() => undefined);
+    return restored;
   }
   async status(): Promise<ServerStatus | undefined> {
     if (!this.child) { return undefined; }

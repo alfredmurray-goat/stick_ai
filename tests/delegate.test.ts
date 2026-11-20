@@ -37,6 +37,24 @@ it("stops Lite, starts Max, stops Max and restarts Lite without changing history
   expect(result).toBe("code"); expect(history).toEqual(original);
   expect(engine.start.mock.calls.every((args) => args[0])).toBe(true);
 });
+it("saves Lite's prompt cache before Max and restores it after Lite restarts", async () => {
+  const sequence: string[] = [];
+  const engine = { stop: async () => { sequence.push("stop"); }, start: async (model: string) => { sequence.push(model); }, saveLiteCache: async () => { sequence.push("save"); return true; }, restoreLiteCache: async () => { sequence.push("restore"); return true; } };
+  expect(await codeWithSwap(engine, async () => { sequence.push("code"); return "code"; }, new AbortController().signal, vi.fn())).toBe("code");
+  expect(sequence).toEqual(["save", "stop", "stellan-1-max", "code", "stop", "stellan-1-lite", "restore"]);
+});
+it("still swaps when the cache can't be saved, and skips the restore", async () => {
+  const restore = vi.fn(async () => true); const sequence: string[] = [];
+  const engine = { stop: async () => { sequence.push("stop"); }, start: async (model: string) => { sequence.push(model); }, saveLiteCache: async (): Promise<boolean> => { throw new Error("disk full"); }, restoreLiteCache: restore };
+  expect(await codeWithSwap(engine, async () => "code", new AbortController().signal, vi.fn())).toBe("code");
+  expect(sequence).toEqual(["stop", "stellan-1-max", "stop", "stellan-1-lite"]); expect(restore).not.toHaveBeenCalled();
+});
+it("doesn't restore Lite's cache after a cancelled delegation", async () => {
+  const controller = new AbortController(); const restore = vi.fn(async () => true);
+  const engine = { stop: vi.fn(async () => {}), start: vi.fn(async (_model: string) => {}), saveLiteCache: async () => true, restoreLiteCache: restore };
+  await expect(codeWithSwap(engine, async () => { controller.abort(new Error("Cancelled")); throw new Error("Cancelled"); }, controller.signal, vi.fn())).rejects.toThrow("Cancelled");
+  expect(restore).not.toHaveBeenCalled();
+});
 it("restores Lite even if Max fails", async () => {
   const sequence: string[] = [];
   const engine = { stop: async () => { sequence.push("stop"); }, start: async (model: string) => { sequence.push(model); } };

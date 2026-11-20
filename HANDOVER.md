@@ -25,7 +25,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 ## Known issues
 
 - **Metal hasn't been checked on a real Apple Silicon Mac.** CI builds the Metal server, but GitHub's Macs are virtual machines whose paravirtual GPU was so slow that the Lite smoke test timed out, so virtual Macs now stay on the CPU and CI can't exercise Metal. Speed and memory on real M-series Macs (especially 8 GB) still need checking.
-- **The Lite → Max handoff is slow.** Paired mode unloads Lite, loads Max, then reloads Lite, which loses Lite's prompt cache, so the conversation is read again from the start. llama.cpp's slot save/restore doesn't keep context checkpoints for Mamba2, so it won't fix this as is.
+- **The Lite → Max handoff reloads both models.** Only one fits in memory, so Max replaces Lite while it writes code (loading each takes time on a USB stick). Lite's prompt cache is now saved to the computer's temp folder before the swap (`/slots/0?action=save`, `--slot-save-path`) and restored afterwards, so Lite doesn't re-read the conversation: measured 48 tokens and 3 s instead of 2,020 tokens and 81 s, with save/restore ~0.25 s each and a ~0.55 GB file deleted after restore. If saving fails, the swap works as before.
 - **Max can't share memory with Lite.** Only one model runs at a time by design; Max can be chosen from 16 GB (15 GiB reported) with a slowness warning and is only used automatically from 24 GB (22 GiB reported), and Macs below 24 GiB keep it on the CPU because macOS caps GPU memory at about two thirds of RAM.
 - **Max is very slow in 16 GB, so the app warns before using it there and only pairs it with Lite from 24 GB.** Retested on 2026-11-20: no answer to a one-line prompt after 20+ minutes, 272 GB re-read from disk. On a 16 GB Linux machine (4 cores), Max loaded and read prompts at ~7 tokens/s, but generating kept re-reading the 14.3 GB GGUF from disk (~240 MB/s of reads): the weights plus everything else don't fit in RAM, so pages are evicted every token. Max is only practical with more than 16 GB, or on Apple Silicon with Metal. Measure before promising Max on 16 GB machines.
 - **Slow prompts and Node's fetch.** Node's fetch drops a response that's silent for 300 s. The app now asks the bundled server for `return_progress`, so long prompts stream progress chunks instead of going silent.
@@ -41,7 +41,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 1. Confirm the #27 release published every asset, then download the Linux model-free archive and run a real task with a linked Lite.
 2. Measure Max on HumanEval and run the agentic tasks on a machine with more than 16 GB of memory, then add them to the README (Lite's full HumanEval result is already there).
 3. Run Lite on a real Apple Silicon Mac (8 GB and 16 GB) and record tokens per second with Metal and with `STICK_GPU=0`.
-4. Speed up the Lite → Max handoff, for example by keeping Lite loaded when RAM allows, or by skipping the Lite reload until it's needed.
+4. Keep Lite and Max both loaded on computers with 32 GB or more, so the handoff skips the reloads entirely.
 6. Sign and notarise the Mac builds, and sign the Windows build.
 
 ## Useful facts

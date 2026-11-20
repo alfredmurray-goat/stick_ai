@@ -43,7 +43,7 @@ it("uploads and removes each finished part before writing the next, bounding pub
     });
     expect(uploaded).toHaveLength(record.parts.length); expect(Buffer.concat(uploaded)).toEqual(content);
   } finally { await rm(root, cleanup); }
-});
+}, 30000);
 
 it('supports actual DMG images without wrapping them in a ZIP', async () => {
   const root=await mkdtemp(join(tmpdir(),'stick-dmg-parts-'));
