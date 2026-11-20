@@ -61,7 +61,7 @@ export const installNotes = `HOW TO PUT STICK AI ON A STICK
 1. Use a USB stick formatted as exFAT (32 GB or more) with your models in
    stellan/models:  ${lite}  and  ${max}
 2. Open the helper for this computer and follow it:
-     Mac      Install on stick (Mac).command   (right-click > Open the first time)
+     Mac      Install on stick (Mac).command   (first time: System Settings > Privacy & Security > Open Anyway)
      Windows  Install on stick (Windows).bat
      Linux    sh install-on-stick.sh /path/to/stick
 3. It copies the apps and the stellan folder onto the stick. It never deletes

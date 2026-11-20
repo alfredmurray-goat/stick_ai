@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>stick_ai — box card</title>
+<!-- Printable A6 card (105 × 148 mm) for the box: front = getting started, back = if your computer warns you.
+     Open in a browser and print at 100% scale, double-sided, flipping on the long edge. -->
+<style>
+  @font-face { font-family: "Space Grotesk"; src: url("space-grotesk.woff2") format("woff2"); font-weight: 300 700; }
+  @font-face { font-family: "JetBrains Mono"; src: url("jetbrains-mono-400.woff2") format("woff2"); }
+  @page { size: 105mm 148mm; margin: 0; }
+  :root { --ink: #16121f; --muted: #5d566b; --violet: #6a3be0; --soft: #efe8ff; --cream: #fcf8f5; --line: #e4dcef; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #d9d4e2; color: var(--ink); font: 9.2pt/1.38 "Space Grotesk", system-ui, sans-serif; }
+  .card { width: 105mm; height: 148mm; margin: 8mm auto; padding: 9mm 8.5mm 7mm; background: var(--cream); position: relative; overflow: hidden; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
+  @media print { html, body { background: none; } .card { margin: 0; } }
+  .logo { height: 15mm; width: auto; display: block; margin: -2mm 0 4mm -2mm; }
+  h1 { font-size: 17pt; line-height: 1.05; margin: 0 0 2mm; letter-spacing: -.02em; }
+  h2 { font-size: 10.5pt; margin: 4.5mm 0 1.4mm; display: flex; align-items: center; gap: 2mm; }
+  p { margin: 0 0 2mm; }
+  .lede { color: var(--muted); margin-bottom: 4mm; }
+  ol { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  ol li { counter-increment: step; position: relative; padding-left: 7.5mm; margin-bottom: 2.6mm; }
+  ol li::before { content: counter(step); position: absolute; left: 0; top: -.2mm; width: 5mm; height: 5mm; border-radius: 50%; background: var(--violet); color: #fff; font-weight: 700; font-size: 8pt; display: grid; place-items: center; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 8pt; background: var(--soft); padding: .2mm 1.1mm; border-radius: 1mm; white-space: nowrap; }
+  .os { display: inline-block; font: 700 7pt "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--ink); padding: .5mm 1.6mm; border-radius: 1mm; }
+  .box { border: .35mm solid var(--line); border-radius: 2.2mm; padding: 2.6mm 3mm; background: #fff; margin-bottom: 2.4mm; }
+  .box p:last-child, .box ol:last-child { margin-bottom: 0; }
+  .note { color: var(--muted); font-size: 8pt; }
+  .foot { margin-top: auto; padding-top: 3mm; border-top: .35mm dashed var(--line); font-size: 7.8pt; color: var(--muted); display: flex; flex-direction: column; gap: 1mm; }
+  .foot b { color: var(--ink); }
+  .back { font-size: 8.4pt; padding-top: 8mm; }
+  .back h1 { font-size: 14pt; }
+  .back .lede { margin-bottom: 1mm; }
+  .back h2 { font-size: 9.2pt; margin: 3mm 0 1.2mm; }
+  .back ol li { margin-bottom: 1.4mm; padding-left: 6.5mm; }
+  .back ol li::before { width: 4.4mm; height: 4.4mm; font-size: 7pt; }
+  .back .box { padding: 2mm 2.6mm; margin-bottom: 1mm; }
+</style>
+</head>
+<body>
+
+<section class="card">
+  <img class="logo" src="../brand/logo-light.png" alt="stick_ai">
+  <h1>Your private coding assistant.</h1>
+  <p class="lede">It runs entirely from this stick, on your own computer. Your code never leaves it.</p>
+  <ol>
+    <li>Plug the stick into your Mac, Windows PC or Linux computer.</li>
+    <li>Open the stick and double-click the app for your computer:<br>
+      <span class="mono">Stick AI</span> (Mac) · <span class="mono">Stick AI.exe</span> (Windows) · <span class="mono">stick-ai</span> (Linux)</li>
+    <li>Click <b>Open workspace</b>, choose a project folder and start chatting.</li>
+  </ol>
+  <div class="box">
+    <p><b>The first start takes a few minutes</b> while it checks the AI models on the stick. After that it starts in seconds.</p>
+  </div>
+  <p class="note">Needs 8 GB of memory; the larger Max model works best with 24 GB. Keep the stick plugged in while you work, and quit the app before you unplug it.</p>
+  <div class="foot"><span>Help: <b>stick-ai.localilabs.com/start</b></span><span>Turn over if your computer warns you →</span></div>
+</section>
+
+<section class="card back">
+  <h1>If your computer warns you</h1>
+  <p class="lede">stick_ai isn’t signed with a paid Apple or Microsoft certificate, so your computer may ask once before opening it. That’s expected and only happens the first time.</p>
+
+  <h2><span class="os">Mac</span> “can’t be opened” or “could not verify”</h2>
+  <div class="box">
+    <ol>
+      <li>Click <b>Done</b> (not Move to Bin).</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>.</li>
+      <li>Scroll to <b>Security</b> and click <b>Open Anyway</b> next to Stick AI.</li>
+      <li>Open Stick AI again, click <b>Open Anyway</b> and enter your password.</li>
+    </ol>
+  </div>
+
+  <h2><span class="os">Windows</span> “Windows protected your PC”</h2>
+  <div class="box">
+    <p>Click <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p class="note">If <b>Smart App Control</b> blocks it, Stick AI can't run on that PC unless Smart App Control is turned off in Windows Security → App &amp; browser control.</p>
+  </div>
+
+  <h2><span class="os">Linux</span> won't start</h2>
+  <div class="box">
+    <p>Right-click <span class="mono">stick-ai</span> → Properties → Permissions → <b>Allow executing file as program</b>.</p>
+  </div>
+
+  <div class="foot"><span>More help and screenshots: <b>stick-ai.localilabs.com/start</b></span></div>
+</section>
+
+</body>
+</html>

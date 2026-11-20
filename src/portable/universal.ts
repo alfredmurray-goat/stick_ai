@@ -29,13 +29,36 @@ export const universalReadme = `YOUR PRIVATE ASSISTANT
 
 This stick works on Mac, Windows and Linux. Open the app for your computer:
 
-  Mac      Stick AI (Stick AI.app). The first time, right-click it and choose Open.
-  Windows  Stick AI.exe. If Windows warns you, choose More info, then Run anyway.
+  Mac      Stick AI (Stick AI.app)
+  Windows  Stick AI.exe
   Linux    stick-ai
 
-Everything the apps share, including the AI models, is in the stellan folder. Keep it next to the apps.
+Then click Open workspace.
 
-Then click Open workspace. Everything runs on this computer; nothing is sent anywhere.
+IF YOUR COMPUTER WARNS YOU THE FIRST TIME
+Stick AI isn't signed with a paid Apple or Microsoft certificate, so your computer
+may ask before opening it the first time. That's expected; it only happens once.
+
+  Mac      If it says Stick AI "can't be opened" or "Apple could not verify" it:
+           1. Click Done (not Move to Bin).
+           2. Open System Settings > Privacy & Security.
+           3. Scroll down to Security and click Open Anyway next to Stick AI.
+           4. Open Stick AI again and click Open Anyway, then enter your password.
+  Windows  If a blue "Windows protected your PC" box appears:
+           click More info, then Run anyway.
+           If it says Smart App Control blocked it, Stick AI can't run on that PC
+           unless Smart App Control is turned off (Windows Security > App & browser control).
+  Linux    If it won't start, right-click stick-ai > Properties > Permissions and tick
+           "Allow executing file as program".
+
+More help: https://stick-ai.localilabs.com/start
+
+PRIVACY
+Your code and conversations stay on this computer. Stick AI only goes online to check
+for updates and, if you allow each one, for a web search; then only the search words
+are sent.
+
+Everything the apps share, including the AI models, is in the stellan folder. Keep it next to the apps.
 Lite needs 8 GB of memory. Max works best with 24 GB; on 16 GB it can be very slow.
 
 Keep the stick connected while you work, and close the app before ejecting it.

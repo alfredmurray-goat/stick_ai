@@ -47,7 +47,7 @@ it("fails before output if a required input is missing", async () => {
   await expect(buildStick(resolve("."), join(root, "stick"), input)).rejects.toThrow();
   await expect(lstat(join(root, "stick"))).rejects.toThrow();
 });
-it("keeps the plain-language readme under 200 words", () => { expect(userReadme.split(/\s+/).length).toBeLessThan(200); expect(userReadme).toContain("If macOS blocks this, right-click Start and choose Open, once."); });
+it("keeps the plain-language readme under 200 words", () => { expect(userReadme.split(/\s+/).length).toBeLessThan(200); expect(userReadme).toContain("If macOS blocks this, open System Settings > Privacy & Security and click Open Anyway, once."); });
 
 it("runs the generated native start file in dry-run mode from a path with spaces", async () => {
   const root = await temp(); const input = await assets(root);

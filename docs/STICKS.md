@@ -13,7 +13,7 @@ Every build that passes on `main` publishes one **private draft** release, **Sti
 
 1. Open the newest **Stick AI — all devices** draft and download **`stick_ai-all-devices.zip`** (a few hundred MB). Unzip it.
 2. Open the helper for your computer:
-   - Mac: **Install on stick (Mac).command** (right-click → Open the first time), then drag the stick from the Finder sidebar into its window and press Return.
+   - Mac: **Install on stick (Mac).command** (the first time, if macOS refuses, open System Settings > Privacy & Security and click Open Anyway), then drag the stick from the Finder sidebar into its window and press Return.
    - Windows: **Install on stick (Windows).bat**, then type the stick's drive letter.
    - Linux: `sh install-on-stick.sh "/media/$USER/STICK_AI"`.
 

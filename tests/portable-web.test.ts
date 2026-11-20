@@ -51,6 +51,7 @@ it("serves a private browser session, swaps models, preserves history and applie
   try {
     expect((await fetch(url.origin + "/api/state")).status).toBe(403);
     const page = await fetch(url.origin); expect(page.headers.get("content-security-policy")).toContain("connect-src 'self'"); expect(await page.text()).toContain("Start chatting");
+    const highlighter = await fetch(url.origin + "/highlight.js"); expect(highlighter.headers.get("content-type")).toBe("text/javascript"); expect(await highlighter.text()).toContain("stickHighlight");
     for (const logo of ["/brand/icon-dark.png", "/brand/icon-light.png", "/brand/favicon.png"]) { const image = await fetch(url.origin + logo); expect(image.headers.get("content-type")).toBe("image/png"); expect((await image.arrayBuffer()).byteLength).toBeGreaterThan(1000); }
     await api("/api/start", { model: "stellan-1-lite" });
     await api("/api/task", { text: "Add greet" });

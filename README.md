@@ -29,7 +29,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code. Lite + Max work together automatically with 24 GB of memory or more; on 16 GB you can still choose Max, with a warning that it may be very slow. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
 - **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
-- **Readable answers.** Replies render with headings, lists, tables and code blocks with a Copy button.
+- **Readable answers.** Replies render with headings, lists, tables and code blocks with syntax colours (JavaScript/TypeScript and other C-style languages, Python, shell, JSON, CSS, HTML, YAML/TOML and SQL) and a Copy button.
 - **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
 - **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
 - **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
@@ -82,7 +82,7 @@ Max works best with 24 GB of memory or more. On 16 GB you can still choose it (S
 > Use the **Install on stick** helper from the zip rather than dragging folders: it merges onto the stick and never deletes `stellan/models`.
 
 > [!NOTE]
-> These are unsigned test builds. The first time you open one, macOS Gatekeeper or Windows SmartScreen may ask you to confirm. On a Mac, right-click the app and choose **Open**.
+> These are unsigned test builds. The first time you open one, macOS Gatekeeper or Windows SmartScreen may ask you to confirm. On a Mac, if it says the app can't be opened, go to **System Settings → Privacy & Security** and click **Open Anyway** (macOS 15 and later removed the old right-click → Open shortcut). On Windows, click **More info → Run anyway**. Apps run from an exFAT stick usually aren't flagged at all, because exFAT can't store the "downloaded from the internet" mark. [docs/FIRST_OPEN.md](docs/FIRST_OPEN.md) has the full steps and the printable card for the box.
 
 ## Install
 
@@ -231,7 +231,7 @@ This is a model-free download with no Lite linked yet. Click **Open workspace** 
 <details>
 <summary><b>On a Mac, the assistant won't start</b></summary>
 
-Open the app with right-click → **Open** the first time. A zip downloaded in a browser marks every file inside as "from the internet", and macOS refuses to run the bundled model server until that mark is cleared. From this version the app clears it itself, but only for its own runtimes after checking their checksums. With an older copy, run this once in Terminal, dragging the **Stick AI** folder in for the path:
+The first time, if macOS refuses, open **System Settings → Privacy & Security** and click **Open Anyway**. A zip downloaded in a browser marks every file inside as "from the internet", and macOS refuses to run the bundled model server until that mark is cleared. From this version the app clears it itself, but only for its own runtimes after checking their checksums. With an older copy, run this once in Terminal, dragging the **Stick AI** folder in for the path:
 
 ```bash
 xattr -dr com.apple.quarantine "/path/to/Stick AI"

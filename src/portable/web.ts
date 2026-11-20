@@ -132,7 +132,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     try {
       if (request.headers.host !== origin.slice(7)) { send(response, 403, {}); return; }
       const url = new URL(request.url ?? "/", origin);
-      const assets: Record<string, [string, string]> = { "/": ["index.html", "text/html"], "/main.js": ["main.js", "text/javascript"], "/style.css": ["style.css", "text/css"], "/brand/icon-dark.png": ["brand/icon-dark.png", "image/png"], "/brand/icon-light.png": ["brand/icon-light.png", "image/png"], "/brand/favicon.png": ["brand/favicon.png", "image/png"] };
+      const assets: Record<string, [string, string]> = { "/": ["index.html", "text/html"], "/main.js": ["main.js", "text/javascript"], "/highlight.js": ["highlight.js", "text/javascript"], "/style.css": ["style.css", "text/css"], "/brand/icon-dark.png": ["brand/icon-dark.png", "image/png"], "/brand/icon-light.png": ["brand/icon-light.png", "image/png"], "/brand/favicon.png": ["brand/favicon.png", "image/png"] };
       if (request.method === "GET" && assets[url.pathname]) {
         const asset = assets[url.pathname]!; response.writeHead(200, { "Content-Type": asset[1] }); response.end(await readFile(join(root, "app", "ui", asset[0]))); return;
       }

@@ -80,7 +80,8 @@ function codeBlock(code, language) {
   const block = document.createElement("div"), head = document.createElement("div"), lang = document.createElement("span"), copy = document.createElement("button"), pre = document.createElement("pre"), body = document.createElement("code");
   block.className = "code-block"; head.className = "code-head"; lang.className = "code-lang"; lang.textContent = language || "code";
   copy.type = "button"; copy.className = "copy-button"; copy.setAttribute("aria-label", "Copy code"); copy.append(icon("copy"), "Copy");
-  body.textContent = code; pre.append(body); head.append(lang, copy); block.append(head, pre); return block;
+  if (window.stickHighlight) { window.stickHighlight.highlightInto(body, code, language); } else { body.textContent = code; }
+  pre.append(body); head.append(lang, copy); block.append(head, pre); return block;
 }
 const LIST_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
 const BLOCK_START = /^\s*(#{1,6}\s|```|~~~|>|([-*_])(\s*\2){2,}\s*$)/;

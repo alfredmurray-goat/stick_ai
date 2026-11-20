@@ -1,7 +1,7 @@
 // Publishes ONE private draft release per build: a small zip with the all-devices stick files (Mac, Windows
 // and Linux apps plus the shared stellan folder, without models) and install helpers, checksums and the
 // signed app updates. Sticks already carry the models in stellan/models; the apps use them from there.
-// Releases stay drafts, visible only to people with write access, unless STICK_PUBLIC_RELEASES=1.
+// Releases are always private drafts, visible only to people with write access: sticks are sold preinstalled.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
@@ -36,7 +36,7 @@ const notes = `# Stick AI: all devices, build ${runId}
 1. The stick: **exFAT**, 32 GB or more, with the models in \`stellan/models\` named exactly \`stellan-1-lite-q4_k_m.gguf\` and \`stellan-1.0-q4_k_m.gguf\`.
 2. Download **\`stick_ai-all-devices.zip\`** and unzip it.
 3. Open the helper for your computer and follow it:
-   - Mac: **Install on stick (Mac).command** (right-click → Open the first time), then drag the stick into its window.
+   - Mac: **Install on stick (Mac).command** (the first time, if macOS refuses, open System Settings > Privacy & Security and click Open Anyway), then drag the stick into its window.
    - Windows: **Install on stick (Windows).bat**, then type the stick's drive letter.
    - Linux: \`sh install-on-stick.sh /media/$USER/STICK_AI\`
 4. The helper copies the apps and the \`stellan\` folder onto the stick **without deleting anything**, so your models stay put, and tells you if a model is missing. Don't drag \`stellan\` onto the stick in Finder: "Replace" would delete the models.
@@ -97,7 +97,6 @@ try {
   const checksums = join(temporary, "RELEASE_CHECKSUMS.json");
   await writeFile(checksums, JSON.stringify({ source: run.head_sha, run: runId, archives: [record] }, null, 2) + "\n");
   await gh("release", "upload", tag, checksums, "--repo", repo, "--clobber");
-  const publicRelease = process.env.STICK_PUBLIC_RELEASES === "1";
-  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notesFile, ...(publicRelease ? ["--draft=false"] : []));
-  console.log(publicRelease ? `Published https://github.com/${repo}/releases/tag/${tag}` : `Private draft ready (only people with write access can see it): https://github.com/${repo}/releases`);
+  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notesFile);
+  console.log(`Private draft ready (only people with write access can see it): https://github.com/${repo}/releases`);
 } finally { await rm(temporary, { recursive: true, force: true }); }

@@ -11,6 +11,7 @@
   --raised-2: #252231;
   --input: #18161f;
   --code-bg: #09080d;
+  --tok-kw: #c4a2ff; --tok-str: #8be0a4; --tok-num: #ffc06b; --tok-com: #7d778e; --tok-fn: #7fc8ff; --tok-type: #ff9ec8; --tok-attr: #ffd27a; --tok-key: #9fb8ff;
   --border: #231f2d;
   --border-strong: #3a3450;
   --text: #f4f2f8;
@@ -55,6 +56,7 @@
   --raised-2: #f1ebf5;
   --input: #ffffff;
   --code-bg: #f6f1f4;
+  --tok-kw: #6a2fd6; --tok-str: #17803f; --tok-num: #b35f00; --tok-com: #857f91; --tok-fn: #0b63b5; --tok-type: #b62d71; --tok-attr: #9a5a00; --tok-key: #3550b8;
   --border: #ebe3e3;
   --border-strong: #d6cdd9;
   --text: #16131e;
@@ -663,4 +665,13 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 @keyframes slidein-r { from { transform: translateX(100%); } to { transform: none; } }
 .file-entry .chev.blank { visibility: hidden; }
 .code-block code { all: unset; font: inherit; white-space: inherit; }
+/* Syntax colours (highlight.js): violet keywords, green strings, amber numbers, muted comments. */
+.tok-kw { color: var(--tok-kw); }
+.tok-str { color: var(--tok-str); }
+.tok-num, .tok-lit { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+.tok-fn { color: var(--tok-fn); }
+.tok-type, .tok-tag { color: var(--tok-type); }
+.tok-attr, .tok-var { color: var(--tok-attr); }
+.tok-key { color: var(--tok-key); }
 .composer textarea:focus-visible, .file-editor:focus-visible { outline: none; }
