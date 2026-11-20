@@ -142,6 +142,18 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .term .del { color: #ff8a80; background: rgba(255,138,128,.08); } .term .add { color: #74e3a0; background: rgba(116,227,160,.08); }
 .term .ask { color: #fff; font-weight: 700; }
 .term .cursor { background: #ffb340; }
+.term .think { color: #8a849b; font-style: italic; }
+
+/* Features */
+.features h2 { max-width: 14em; }
+.feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+.feature-grid article { border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); padding: 22px 22px 24px; display: grid; align-content: start; gap: 10px; }
+.feature-grid h3 { margin: 0; font: 600 1.2rem/1.2 var(--display); letter-spacing: -.01em; }
+.feature-grid p { margin: 0; color: var(--muted); font-size: .96rem; line-height: 1.55; }
+.feature-tag { font: 400 12px var(--mono); color: var(--violet-hi); }
+.feature-tag::before { content: "// "; color: var(--faint); }
+@media (max-width: 1100px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 620px) { .feature-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .session { grid-template-columns: 1fr; } }
 
 /* Benchmarks */

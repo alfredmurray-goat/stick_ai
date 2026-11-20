@@ -31,6 +31,7 @@
     </a>
     <nav aria-label="Main">
       <a href="#session">./how</a>
+      <a href="#features">./features</a>
       <a href="#bench">./benchmarks</a>
       <a href="#specs">./specs</a>
       <a href="#price">./price</a>
@@ -51,7 +52,7 @@
         </div>
         <ul class="facts" aria-label="At a glance">
           <li><b>73.2%</b> HumanEval</li>
-          <li><b>0 bytes</b> sent anywhere</li>
+          <li><b>0 bytes</b> of code sent</li>
           <li><b>Mac · Win · Linux</b> one stick</li>
         </ul>
       </div>
@@ -79,10 +80,11 @@
       <div class="term" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
         <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
 <pre><span class="dim">$</span> stick_ai open ~/projects/shop
-<span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes sent</span>
+<span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes of code sent</span>
 
 <span class="you">you ›</span> why does checkout crash when the cart is empty?
 
+<span class="think">  thinking · it only fails at checkout, so the totals…</span>
 <span class="ai">stellan ›</span> <span class="dim">reading src/cart.ts … src/checkout.ts …</span>
 <span class="ai">stellan ›</span> found it: average() divides by items.length,
           which is 0 for an empty cart.
@@ -91,6 +93,17 @@
 <span class="dim">│</span> <span class="del">- const avg = total / items.length;</span>
 <span class="dim">│</span> <span class="add">+ const avg = items.length ? total / items.length : 0;</span>
 <span class="dim">└</span> <span class="ask">Allow changes? [y/N]</span> <span class="cursor small" aria-hidden="true"></span></pre>
+      </div>
+    </section>
+
+    <section class="features" id="features" aria-labelledby="features-title">
+      <p class="kicker">// built in</p>
+      <h2 id="features-title">Small stick, <em>grown-up tools.</em></h2>
+      <div class="feature-grid">
+        <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p>Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p></article>
+        <article><span class="feature-tag">memory</span><h3>Rests when you do.</h3><p>After 10 quiet minutes it gives your computer its memory back. Your next message wakes it in seconds, conversation intact.</p></article>
+        <article><span class="feature-tag">hooks</span><h3>Hooks, like Claude Code.</h3><p>Run your own command, or tell another app, when Stellan finishes or needs you. A hook can stop a step. It can never approve one.</p></article>
+        <article><span class="feature-tag">web</span><h3>Web search, if you say so.</h3><p>It can look up docs and error messages with Actuent. It asks first every time, and only the search words leave. Your code never does.</p></article>
       </div>
     </section>
 
@@ -126,9 +139,10 @@
           <div><dt>Models</dt><dd>Stellan-1 Lite (7.3B) · Stellan-1 Max (23.6B)</dd></div>
           <div><dt>Runs on</dt><dd>macOS 13.5+ (Apple Silicon &amp; Intel) · Windows 10/11 · Linux x64</dd></div>
           <div><dt>Memory</dt><dd>Lite: 8 GB · Max: 16 GB minimum, 24 GB+ recommended</dd></div>
-          <div><dt>Internet</dt><dd>Not needed. Not used.</dd></div>
+          <div><dt>Internet</dt><dd>Not needed. Optional web search asks first</dd></div>
           <div><dt>Stick</dt><dd>64 GB USB, exFAT, everything preinstalled</dd></div>
           <div><dt>Approvals</dt><dd>Every edit, command and tool call</dd></div>
+          <div><dt>Extensions</dt><dd>MCP servers · skills · hooks</dd></div>
           <div><dt>Subscription</dt><dd>None. Buy it once.</dd></div>
         </dl>
         <div class="barcode" aria-hidden="true"></div>
@@ -197,6 +211,7 @@
       <details><summary>My computer says it can't open the app. Is it safe?</summary><p>Yes. stick_ai isn't signed with a paid Apple or Microsoft certificate, so your computer may ask once before opening it. <a href="/start">Here's how to open it</a>: it takes a few clicks and only happens the first time.</p></details>
       <details><summary>Does the AI get copied onto my computer?</summary><p>No. The models stay on the stick. While the app is open they're read into your computer's memory, like playing a film straight off a USB drive. Nothing is installed.</p></details>
       <details><summary>Which computers does it work on?</summary><p>Macs with Apple Silicon or Intel (macOS 13.5 or newer), Windows 10 and 11 (64-bit) and 64-bit Linux. Lite needs 8 GB of memory; Max needs at least 16 GB and runs best with 24 GB or more.</p></details>
+      <details><summary>Can it work with my other tools?</summary><p>Yes. Like Claude Code, it supports MCP servers (tools from other apps), skills (reusable instructions) and hooks (your own commands or apps that run when Stellan sends a message, uses a tool, needs your approval or finishes). Hooks can stop a step but can never approve one: changes always wait for you.</p></details>
       <details><summary>Do I pay for shipping?</summary><p>Yes. Shipping is added at checkout and depends on where the stick is going.</p></details>
     </section>
   </main>
