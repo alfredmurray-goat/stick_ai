@@ -12,6 +12,8 @@ import { targets } from "../src/portable/platform.js";
 const roots: string[] = [];
 const key = generateKeyPairSync("ed25519"); const publicKey = key.publicKey.export({ type: "spki", format: "pem" }).toString();
 const source = (sequence: number) => sequence.toString(16).padStart(40, "0");
+// These tests build and update whole stick installs; Windows and Intel Mac runners can take over 5 s.
+vi.setConfig({ testTimeout: 30000 });
 afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 async function packageFixture(root: string, sequence: number, model = "saved model bytes") {
   const files: Record<string, string> = {
