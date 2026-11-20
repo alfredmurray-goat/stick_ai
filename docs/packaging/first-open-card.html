@@ -14,7 +14,9 @@
   html, body { margin: 0; background: #d9d4e2; color: var(--ink); font: 9.2pt/1.38 "Space Grotesk", system-ui, sans-serif; }
   .card { width: 105mm; height: 148mm; margin: 8mm auto; padding: 9mm 8.5mm 7mm; background: var(--cream); position: relative; overflow: hidden; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
   @media print { html, body { background: none; } .card { margin: 0; } }
-  .logo { height: 15mm; width: auto; display: block; margin: -2mm 0 4mm -2mm; }
+  /* The full logo is an upright stick (287 × 360 px): keep its proportions and sit it beside the title. */
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 3mm; align-items: center; margin-bottom: 3mm; }
+  .logo { height: 30mm; width: auto; max-width: none; display: block; align-self: center; }
   h1 { font-size: 17pt; line-height: 1.05; margin: 0 0 2mm; letter-spacing: -.02em; }
   h2 { font-size: 10.5pt; margin: 4.5mm 0 1.4mm; display: flex; align-items: center; gap: 2mm; }
   p { margin: 0 0 2mm; }
@@ -41,9 +43,13 @@
 <body>
 
 <section class="card">
-  <img class="logo" src="../brand/logo-light.png" alt="stick_ai">
-  <h1>Your private coding assistant.</h1>
-  <p class="lede">It runs entirely from this stick, on your own computer. Your code never leaves it.</p>
+  <div class="hero">
+    <div>
+      <h1>Your private coding assistant.</h1>
+      <p class="lede">It runs entirely from this stick, on your own computer. Your code never leaves it.</p>
+    </div>
+    <img class="logo" src="../brand/logo-light.png" alt="stick_ai">
+  </div>
   <ol>
     <li>Plug the stick into your Mac, Windows PC or Linux computer.</li>
     <li>Open the stick and double-click the app for your computer:<br>
