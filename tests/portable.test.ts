@@ -17,8 +17,8 @@ afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root,
 async function temp() { const path = await mkdtemp(join(tmpdir(), "stick-portable-")); roots.push(path); return path; }
 it.each([["darwin", "arm64", "macos-arm64"], ["darwin", "x64", "macos-x64"], ["win32", "x64", "windows-x64"], ["linux", "x64", "linux-x64"]])("selects %s %s", (platform, arch, expected) => { expect(targetFor(platform!, arch!)).toBe(expected); });
 it("refuses unsupported CPUs", () => { expect(() => targetFor("win32", "arm64")).toThrow(); expect(() => targetFor("linux", "arm64")).toThrow(); });
-it.each([[8, 1], [15.9, 1], [16, 2]])("locks the model list at %s GB", (memory, count) => { expect(portableModels(memory! * GiB, true)).toHaveLength(count!); });
-it("refuses less than 8 GB and hides absent Max", () => { expect(() => portableModels(7 * GiB, true)).toThrow(); expect(portableModels(16 * GiB, false)).toEqual(["stellan-1-lite"]); });
+it.each([[8, 1], [16, 1], [21.9, 1], [22, 2], [24, 2]])("locks the model list at %s GB", (memory, count) => { expect(portableModels(memory! * GiB, true)).toHaveLength(count!); });
+it("refuses less than 8 GB and hides absent Max", () => { expect(() => portableModels(7 * GiB, true)).toThrow(); expect(portableModels(24 * GiB, false)).toEqual(["stellan-1-lite"]); });
 it("skips an occupied port instead of reusing another server", async () => {
   const first = await reservePort();
   try { const next = await reservePort(first.port, 8099); expect(next.port).not.toBe(first.port); await next.release(); await expect(reservePort(first.port, first.port)).rejects.toThrow(); } finally { await first.release(); }

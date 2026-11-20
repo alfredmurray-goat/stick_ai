@@ -1,3 +1,4 @@
+import { maxMinimumBytes } from "../config/models.js";
 import { constants } from "node:fs";
 import { lstat, open, readFile, realpath, mkdir, rename, rm, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
@@ -87,12 +88,12 @@ async function liteStatus(root: string): Promise<LiteStatus> {
   } catch (error) { return { available: false, source: "linked", message: error instanceof LocalModelError ? error.message : "The Lite model could not be read. Choose the file again." }; }
 }
 export async function localModelStatus(root: string, bytes = totalmem()): Promise<LocalModelStatus> {
-  const lite = await liteStatus(root); const eligible = bytes >= 16 * 1024 ** 3;
+  const lite = await liteStatus(root); const eligible = bytes >= maxMinimumBytes;
   try {
     const model = await resolveLocalMax(root);
     const maxText = model ? model.source === "bundled" ? "Max is included" : `Max linked: ${model.name}` : "";
     const message = !lite.available ? lite.message
-      : model ? eligible ? `${lite.message} ${maxText}. Lite + Max is ready.` : `${lite.message} ${maxText}. Max needs at least 16 GiB RAM; use Lite on this computer.`
+      : model ? eligible ? `${lite.message} ${maxText}. Lite + Max is ready.` : `${lite.message} ${maxText}. Max needs a computer with 24 GB of memory or more; use Lite on this one.`
       : `${lite.message} Choose the Max GGUF already on your stick to enable Max in this same app.`;
     return { available: Boolean(model), eligible, totalBytes: bytes, ...(model ? { name: model.name, path: model.path, source: model.source } : {}), message, lite };
   } catch (error) { return { available: false, eligible, totalBytes: bytes, source: "linked", message: error instanceof LocalModelError ? error.message : "The Max model could not be read. Choose the file again or continue with Lite.", lite }; }

@@ -1,4 +1,4 @@
-import { GiB } from "../config/models.js";
+import { GiB, maxMinimumBytes } from "../config/models.js";
 
 export const targets = ["macos-arm64", "macos-x64", "windows-x64", "linux-x64"] as const;
 export type Target = typeof targets[number];
@@ -30,7 +30,7 @@ export function targetFor(platform: string, arch: string): Target {
 }
 export function portableModels(bytes: number, maxPresent: boolean): string[] {
   if (bytes < 8 * GiB) { throw new UserError("memory"); }
-  return bytes >= 16 * GiB && maxPresent ? ["stellan-1-lite", "stellan-1-max"] : ["stellan-1-lite"];
+  return bytes >= maxMinimumBytes && maxPresent ? ["stellan-1-lite", "stellan-1-max"] : ["stellan-1-lite"];
 }
 export function modelFile(model: string): string {
   if (model === "stellan-1-lite") { return "models/stellan-1-lite-q4_k_m.gguf"; }

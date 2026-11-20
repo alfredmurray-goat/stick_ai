@@ -26,7 +26,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 ## Features
 
 - **Fully local.** Stellan runs on your own computer through a bundled llama.cpp server. No account, no cloud, no telemetry.
-- **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code when your computer has 16 GB or more. Use them together, Lite on its own, or Max directly.
+- **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code when your computer has 24 GB of memory or more. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
 - **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
 - **Readable answers.** Replies render with headings, lists, tables and code blocks with a Copy button.
@@ -60,7 +60,7 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 - **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The 95% confidence interval is about **66% to 79%**.
 - **Against the 2023 flagships.** OpenAI reported [67.0% for GPT-4](https://arxiv.org/abs/2303.08774) and Anthropic [71.2% for Claude 2](https://www.anthropic.com/news/claude-2), each with its own prompts and settings. Newer cloud models score over 90% (Anthropic reported [92.0% for Claude 3.5 Sonnet](https://www.anthropic.com/news/claude-3-5-sonnet) in 2024), and most of the newest ones no longer publish HumanEval at all.
 - **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
-- **Max.** Max needs more memory than the 16 GB benchmark machine could give it without reading the model from disk on every token, so its score will be measured on a larger machine.
+- **Max.** On the 16 GB benchmark machine, Max loaded and read prompts at about 6 tokens a second, but then kept re-reading its 14.3 GB file from disk (about 210 MB/s) and gave no answer within 20 minutes. Its score will be measured on a machine with 32 GB.
 
 **Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 
@@ -76,7 +76,7 @@ One stick works on every supported computer: the three apps sit at the top of th
 | Windows x64 | `Stick AI.exe` | Windows 10+, 8 GB RAM, Edge WebView2 |
 | Linux x64 | `stick-ai` | glibc 2.35+, GTK 3, WebKitGTK 4.1, 8 GB RAM |
 
-Max needs at least 16 GB RAM and runs best with 24 GB or more.
+Max needs a computer with 24 GB of memory or more. On 16 GB it loads but keeps re-reading its 14.3 GB file from disk and is far too slow to use, so the app only offers Lite there.
 
 > [!TIP]
 > Use the **Install on stick** helper from the zip rather than dragging folders: it merges onto the stick and never deletes `stellan/models`.
@@ -185,7 +185,7 @@ stick run "Inspect this repository and fix its failing tests"
 - Writes, edits and every shell command need your approval. `--yes` skips approval for that one run. Non-interactive runs deny changes unless `--yes` is given.
 - `/exit` exits, `/clear` deletes the current history and `/history` shows it. Ctrl+C cancels the active request, approval or command and keeps the chat open. A cancelled one-shot run exits with status 1, and reaching the step limit exits with status 2.
 - `.stick/config.json` holds `model`, `baseUrl` and `maxSteps` (1 to 1000). `STICK_MODEL` and `STICK_BASE_URL` override them. Only `localhost`, `127.0.0.1` and `::1` are accepted unless you pass `--allow-remote`, which sends prompts and tool results to that endpoint.
-- Max is locked below 16 GiB of total RAM. `--force-max` overrides it for one run, with a warning that Max may be very slow or crash. `stick doctor` shows total memory and the lock status without loading a model.
+- Max is locked on computers with less than 24 GB (below 22 GiB of total RAM reported, to allow for memory the firmware and graphics keep). `--force-max` overrides it for one run, with a warning that Max may be very slow or crash. `stick doctor` shows total memory and the lock status without loading a model.
 - Files must be UTF-8 and at most 1 MiB. Search returns up to 200 matching lines and skips `.git`, `.stick` and `node_modules`. There is no execution or inactivity deadline; use Cancel or Ctrl+C.
 - History is appended to `.stick/history.jsonl`, and one session per project is enforced with `.stick/session.lock`. History stores source contents in plain text, so keep `.stick` out of version control.
 
@@ -251,7 +251,7 @@ The first message in a conversation has to be read in full, which can take a min
 <details>
 <summary><b>Max is unavailable</b></summary>
 
-Max needs at least 16 GB of total RAM, and a Max GGUF that is bundled or linked. On a smaller computer, use Lite.
+Max needs a computer with 24 GB of memory or more, and a Max GGUF that is bundled or linked. On a smaller computer, use Lite.
 
 </details>
 
@@ -300,7 +300,7 @@ Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the p
 - **Review what it writes.** Stellan can make mistakes. In stricter tests it mis-copied long random identifiers.
 - **Lite's chat template.** The supplied Lite GGUF has no embedded template, so the app uses a tested Mistral-v1 formatter. The original training template is unverified.
 - **Unsigned builds.** Gatekeeper, SmartScreen, clean-machine launch and physical USB performance still need manual checks.
-- **Memory is total, not free.** The 8 GB and 16 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
+- **Memory is total, not free.** The 8 GB and 24 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
 
 ## Licences
 

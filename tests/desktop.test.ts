@@ -7,8 +7,8 @@ function driver() {
   const mock = Object.fromEntries(["verify", "prepare", "startLite", "waitHealthy", "openChat", "stop", "cleanup"].map((name) => [name, vi.fn(async () => { calls.push(name); })])) as unknown as DesktopDriver;
   return { mock, calls };
 }
-it.each([8, 15.9, 16])("desktop RAM lock at %s GB keeps Lite available", (ram) => {
-  expect(portableModels(ram * gb, true)).toEqual(ram < 16 ? ["stellan-1-lite"] : ["stellan-1-lite", "stellan-1-max"]);
+it.each([8, 16, 21.9, 22, 24])("desktop RAM lock at %s GB keeps Lite available", (ram) => {
+  expect(portableModels(ram * gb, true)).toEqual(ram < 22 ? ["stellan-1-lite"] : ["stellan-1-lite", "stellan-1-max"]);
 });
 it("verifies before launching, waits for health before chat, and cleans up on quit", async () => {
   const { mock, calls } = driver(); const stop = await launchDesktop(mock, new AbortController().signal, 16 * gb);

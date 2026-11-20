@@ -1,3 +1,4 @@
+import { maxMinimumBytes } from "../config/models.js";
 import { buildTaskContext, type ContextSource } from "./context.js";
 import { totalmem } from "node:os";
 import { createDelegate, type Specialist } from "./delegate.js";
@@ -29,7 +30,7 @@ export async function runAgent(options: {
   const commit = async (batch: Message[]): Promise<void> => { await save(batch); messages.push(...batch); };
   const specialist = options.specialist ?? { totalBytes: totalmem(), noSwap: false, available: false, code: async () => "" };
   const delegate = createDelegate(specialist, log);
-  const paired = specialist.available && !specialist.noSwap && specialist.totalBytes >= 16 * 1024 ** 3;
+  const paired = specialist.available && !specialist.noSwap && specialist.totalBytes >= maxMinimumBytes;
   const project = options.context ? await buildTaskContext(options.task, options.context.source, options.context.maxBytes, signal) : "";
   const instructions = `${system}\n${options.extraInstructions ?? ""}\nThis session: ${paired ? "Max is available for delegate_code; delegate larger coding changes before applying them." : "Code delegation is unavailable; write the code yourself using the file tools."}\n${project}`;
   await commit([{ role: "user", content: options.task }]);

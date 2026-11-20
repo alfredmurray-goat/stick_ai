@@ -37,12 +37,12 @@ it("serves a private browser session, swaps models, preserves history and applie
     async code(task: string, context: string, signal: AbortSignal, report: (text: string) => void) {
       return codeWithSwap(this, async () => {
         expect(this.active).toBe("stellan-1-max");
-        const result = await new Ollama("stellan-1-max", this.baseUrl, false, ramStatus(16 * GiB), { apiKey: this.key, specialist: true }).complete([{ role: "system", content: coderSystem }, { role: "user", content: `${task}\n${context}` }], signal, () => {});
+        const result = await new Ollama("stellan-1-max", this.baseUrl, false, ramStatus(24 * GiB), { apiKey: this.key, specialist: true }).complete([{ role: "system", content: coderSystem }, { role: "user", content: `${task}\n${context}` }], signal, () => {});
         return result.content;
       }, signal, report);
     }
   };
-  const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 16 * GiB, choices: ["stellan-1-lite", "stellan-1-max"], noSwap: false, report: vi.fn(), log: vi.fn(), stop: async () => {} });
+  const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 24 * GiB, choices: ["stellan-1-lite", "stellan-1-max"], noSwap: false, report: vi.fn(), log: vi.fn(), stop: async () => {} });
   const url = new URL(app.url); const authorization = `Bearer ${url.hash.slice(1)}`;
   async function api(path: string, body?: object) {
     const response = await fetch(url.origin + path, { method: body ? "POST" : "GET", headers: { Authorization: authorization, Origin: url.origin, ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -86,7 +86,7 @@ it("starts Max directly in the same app and preserves its conversation without e
   });
   const port = await listenLocal(inference);
   const engine = { active: null as string | null, baseUrl: `http://127.0.0.1:${port}`, key: "test-key", async start(model: string) { this.active = model; }, async stop() { this.active = null; } };
-  const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 16 * GiB, choices: ["stellan-1-lite", "stellan-1-max"], noSwap: false, report: vi.fn(), log: vi.fn(), stop: async () => {} });
+  const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 24 * GiB, choices: ["stellan-1-lite", "stellan-1-max"], noSwap: false, report: vi.fn(), log: vi.fn(), stop: async () => {} });
   const url = new URL(app.url);
   async function api(path: string, data?: object): Promise<any> {
     return (await fetch(url.origin + path, { method: data ? "POST" : "GET", headers: { Authorization: `Bearer ${url.hash.slice(1)}`, Origin: url.origin, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) })).json();
