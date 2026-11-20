@@ -1,5 +1,5 @@
 import { maxRecommendedBytes } from "../config/models.js";
-import { buildTaskContext, type ContextSource } from "./context.js";
+import { contextMark, taskContextParts, type ContextSource } from "./context.js";
 import { totalmem } from "node:os";
 import { createDelegate, type Specialist } from "./delegate.js";
 import { errorText, type Message, type Model } from "../model/types.js";
@@ -11,6 +11,20 @@ export const system = `You are stick_ai, an offline coding agent orchestrated by
 Write a tool call exactly as <tool_call>{"name":"list_dir","arguments":{"path":"."}}</tool_call>. Built-in tool names: list_dir, read_file, write_file, edit_file, search_files, run_shell, delegate_code. Emit only one call, then stop and wait for the next message containing <tool_result>...</tool_result>. Recover from reported errors. Never wrap a tool request in <done>; tool requests must use <tool_call>. When finished write <done>Your final summary</done>. Optional reasoning belongs in <think>...</think>. Never use native function calling.
 When Max is available, you must call delegate_code with {"task":"...","context":"relevant file contents"} before creating a new file, adding a new function or changing more than about 20 lines. Handle reading, searching, commands and small edits yourself. Max writes code only; you must review and apply it with write_file or edit_file. Only you call tools or emit done. If delegation is unavailable, under the RAM limit, disabled, write the code yourself. There is no delegation call limit.
 Tool argument schemas: ${JSON.stringify(toolSchemas.map((schema) => schema.function))}`;
+// The system message stays the same for a whole session, so the model server can read it once (see
+// ManagedEngine.warm) and every task and follow-up reuses it. Anything that changes per task (the
+// project file list, named files, skill instructions) goes in the task's own message instead.
+export function agentInstructions(extra: string, paired: boolean): string {
+  return `${system}\n${extra}\nThis session: ${paired ? "Max is available for delegate_code; delegate larger coding changes before applying them." : "Code delegation is unavailable; write the code yourself using the file tools."}`;
+}
+// The file list is sent again only when it changed since the last task of the same conversation.
+const sentLists = new WeakMap<Message[], string>();
+export function taskMessage(task: string, messages: Message[], context: { list: string; named: string }, taskInstructions = ""): string {
+  const list = messages.length && sentLists.get(messages) === context.list ? "" : context.list;
+  if (context.list) { sentLists.set(messages, context.list); }
+  const details = list + context.named;
+  return `${task}${taskInstructions.trim() ? `\n\n${taskInstructions.trim()}` : ""}${details ? `${contextMark}${details}</project_context>` : ""}`;
+}
 export async function runAgent(options: {
   task: string;
   messages: Message[];
@@ -18,6 +32,8 @@ export async function runAgent(options: {
   tools: Pick<Tools, "execute">;
   maxSteps: number;
   extraInstructions?: string;
+  /** Per-task guidance (for example a skill the user picked); sent with the task, not in the system message. */
+  taskInstructions?: string;
   activity?: (event: { step: number; phase: "start" | "finish"; tool: string; path?: string; detail?: string; result?: string }) => void;
   specialist?: Specialist;
   context?: { source: ContextSource; maxBytes?: number };
@@ -31,9 +47,9 @@ export async function runAgent(options: {
   const specialist = options.specialist ?? { totalBytes: totalmem(), noSwap: false, available: false, code: async () => "" };
   const delegate = createDelegate(specialist, log);
   const paired = specialist.available && !specialist.noSwap && specialist.totalBytes >= maxRecommendedBytes;
-  const project = options.context ? await buildTaskContext(options.task, options.context.source, options.context.maxBytes, signal) : "";
-  const instructions = `${system}\n${options.extraInstructions ?? ""}\nThis session: ${paired ? "Max is available for delegate_code; delegate larger coding changes before applying them." : "Code delegation is unavailable; write the code yourself using the file tools."}\n${project}`;
-  await commit([{ role: "user", content: options.task }]);
+  const project = options.context ? await taskContextParts(options.task, options.context.source, options.context.maxBytes, signal) : { list: "", named: "" };
+  const instructions = agentInstructions(options.extraInstructions ?? "", paired);
+  await commit([{ role: "user", content: taskMessage(options.task, messages, project, options.taskInstructions) }]);
   for (let step = 0; step < options.maxSteps; step++) {
     signal.throwIfAborted();
     const reply = await model.complete([{ role: "system", content: instructions }, ...messages], signal, emit);

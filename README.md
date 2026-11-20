@@ -5,7 +5,7 @@
   <img src="docs/brand/logo-light.png" alt="stick_ai" height="150">
 </picture>
 
-<img src="docs/hero.png" alt="The Stick AI workspace: a file tree on the left, a formatted answer with a code block in the middle, and live thinking and tool activity on the right" width="820">
+<img src="docs/hero.png" alt="The Stick AI workspace: a file tree on the left, a folded Thought for 4 s line above a formatted answer with a code block in the middle, and thinking and tool activity on the right" width="820">
 
 # Stick AI
 
@@ -28,7 +28,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Fully local.** Stellan runs on your own computer through a bundled llama.cpp server. No account, no cloud, no telemetry.
 - **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code. Lite + Max work together automatically with 24 GB of memory or more; on 16 GB you can still choose Max, with a warning that it may be very slow. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
-- **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
+- **Watch it think.** Stellan's thinking, file reads, searches and Lite → Max handoffs stream live in the conversation, then fold into a short "Thought for 12 s · 2 steps" line you can open again. The Activity panel shows the same in more detail.
 - **Readable answers.** Replies render with headings, lists, tables and code blocks with syntax colours (JavaScript/TypeScript and other C-style languages, Python, shell, JSON, CSS, HTML, YAML/TOML and SQL) and a Copy button.
 - **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
 - **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
@@ -40,7 +40,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/approval.png" alt="An approval card asking to save changes to greet.ts, with a gradient shield icon, the old line in red and the new line in green, and Keep my file and Allow changes buttons"></td>
+    <td width="50%"><img src="docs/approval.png" alt="Stellan's live thinking and steps in the conversation, above an approval card asking to save changes to greet.ts with the old line in red, the new line in green, and Keep my file and Allow changes buttons"></td>
     <td width="50%"><img src="docs/welcome-light.png" alt="The Stick AI welcome screen in light mode with an Open workspace button and three feature cards"></td>
   </tr>
   <tr>
@@ -108,7 +108,8 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 
 - **Ask anything.** Type in the box at the bottom, or start from a suggestion such as *Explore this project* or *Find a bug*. Press ↵ to send and Shift ↵ for a new line.
 - **Approve changes.** When Stellan wants to edit a file, an approval card shows the exact before-and-after lines. Click **Allow changes** or **Keep my file**.
-- **Follow along.** The **Activity** panel streams Stellan's thinking and every tool it uses. **Stop** or Esc cancels at any time.
+- **Follow along.** Under each message, a live line shows what Stellan is doing; click it to read its thinking and each step. The **Activity** panel has the full detail. **Stop** or Esc cancels at any time.
+- **Resting.** After 10 quiet minutes the model is paused so it stops holding memory (about 4.5 GB for Lite), and the status says **Resting**. Your next message wakes it in a few seconds with the conversation intact.
 - **Edit files yourself.** Click a file in the sidebar to open it in **File preview**, edit it and save.
 - **Use skills.** Type `/` to pick a skill, or manage them under **Skills**.
 - **Switch appearance.** It follows your system's light or dark mode until you choose one.
@@ -140,6 +141,8 @@ flowchart LR
 - **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags, constrained by a grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
 - **Lite and Max take turns.** In paired mode, only one model is loaded at a time. When Lite delegates, Max is started, writes the code, and Lite is restarted to review and apply it.
 - **Prompt cache.** Lite keeps its conversation cache with one context checkpoint (about 0.3 GB), and old tool output is trimmed in large steps so the start of the conversation stays identical. Each step processes only new text.
+- **Instructions read once.** The system message is the same for the whole session; the project file list, named files and skill guidance travel with each task instead. Right after Lite starts, it reads that system message in the background while you type, and saves the result so **New conversation** reloads it in a fraction of a second. On 4 CPU cores the first reply read 75 new tokens instead of 1,721, and took 60 s instead of 116 s.
+- **Nothing runs when idle.** The window waits for the app to report a change instead of asking twice a second, and the model rests after 10 quiet minutes (`STICK_REST_MINUTES` changes this; `0` turns it off).
 - **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Macs running as virtual machines stay on the CPU, because their virtual GPU is far slower. Set `STICK_GPU=0` to force the CPU.
 
 ## Configuration

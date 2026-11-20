@@ -253,6 +253,7 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
 .sidebar-bottom { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; display: grid; gap: 1px; }
 .local-note { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px; font-size: 11.5px; color: var(--faint); }
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); flex-shrink: 0; }
+.status-dot.resting { background: var(--faint); box-shadow: 0 0 0 3px var(--raised-2); }
 
 /* ---------- Main ---------- */
 .main-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
@@ -329,11 +330,27 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .message.status { font-size: 12.5px; color: var(--muted); padding: 8px 12px; border-radius: var(--radius-sm); background: var(--raised); border: 1px dashed var(--border); }
 .message.status .message-label { margin-bottom: 2px; }
 .message.status pre { font: 12.5px/1.6 var(--sans); }
-.message.reasoning-history { margin: -10px 0 22px; font-size: 12.5px; color: var(--muted); }
-.message.reasoning-history summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border); font-size: 11.5px; color: var(--faint); list-style: none; }
-.message.reasoning-history summary::-webkit-details-marker { display: none; }
-.message.reasoning-history summary:hover { color: var(--text); border-color: var(--border-strong); }
-.message.reasoning-history pre { margin-top: 10px; padding: 12px 14px; border-left: 2px solid var(--border); font: italic 13px/1.7 var(--sans); color: var(--muted); max-height: 260px; overflow: auto; }
+/* Inline activity row: thinking and tool steps for one message, folded once it's done. */
+.message.turn-activity { margin: -6px 0 18px; font-size: 13px; color: var(--muted); }
+.turn-activity summary { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; cursor: pointer; padding: 5px 11px 5px 9px; border-radius: 20px; border: 1px solid var(--border); background: var(--raised); color: var(--muted); font-size: 12.5px; list-style: none; user-select: none; }
+.turn-activity summary::-webkit-details-marker { display: none; }
+.turn-activity summary:hover { color: var(--text); border-color: var(--border-strong); }
+.turn-activity summary svg { width: 13px; height: 13px; flex-shrink: 0; transition: transform .15s ease; }
+.turn-activity[open] summary svg { transform: rotate(90deg); }
+.turn-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn-meta { color: var(--faint); font: 11px var(--mono); white-space: nowrap; }
+.turn-meta:empty { display: none; }
+.turn-spinner { display: none; width: 11px; height: 11px; border: 1.6px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+.turn-activity.live .turn-spinner { display: inline-block; }
+.turn-activity.live summary { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.turn-body { margin: 10px 0 0 6px; padding: 2px 0 2px 14px; border-left: 2px solid var(--border); max-height: 320px; overflow: auto; }
+.turn-thought { margin: 0 0 8px; font-size: 13px; line-height: 1.65; font-style: italic; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.turn-step { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.turn-step svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--faint); }
+.turn-step strong { font-weight: 600; color: var(--text); white-space: nowrap; }
+.turn-step span { font: 11.5px var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn-step.complete svg { color: var(--green); }
+.turn-step.failed svg { color: var(--red); }
 
 /* Rendered markdown in assistant answers */
 .md { font-size: 14.5px; line-height: 1.72; color: var(--text); overflow-wrap: anywhere; }

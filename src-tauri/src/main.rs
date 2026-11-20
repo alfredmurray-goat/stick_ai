@@ -195,7 +195,7 @@ fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, St
     if mode == "lite" { command.arg("--no-swap"); }
     if mode == "max" { command.args(["--model", "stellan-1-max"]); }
     command.current_dir(&state.root).env_clear();
-    for name in ["PATH", "Path", "SystemRoot", "ComSpec", "STICK_CONTEXT_MAX_BYTES"] {
+    for name in ["PATH", "Path", "SystemRoot", "ComSpec", "STICK_CONTEXT_MAX_BYTES", "STICK_REST_MINUTES"] {
         if let Some(value) = std::env::var_os(name) { command.env(name, value); }
     }
     for name in ["HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME"] { command.env(name, &state.temporary); }

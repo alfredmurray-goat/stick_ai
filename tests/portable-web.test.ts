@@ -73,7 +73,9 @@ it("serves a private browser session, swaps models, preserves history and applie
     expect(order).toEqual(["start stellan-1-lite", "stop stellan-1-lite", "start stellan-1-max", "stop stellan-1-max", "start stellan-1-lite"]);
     expect(bodies.map((body) => body.model)).toEqual(["stellan-1-lite", "stellan-1-max", "stellan-1-lite", "stellan-1-lite"]);
     expect(bodies[2]!.messages.some((message: any) => message.content === `<tool_result>${code}</tool_result>`)).toBe(true);
-    expect(bodies[2]!.messages.some((message: any) => message.content === "Add greet")).toBe(true);
+    // The task keeps its own words; the project details ride along with it, not in the system message.
+    expect(bodies[2]!.messages.some((message: any) => message.content.startsWith("Add greet\n\n<project_context>\nProject file list:"))).toBe(true);
+    expect(bodies[0]!.messages[0].content).not.toContain("Project file list");
   } finally { await app.close(); inference.closeAllConnections(); await new Promise<void>((resolve) => inference.close(() => resolve())); await rm(root, { recursive: true, force: true }); }
 }, 15000);
 
