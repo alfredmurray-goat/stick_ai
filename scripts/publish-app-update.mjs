@@ -1,5 +1,4 @@
-// Releases stay private drafts (visible only to people with write access) unless STICK_PUBLIC_RELEASES=1:
-// the app is sold preinstalled on sticks, so builds are for the owner, not public downloads.
+// App update releases are always private drafts (visible only to people with write access): sticks are sold preinstalled.
 import { createPrivateKey, createHash, sign, verify } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readdir, rm, writeFile } from "node:fs/promises";
@@ -7,7 +6,7 @@ import { basename, join } from "node:path";
 import { updatePublicKey } from "../src/portable/update-key.ts";
 import { createUpdateHost, defaultFeedUrl, feedKey, publishedSequence } from "./update-host.mjs";
 
-export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey, publicRelease = process.env.STICK_PUBLIC_RELEASES === "1", host = createUpdateHost(), feedUrl = process.env.STICK_UPDATE_FEED || defaultFeedUrl, currentSequence = publishedSequence, tag = `app-${runId}`, ownRelease = true, universal }) {
+export async function publishAppUpdate({ repo, runId, source, artifacts, platforms, temporary, signingKey, gh, publicKey = updatePublicKey, host = createUpdateHost(), feedUrl = process.env.STICK_UPDATE_FEED || defaultFeedUrl, currentSequence = publishedSequence, tag = `app-${runId}`, ownRelease = true, universal }) {
   if (!signingKey) { throw new Error("STICK_UPDATE_SIGNING_KEY is required to publish the app update"); }
   const key = createPrivateKey(signingKey); const probe = Buffer.from("stick-ai-update-key-check");
   if (!verify(null, probe, publicKey, sign(null, probe, key))) { throw new Error("Update signing key does not match the app public key"); }
@@ -58,7 +57,7 @@ export async function publishAppUpdate({ repo, runId, source, artifacts, platfor
     else { await host.put(feed, feedKey(feedUrl), { contentType: "application/json", cacheControl: "no-cache, max-age=0" }); console.log(`Sold sticks will now update to build ${runId}: ${feedUrl}`); }
   }
   if (!ownRelease) { return tag; }
-  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notes, ...(publicRelease ? ["--draft=false"] : []));
-  console.log(publicRelease ? `Published app update: https://github.com/${repo}/releases/tag/${tag}` : `Private app update draft ready: https://github.com/${repo}/releases`);
+  await gh("release", "edit", tag, "--repo", repo, "--notes-file", notes);
+  console.log(`Private app update draft ready: https://github.com/${repo}/releases`);
   return tag;
 }

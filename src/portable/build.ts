@@ -104,7 +104,7 @@ Keep the stick connected. Close the app before safely ejecting it.
 If your computer blocks the app, ask the person who supplied the stick for a signed copy.
 
 Start.command, Start.bat and start.sh are fallbacks for technical users; they open a terminal and a browser.
-If macOS blocks this, right-click Start and choose Open, once.
+If macOS blocks this, open System Settings > Privacy & Security and click Open Anyway, once.
 If Windows blocks the fallback, choose More info and Run anyway only if you trust this stick.
 
 Some computers need a system update before the desktop app can open; ask the person who supplied the stick for help.\n`;

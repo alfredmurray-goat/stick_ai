@@ -19,7 +19,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 
 ### In flight
 
-- **Release for #27.** Desktop builds run [44284459765](https://github.com/alfredmurray-goat/stick_ai/actions/runs/44284459765) builds all four platforms. If it passes, it publishes the desktop release (`desktop-44284459765`) and the Mac DMGs. Check that every expected asset is there, including the four `stick_ai-<platform>-model-free` files.
+- **Releases.** Each main build publishes one private draft, `stick-<run>` ("Stick AI — all devices — build N"), with `stick_ai-all-devices.zip` and the signed updates, and uploads the updates to Cloudflare R2. There is no way to publish a public release; the old Mac DMG workflows were removed.
 - **Benchmarks.** Lite scored 120/164 (73.2%) on the full HumanEval (in the README). Max and the agentic tasks still need a machine with more than 16 GB of memory (see Known issues).
 
 ## Known issues
