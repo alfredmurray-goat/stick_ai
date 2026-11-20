@@ -42,7 +42,6 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 2. Measure Max on HumanEval and run the agentic tasks on a machine with more than 16 GB of memory, then add them to the README (Lite's full HumanEval result is already there).
 3. Run Lite on a real Apple Silicon Mac (8 GB and 16 GB) and record tokens per second with Metal and with `STICK_GPU=0`.
 4. Speed up the Lite → Max handoff, for example by keeping Lite loaded when RAM allows, or by skipping the Lite reload until it's needed.
-5. Add syntax highlighting to code blocks in answers. It has to be built in, because the CSP blocks external libraries.
 6. Sign and notarise the Mac builds, and sign the Windows build.
 
 ## Useful facts

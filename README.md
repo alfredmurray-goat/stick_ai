@@ -29,7 +29,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code. Lite + Max work together automatically with 24 GB of memory or more; on 16 GB you can still choose Max, with a warning that it may be very slow. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
 - **Watch it think.** Reasoning, file reads, searches and Lite → Max handoffs stream into a live activity panel as they happen.
-- **Readable answers.** Replies render with headings, lists, tables and code blocks with a Copy button.
+- **Readable answers.** Replies render with headings, lists, tables and code blocks with syntax colours (JavaScript/TypeScript and other C-style languages, Python, shell, JSON, CSS, HTML, YAML/TOML and SQL) and a Copy button.
 - **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
 - **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
 - **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
