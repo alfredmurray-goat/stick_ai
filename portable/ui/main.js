@@ -18,6 +18,7 @@ let retryStart = true;
 let nativeStarted = 0;
 let errorAction = "Retry";
 let polling = false;
+let stateKey = "";
 let nativeStarting = false;
 let installingUpdate = false;
 let lastUpdateFailed = false;
@@ -48,6 +49,7 @@ function progress(view, busy) {
   if (byId("file-editor")) byId("file-editor").readOnly = busy || repositoryBusy || savingFile;
   if (typeof updateEditorState === "function") updateEditorState();
   byId("status").textContent = view?.message || "Thinking...";
+  if (busy) turnProgress(view?.message || "Thinking..."); else finishTurnActivity();
   byId("elapsed").textContent = view?.elapsedSeconds == null ? "" : ` ${view.elapsedSeconds} seconds`;
   byId("reassurance").textContent = view?.reassurance || "";
 }
@@ -178,8 +180,53 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => { if ((event.key === "Enter" || event.key === " ") && event.target.classList?.contains("md-link")) { event.preventDefault(); event.target.click(); } });
 
 let thinkingBreak = false;
+// ---------- Inline activity: what Stellan is doing for this message, shown in the conversation ----------
+// A live row appears as soon as a message is sent (so the chat is never blank while the model reads),
+// streams the model's thinking and each tool step, then folds into "Thought for 12 s · 2 steps".
+let turn;
+function turnActivity() {
+  if (turn?.card.isConnected) return turn;
+  const card = document.createElement("details"), summary = document.createElement("summary"), spinner = document.createElement("span"), title = document.createElement("span"), meta = document.createElement("span"), body = document.createElement("div");
+  card.className = "message turn-activity live"; spinner.className = "turn-spinner"; title.className = "turn-title"; meta.className = "turn-meta"; body.className = "turn-body";
+  title.textContent = "Starting..."; summary.append(spinner, title, meta, icon("chevron")); card.append(summary, body);
+  summary.addEventListener("click", () => { if (turn?.card === card) turn.touched = true; });
+  byId("chat-empty").hidden = true; byId("messages").append(card);
+  turn = { card, title, meta, body, started: Date.now(), steps: new Map(), thought: false, touched: false, done: false };
+  scrollConversation(); return turn;
+}
+function turnProgress(text) {
+  if (!turn || turn.done || !turn.card.isConnected) return;
+  turn.title.textContent = text; turn.meta.textContent = `${Math.max(1, Math.round((Date.now() - turn.started) / 1000))} s`;
+}
+function turnThought(text, newParagraph) {
+  const t = turnActivity(); let paragraph = t.body.lastElementChild;
+  if (!paragraph?.classList.contains("turn-thought") || newParagraph) { paragraph = document.createElement("p"); paragraph.className = "turn-thought"; t.body.append(paragraph); text = text.replace(/^\s+/, ""); }
+  paragraph.textContent += text; t.thought = true;
+  if (!t.touched && !t.done) t.card.open = true;
+  if (t.card.open) t.body.scrollTop = t.body.scrollHeight;
+  scrollConversation();
+}
+function turnStep(data, title, iconName) {
+  const t = turnActivity(); let row = t.steps.get(data.step);
+  if (!row) {
+    row = document.createElement("div"); row.className = "turn-step"; const name = document.createElement("strong"), where = document.createElement("span");
+    name.textContent = title; where.textContent = [".", "./", ""].includes(data.path ?? "") ? data.detail || "Project root" : data.path; for (const [id, label] of mcpNames) where.textContent = where.textContent.replace(id, label);
+    row.append(icon(iconName), name, where); t.body.append(row); t.steps.set(data.step, row); scrollConversation();
+  }
+  if (data.phase === "finish") row.classList.add(data.result?.startsWith("Error:") || data.result === "Denied by user" ? "failed" : "complete");
+}
+function closeTurnActivity() { if (turn && !turn.touched) turn.card.open = false; }
+function finishTurnActivity() {
+  if (!turn || turn.done) return; const t = turn; t.done = true; t.card.classList.remove("live");
+  if (!t.thought && !t.steps.size) { t.card.remove(); return; }
+  const seconds = Math.max(1, Math.round((Date.now() - t.started) / 1000)), steps = t.steps.size;
+  t.title.textContent = t.thought ? `Thought for ${seconds} s` : `Worked for ${seconds} s`; t.meta.textContent = steps ? `${steps} step${steps === 1 ? "" : "s"}` : "";
+  if (!t.touched) t.card.open = false;
+}
 function message(text, kind = "answer") {
   if (!text) return;
+  if (kind === "thinking") turnThought(text, thinkingBreak);
+  if (kind === "answer") closeTurnActivity();
   if (kind === "thinking" || kind === "coding") {
     byId(kind === "thinking" ? "thoughts" : "code-preview").hidden = false;
     const target = byId(kind); const follow = target.scrollHeight - target.scrollTop - target.clientHeight < 60;
@@ -221,9 +268,8 @@ async function start(faster = false) {
 }
 function beginTurn(text) {
   if (innerWidth > 620) inspectorTab(false);
-  if (byId("thinking").textContent) { const card = document.createElement("details"), summary = document.createElement("summary"), content = document.createElement("pre"); card.className = "message reasoning-history"; summary.textContent = "Previous turn · thinking"; content.textContent = byId("thinking").textContent; card.append(summary, content); byId("messages").append(card); }
-  finishStreaming(); thinkingBreak = false;
-  streaming = undefined; message(text, "you"); streaming = undefined;
+  finishStreaming(); finishTurnActivity(); thinkingBreak = false;
+  streaming = undefined; message(text, "you"); streaming = undefined; turnActivity();
   toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0";
   byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Waiting for the model’s reasoning stream. Tool activity appears below.";
   for (const id of ["thinking", "coding"]) { byId(id).textContent = ""; }
@@ -262,7 +308,8 @@ async function update() {
       if (state.error) { showError(state.error); }
       return;
     }
-    const state = await api(`/api/state?after=${after}`);
+    // The server holds this request until something changes, so an idle window sends nothing.
+    const state = await api(`/api/state?after=${after}${stateKey ? `&wait=${encodeURIComponent(stateKey)}` : ""}`); stateKey = state.key || "";
     availableSkills = state.skills || []; for (const server of state.mcp || []) mcpNames.set(server.id, server.name);
     byId("welcome").hidden = !(["choose", "error"].includes(state.phase) && !state.problem);
     byId("loading").hidden = state.phase !== "starting";
@@ -280,6 +327,8 @@ async function update() {
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
     progress(state.progress, ["starting", "working"].includes(state.phase));
+    const resting = state.resting && !["starting", "working"].includes(state.phase); byId("ready-dot").classList.toggle("resting", resting);
+    if (resting) { byId("ready-label").textContent = "Resting"; byId("ready-label").title = "The model is paused to free memory. Your next message wakes it."; } else byId("ready-label").title = "";
     if (state.problem) { showError(state.problem); byId("ready-label").textContent = "Needs attention"; }
     for (const event of state.events) {
       after = event.id;
@@ -303,8 +352,10 @@ async function update() {
         byId("approvals").append(card); if (innerWidth <= 620) document.body.classList.remove("inspector-open"); scrollConversation(true);
       }
     }
-  } catch { if (!native) { showError({ message: "The assistant has stopped. Open the app again to continue.", action: "OK" }); } }
+    if (!["starting", "working"].includes(state.phase)) finishTurnActivity();
+  } catch { stateKey = ""; if (!native) { showError({ message: "The assistant has stopped. Open the app again to continue.", action: "OK" }); } return false; }
   finally { polling = false; }
+  return true;
 }
 function diffLines(before, after) {
   const a = before.split("\n"), b = after.split("\n");
@@ -334,9 +385,14 @@ function approvalCard(data) {
   } else { const preview = document.createElement("pre"); preview.textContent = data.after; card.append(preview); }
   return card;
 }
-// Poll quickly while the model is streaming so text arrives smoothly, and slowly when idle.
-(function poll() { setTimeout(async () => { await update(); poll(); }, working || nativeStarting ? 150 : 500); })();
-if (!native) { void update(); }
+// The desktop start page asks the native shell for progress; the workspace page long-polls its server.
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+(async function loop() {
+  for (;;) {
+    if (native) { await pause(nativeStarting ? 150 : 500); await update(); continue; }
+    if (!await update()) await pause(2000);
+  }
+})();
 
 async function checkAppUpdates() {
   if (!native || installingUpdate) { return; }
@@ -524,13 +580,16 @@ byId("sidebar-toggle").onclick = () => { if (innerWidth <= 860) document.body.cl
 byId("activity-toggle").onclick = () => { if (innerWidth <= 620) document.body.classList.toggle("inspector-open"); else document.body.classList.toggle("inspector-hidden"); };
 function inspectorTab(file) { byId("activity-panel").hidden = file; byId("file-panel").hidden = !file; byId("tab-file").classList.toggle("active", file); byId("tab-activity").classList.toggle("active", !file); document.body.classList.remove("inspector-hidden"); if (innerWidth <= 620) document.body.classList.add("inspector-open"); }
 byId("tab-file").onclick = () => inspectorTab(true); byId("tab-activity").onclick = () => inspectorTab(false);
+const toolTitle = (tool) => ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[tool] || tool;
+const toolIcon = (tool) => ({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass"})[tool] || "sparkle";
 function renderTool(data) {
+  turnStep(data, toolTitle(data.tool), toolIcon(data.tool));
   let card = toolCards.get(data.step);
   if (!card) {
     if (!toolCards.size) byId("tool-activity").textContent = "";
     card = document.createElement("div"); card.className = "tool-card"; thinkingBreak = true;
-    const badge = document.createElement("span"); badge.className = "tool-icon"; badge.append(icon(({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass"})[data.tool] || "sparkle")); card.append(badge);
-    const title = document.createElement("strong"); title.textContent = ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[data.tool] || data.tool;
+    const badge = document.createElement("span"); badge.className = "tool-icon"; badge.append(icon(toolIcon(data.tool))); card.append(badge);
+    const title = document.createElement("strong"); title.textContent = toolTitle(data.tool);
     const path = document.createElement("span"); path.className = "tool-path"; path.textContent = [".", "./", ""].includes(data.path ?? "") ? data.detail || "Project root" : data.path; for (const [id,name] of mcpNames) path.textContent = path.textContent.replace(id,name);
     card.append(title,path); byId("tool-activity").append(card); toolCards.set(data.step,card); byId("tool-count").textContent = String(toolCards.size);
   }

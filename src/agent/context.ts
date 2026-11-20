@@ -28,10 +28,15 @@ function mentions(task: string, name: string): boolean {
   return false;
 }
 export async function buildTaskContext(task: string, source: ContextSource, limit = contextLimit(), signal = new AbortController().signal): Promise<string> {
+  const parts = await taskContextParts(task, source, limit, signal); return parts.list + parts.named;
+}
+// The file list and the files a task names, kept apart so a follow-up can leave out an unchanged list.
+export async function taskContextParts(task: string, source: ContextSource, limit = contextLimit(), signal = new AbortController().signal): Promise<{ list: string; named: string }> {
   const files = (await source.list(signal)).sort();
   const basenames = new Map<string, number>();
   for (const file of files) { const name = file.split(/[\\/]/).at(-1)!.toLowerCase(); basenames.set(name, (basenames.get(name) ?? 0) + 1); }
-  let result = clipUtf8(`Project file list:\n${files.join("\n") || "(No files yet)"}\n`, Math.min(4096, Math.floor(limit / 3)));
+  const list = clipUtf8(`Project file list:\n${files.join("\n") || "(No files yet)"}\n`, Math.min(4096, Math.floor(limit / 3)));
+  let result = list;
   for (const file of files) {
     signal.throwIfAborted();
     const name = file.split(/[\\/]/).at(-1)!;
@@ -41,7 +46,7 @@ export async function buildTaskContext(task: string, source: ContextSource, limi
     try { result += clipUtf8(`\nNamed file: ${file}\n${await source.read(file, signal)}\n`, remaining); }
     catch { result += clipUtf8(`\nNamed file ${file} is unavailable; inspect it with a file tool if needed.\n`, remaining); }
   }
-  return result;
+  return { list, named: result.slice(list.length) };
 }
 export function projectContext(box: Sandbox): ContextSource {
   return {
@@ -71,9 +76,13 @@ export function projectContext(box: Sandbox): ContextSource {
 // the append-only history, so the beginning of each request stays byte-identical
 // across several agent steps. That keeps the model server's prompt cache valid;
 // trimming a little more every step would force it to reprocess the whole prompt.
+/** Starts the project details attached to a task message; see runAgent. */
+export const contextMark = "\n\n<project_context>\n";
 export function boundedToolHistory(messages: Message[], limit = contextLimit()): Message[] {
   const omitted = "\n[Older context omitted to keep this request small; read focused files if needed.]";
-  const sizes = messages.map((message) => message.role === "system" || message.role === "user" && !message.content.startsWith("<tool_result>") ? 0 : Buffer.byteLength(message.content));
+  // A task message keeps its own words; only the project context attached to it can be trimmed.
+  const keep = messages.map((message) => message.role === "system" ? message.content.length : message.role === "user" && !message.content.startsWith("<tool_result>") ? (message.content.includes(contextMark) ? message.content.indexOf(contextMark) : message.content.length) : 0);
+  const sizes = messages.map((message, index) => Buffer.byteLength(message.content.slice(keep[index]!)));
   const total = sizes.reduce((sum, size) => sum + size, 0);
   if (total <= limit) { return [...messages]; }
   const step = Math.max(1, Math.floor(limit / 2));
@@ -83,6 +92,7 @@ export function boundedToolHistory(messages: Message[], limit = contextLimit()):
     const size = sizes[index]!; if (!size) { return message; }
     const start = offset; offset += size;
     if (start >= drop) { return message; }
-    return { ...message, content: `${clipUtf8(message.content, Math.max(0, offset - drop - 100))}${omitted}` };
+    const head = message.content.slice(0, keep[index]!);
+    return { ...message, content: `${head}${clipUtf8(message.content.slice(head.length), Math.max(0, offset - drop - 100))}${omitted}` };
   });
 }

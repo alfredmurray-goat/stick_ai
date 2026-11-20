@@ -164,9 +164,9 @@ export class ManagedEngine implements Switchable {
     }
     this.child = null; this.active = null; this.onProcess?.(null);
   }
-  private async slotAction(action: "save" | "restore"): Promise<boolean> {
+  private async slotAction(action: "save" | "restore", filename = "lite-cache.bin"): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/slots/0?action=${action}`, { method: "POST", redirect: "error", headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ filename: "lite-cache.bin" }), signal: AbortSignal.timeout(120000) });
+      const response = await fetch(`${this.baseUrl}/slots/0?action=${action}`, { method: "POST", redirect: "error", headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ filename }), signal: AbortSignal.timeout(120000) });
       await response.body?.cancel(); return response.ok;
     } catch (error) { this.log(error); return false; }
   }
@@ -176,6 +176,34 @@ export class ManagedEngine implements Switchable {
     // The file is about half a gigabyte; it's only needed for this one swap.
     await rm(join(this.temp, "slots", "lite-cache.bin"), { force: true }).catch(() => undefined);
     return restored;
+  }
+  private warmed = "";
+  // Reads the session's system message into Lite's prompt cache while the user is still typing, so
+  // the first answer only reads the task itself. Measured on 4 CPU cores: an 851-token system message
+  // took 35 s once; the request after it read 19 new tokens (3.7 s instead of ~40 s). The template is
+  // rendered by the server itself and cut just before the user's words, so the cached tokens are an
+  // exact prefix of every real request. The read state is saved so a new conversation can start
+  // from it again in a fraction of a second instead of reading it all again.
+  async warm(system: string, signal: AbortSignal): Promise<boolean> {
+    if (this.active !== "stellan-1-lite" || !this.child) { return false; }
+    try {
+      const post = async (path: string, body: unknown): Promise<unknown> => {
+        const response = await fetch(`${this.baseUrl}${path}`, { method: "POST", redirect: "error", headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+        if (!response.ok) { await response.body?.cancel(); throw new Error(`Model server ${path} failed with HTTP ${response.status}`); }
+        return response.json();
+      };
+      const mark = "\u0001STICK_TASK\u0001";
+      const rendered = await post("/apply-template", { messages: [{ role: "system", content: system }, { role: "user", content: mark }] }) as { prompt?: unknown };
+      const at = typeof rendered.prompt === "string" ? rendered.prompt.indexOf(mark) : -1;
+      if (at <= 0) { return false; }
+      await post("/completion", { prompt: (rendered.prompt as string).slice(0, at), n_predict: 0, cache_prompt: true });
+      if (!await this.slotAction("save", "system-cache.bin")) { return false; }
+      this.warmed = system; return true;
+    } catch (error) { if (!signal.aborted) { this.log(error); } return false; }
+  }
+  /** Puts Lite back to the state right after reading `system`; false if that state wasn't saved. */
+  async restoreSystem(system: string): Promise<boolean> {
+    return this.active === "stellan-1-lite" && this.child && this.warmed === system ? this.slotAction("restore", "system-cache.bin") : false;
   }
   async status(): Promise<ServerStatus | undefined> {
     if (!this.child) { return undefined; }
