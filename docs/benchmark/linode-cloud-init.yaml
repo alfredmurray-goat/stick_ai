@@ -1,0 +1,38 @@
+#cloud-config
+# Paste into Akamai Cloud's "Add User Data" box when creating the Linode (see docs/BENCHMARKS.md).
+# Replace the two PASTE_… values. The Linode registers as a one-job GitHub runner, runs the
+# "Max benchmark" workflow, then DELETES ITSELF so it can't keep billing. Hard stop: 12 hours.
+package_update: true
+packages: [build-essential, cmake, git, curl, jq, python3]
+write_files:
+  - path: /root/stick-bench.sh
+    permissions: "0700"
+    content: |
+      #!/bin/bash
+      set -u
+      RUNNER_TOKEN="PASTE_GITHUB_RUNNER_TOKEN"
+      LINODE_TOKEN="PASTE_AKAMAI_API_TOKEN"
+      # Whatever happens (finished, failed, timed out), delete this Linode afterwards.
+      delete_me() {
+        meta=$(curl -s -X PUT -H "Metadata-Token-Expiry-Seconds: 3600" http://169.254.169.254/v1/token)
+        id=$(curl -s -H "Metadata-Token: $meta" -H "Accept: application/json" http://169.254.169.254/v1/instance | jq -r .id)
+        # If the metadata service didn't answer, find this Linode by its public IPv4 address instead.
+        if ! [[ "$id" =~ ^[0-9]+$ ]]; then
+          ip=$(curl -s -4 https://api.ipify.org)
+          id=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" "https://api.linode.com/v4/linode/instances?page_size=500" | jq -r --arg ip "$ip" '.data[] | select(.ipv4 | index($ip)) | .id' | head -1)
+        fi
+        curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" "https://api.linode.com/v4/linode/instances/$id"
+      }
+      trap delete_me EXIT
+      useradd -m runner
+      cd /home/runner
+      version=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | jq -r .tag_name | tr -d v)
+      curl -sL -o runner.tgz "https://github.com/actions/runner/releases/download/v$version/actions-runner-linux-x64-$version.tar.gz"
+      tar xzf runner.tgz && rm runner.tgz && chown -R runner: /home/runner
+      ./bin/installdependencies.sh
+      sudo -u runner ./config.sh --unattended --ephemeral --url https://github.com/alfredmurray-goat/stick_ai \
+        --token "$RUNNER_TOKEN" --labels max-bench --name linode-max-bench
+      # One job, then the runner exits. 12 h covers the build, the download and the test with room to spare.
+      sudo -u runner timeout 12h ./run.sh
+runcmd:
+  - [bash, /root/stick-bench.sh]

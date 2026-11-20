@@ -17,4 +17,6 @@ The Droplet installs the build tools, builds the pinned llama.cpp, downloads Max
 
 **Paying by card instead:** Hetzner's **CCX33** (8 dedicated vCPUs, 32 GB) is cheaper, at €0.1891 an hour excl. VAT (about 1.76 kr with Danish VAT, so about 21 kr for the full 12 hours). Use [`benchmark/hetzner-cloud-init.yaml`](benchmark/hetzner-cloud-init.yaml) in the **Cloud config** box, and a Hetzner API token (project → **Security → API tokens**, **Read & Write**) in place of the DigitalOcean one. Hetzner takes cards and PayPal, but not Google Pay or Apple Pay.
 
+**Akamai Cloud (Linode), by card:** the **Shared CPU → Linode 32 GB** plan (8 CPUs) is $0.288 an hour, about 30 kr with Danish VAT for the full 12 hours, and new accounts have been offered free trial credit. Create a personal access token (profile → **API Tokens → Create**, **Linodes: Read/Write**, expiry 1 day), then create the Linode with **Ubuntu 24.04** in a region whose form offers **Add User Data** (for example Amsterdam or Stockholm), and paste [`benchmark/linode-cloud-init.yaml`](benchmark/linode-cloud-init.yaml) there.
+
 The runner only takes one job and the repository is public, so start the workflow before or right after creating the server; the queued benchmark job is what it picks up.
