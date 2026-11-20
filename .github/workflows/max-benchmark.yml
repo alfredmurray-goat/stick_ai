@@ -1,0 +1,63 @@
+# Measures Stellan-1 Max on the full HumanEval on a rented machine with 32 GB of memory (GitHub's own runners
+# have 16 GB, where Max can't run). The machine registers itself as a one-job ("ephemeral") self-hosted runner
+# with the max-bench label; see docs/BENCHMARKS.md. Started by hand only, never by pushes or pull requests.
+name: Max benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: "Run every Nth problem (1 = all 164)"
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  humaneval:
+    runs-on: [self-hosted, linux, x64, max-bench]
+    # A hard stop keeps the rented machine's bill bounded (about 1.76 kr an hour for a Hetzner CCX33).
+    timeout-minutes: 840
+    env:
+      LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
+      HUMANEVAL_COMMIT: b9453e8f1865df0a0057a1383767caa400acfbcf
+      HUMANEVAL_SHA256: b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Machine
+        run: |
+          nproc; free -g; lscpu | grep -E 'Model name|^CPU\(s\)'
+      - name: Build the pinned llama.cpp server (same flags as the release)
+        run: |
+          git init llama.cpp
+          git -C llama.cpp remote add origin https://github.com/ggml-org/llama.cpp.git
+          git -C llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
+          git -C llama.cpp checkout --detach FETCH_HEAD
+          cmake -S llama.cpp -B llama-build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF
+          cmake --build llama-build --config Release --target llama-server -j "$(nproc)"
+      - name: Download the pinned Max and HumanEval
+        run: |
+          node -e 'import("./dist/portable/max-release.js").then(m => console.log(m.maxRelease.url + " " + m.bundledMax.sha256))' > max.txt
+          read -r url sha < max.txt
+          curl --fail --location --retry 5 --output max.gguf "$url"
+          echo "$sha  max.gguf" | sha256sum -c -
+          curl --fail --location --retry 5 --output HumanEval.jsonl.gz "https://raw.githubusercontent.com/openai/human-eval/$HUMANEVAL_COMMIT/data/HumanEval.jsonl.gz"
+          echo "$HUMANEVAL_SHA256  HumanEval.jsonl.gz" | sha256sum -c -
+          gunzip -f HumanEval.jsonl.gz
+      - name: HumanEval
+        run: node scripts/benchmark-humaneval.mjs --server llama-build/bin/llama-server --gguf max.gguf --model stellan-1-max --problems HumanEval.jsonl --out humaneval-max.json --sample "${{ inputs.sample }}"
+      - name: Summary
+        if: always()
+        run: |
+          test -f humaneval-max.json && node -e 'const d=require("./humaneval-max.json");const p=d.results.filter(r=>r.passed).length;const n=d.results.length;const tps=d.results.filter(r=>r.genTokPerSec).map(r=>r.genTokPerSec);console.log(`### Stellan-1 Max HumanEval\n\n**${p} / ${n}** (${(100*p/Math.max(n,1)).toFixed(1)}%) on ${d.cpus} CPUs (${d.cpu}), ${d.totalMemGB} GB. Median ${tps.sort((a,b)=>a-b)[tps.length>>1]?.toFixed(2)} tokens/s.`)' >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: humaneval-max
+          path: humaneval-max.json
+          if-no-files-found: ignore
