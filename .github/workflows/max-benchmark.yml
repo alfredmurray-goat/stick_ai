@@ -16,8 +16,8 @@ permissions:
 jobs:
   humaneval:
     runs-on: [self-hosted, linux, x64, max-bench]
-    # A hard stop keeps the rented machine's bill bounded (about 1.76 kr an hour for a Hetzner CCX33).
-    timeout-minutes: 840
+    # A hard stop keeps the rented machine's bill bounded; the machine itself stops at 12 hours.
+    timeout-minutes: 690
     env:
       LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
       HUMANEVAL_COMMIT: b9453e8f1865df0a0057a1383767caa400acfbcf

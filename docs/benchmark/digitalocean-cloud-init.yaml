@@ -1,7 +1,7 @@
 #cloud-config
-# Paste into Hetzner's "Cloud config" box when creating the server (see docs/BENCHMARKS.md).
-# Replace the two PASTE_… values. The server registers as a one-job GitHub runner, runs the
-# "Max benchmark" workflow, then DELETES ITSELF so it can't keep billing. Hard stop: 16 hours.
+# Paste into DigitalOcean's "User data" box when creating the Droplet (see docs/BENCHMARKS.md).
+# Replace the two PASTE_… values. The Droplet registers as a one-job GitHub runner, runs the
+# "Max benchmark" workflow, then DELETES ITSELF so it can't keep billing. Hard stop: 12 hours.
 package_update: true
 packages: [build-essential, cmake, git, curl, jq, python3]
 write_files:
@@ -11,11 +11,11 @@ write_files:
       #!/bin/bash
       set -u
       RUNNER_TOKEN="PASTE_GITHUB_RUNNER_TOKEN"
-      HCLOUD_TOKEN="PASTE_HETZNER_API_TOKEN"
-      # Whatever happens (finished, failed, timed out), delete this server afterwards.
+      DO_TOKEN="PASTE_DIGITALOCEAN_API_TOKEN"
+      # Whatever happens (finished, failed, timed out), delete this Droplet afterwards.
       delete_me() {
-        id=$(curl -s http://169.254.169.254/hetzner/v1/metadata/instance-id)
-        curl -s -X DELETE -H "Authorization: Bearer $HCLOUD_TOKEN" "https://api.hetzner.cloud/v1/servers/$id"
+        id=$(curl -s http://169.254.169.254/metadata/v1/id)
+        curl -s -X DELETE -H "Authorization: Bearer $DO_TOKEN" "https://api.digitalocean.com/v2/droplets/$id"
       }
       trap delete_me EXIT
       useradd -m runner
@@ -25,8 +25,8 @@ write_files:
       tar xzf runner.tgz && rm runner.tgz && chown -R runner: /home/runner
       ./bin/installdependencies.sh
       sudo -u runner ./config.sh --unattended --ephemeral --url https://github.com/alfredmurray-goat/stick_ai \
-        --token "$RUNNER_TOKEN" --labels max-bench --name hetzner-max-bench
-      # One job, then the runner exits. 16 h covers waiting, the download, the build and the test.
-      sudo -u runner timeout 16h ./run.sh
+        --token "$RUNNER_TOKEN" --labels max-bench --name do-max-bench
+      # One job, then the runner exits. 12 h covers the build, the download and the test with room to spare.
+      sudo -u runner timeout 12h ./run.sh
 runcmd:
   - [bash, /root/stick-bench.sh]
