@@ -11,7 +11,7 @@
   <link rel="canonical" href="https://stick-ai.localilabs.com/">
   <meta property="og:type" content="website">
   <meta property="og:title" content="stick_ai · Your code never leaves the stick">
-  <meta property="og:description" content="A private coding assistant on a €15 USB stick. Plug it in, open it, ask. Nothing is sent anywhere.">
+  <meta property="og:description" content="A private coding assistant on a €15 USB stick. Plug it in, open it, ask. Your code stays on your computer.">
   <meta property="og:url" content="https://stick-ai.localilabs.com/">
   <meta property="og:image" content="https://stick-ai.localilabs.com/img/brand/logo-dark.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -170,6 +170,20 @@
         <div class="stamp eu"><span>EU</span><b>FEB 2027</b><small>orders &amp; shipping</small></div>
         <div class="stamp world"><span>WORLD</span><b>MAY 2027</b><small>orders &amp; shipping</small></div>
         <p class="small">Shipping is paid by the customer and added at checkout, based on where you live. Prices may change before launch.</p>
+        <form class="notify" id="notify" method="post" action="/api/interest">
+          <h3 class="notify-title">Get one email when orders open</h3>
+          <label for="notify-email">Your email</label>
+          <div class="notify-row">
+            <input id="notify-email" name="email" type="email" required autocomplete="email" maxlength="254" placeholder="you@example.com">
+            <select name="region" aria-label="Where should it ship?" required>
+              <option value="eu">EU · Feb 2027</option>
+              <option value="world">Rest of world · May 2027</option>
+            </select>
+          </div>
+          <label class="trap" aria-hidden="true">Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label>
+          <label class="consent"><input type="checkbox" name="consent" value="yes" required><span>Email me once when orders open where I live. Nothing else, no newsletter. I can ask for my email to be deleted any time (<a href="/privacy">privacy policy</a>).</span></label>
+          <button class="btn" type="submit">Notify me →</button>
+        </form>
       </div>
     </section>
 
@@ -179,7 +193,8 @@
       <details><summary>When can I buy it?</summary><p>It isn't on sale yet. Orders open in February 2027 with shipping across the European Union, and in May 2027 for the rest of the world.</p></details>
       <details><summary>How much is it?</summary><p>€15 per stick in the EU, VAT included, and $17 in the rest of the world, plus shipping. It's a one-off price: no subscription.</p></details>
       <details><summary>Is it really better than GPT-4 and Claude 2?</summary><p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023. Today's newest cloud models score higher still. What makes stick_ai different is that it runs privately, on your own computer.</p></details>
-      <details><summary>Does it need the internet?</summary><p>No. Stellan runs entirely on your computer. You only need the internet if you choose to connect GitHub.</p></details>
+      <details><summary>Does it need the internet?</summary><p>No. Stellan runs entirely on your computer. It only goes online to check for app updates, if you connect GitHub, or for a web search you allow (only the search words are sent, never your code). Everything else works offline.</p></details>
+      <details><summary>My computer says it can't open the app. Is it safe?</summary><p>Yes. stick_ai isn't signed with a paid Apple or Microsoft certificate, so your computer may ask once before opening it. <a href="/start">Here's how to open it</a>: it takes a few clicks and only happens the first time.</p></details>
       <details><summary>Does the AI get copied onto my computer?</summary><p>No. The models stay on the stick. While the app is open they're read into your computer's memory, like playing a film straight off a USB drive. Nothing is installed.</p></details>
       <details><summary>Which computers does it work on?</summary><p>Macs with Apple Silicon or Intel (macOS 13.5 or newer), Windows 10 and 11 (64-bit) and 64-bit Linux. Lite needs 8 GB of memory; Max needs at least 16 GB and runs best with 24 GB or more.</p></details>
       <details><summary>Do I pay for shipping?</summary><p>Yes. Shipping is added at checkout and depends on where the stick is going.</p></details>
@@ -190,7 +205,7 @@
     <p class="giant" aria-hidden="true">stick_ai</p>
     <div class="foot-row">
       <p>stick_ai by Localilabs · private, offline coding help</p>
-      <p>© 2026 Localilabs. Not yet launched: details and prices may change.</p>
+      <p><a href="/start">help</a> · <a href="/privacy">privacy</a> · © 2026 Localilabs. Not yet launched: details and prices may change.</p>
     </div>
   </footer>
 </body>

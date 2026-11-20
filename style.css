@@ -220,6 +220,35 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .faq details[open] summary::before { content: "→"; }
 .faq details p { color: var(--muted); margin: 10px 0 0 32px; }
 
+/* Launch notification form: plain HTML, no script. */
+.notify { margin-top: 30px; padding: 22px 22px 24px; background: var(--ink-2); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 10px; }
+.stamps .notify-title { font-size: 1.3rem; letter-spacing: -.02em; margin: 0; }
+.notify label { font: 400 12.5px var(--mono); color: var(--muted); }
+.notify-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.notify input[type=email], .notify select { font: 400 15px var(--display); color: var(--text); background: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; min-width: 0; }
+.notify input[type=email]:focus, .notify select:focus { outline: 2px solid var(--violet); outline-offset: 1px; }
+.notify .consent { display: flex; gap: 10px; align-items: flex-start; font: 400 13px/1.5 var(--display); color: var(--muted); }
+.notify .consent input { margin-top: 3px; accent-color: var(--violet); flex-shrink: 0; }
+.notify .btn { justify-self: start; border: 0; cursor: pointer; font-family: inherit; }
+.trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+@media (max-width: 520px) { .notify-row { grid-template-columns: 1fr; } }
+
+/* Text pages: privacy, help, sign-up result. */
+.page { max-width: 760px; margin: 0 auto; padding: 120px 20px 0; }
+.page h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); margin-bottom: 18px; }
+.page h2 { font-size: 1.5rem; margin: 44px 0 12px; }
+.page h3 { font-size: 1.1rem; margin: 26px 0 8px; letter-spacing: -.01em; }
+.page p, .page li { color: var(--muted); }
+.page p b, .page li b, .page strong { color: var(--text); }
+.page ol, .page ul { padding-left: 1.3em; }
+.page li { margin-bottom: 6px; }
+.page .lede { font-size: 1.15rem; color: var(--text); }
+.page .back { font: 400 13px var(--mono); color: var(--muted); text-decoration: none; }
+.page .back:hover { color: var(--text); }
+.page .os { display: inline-block; font: 700 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; background: var(--text); color: var(--ink); padding: 3px 8px; border-radius: 5px; margin-right: 8px; vertical-align: 3px; }
+.page .box { background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin: 10px 0; }
+.page .updated { font: 400 12.5px var(--mono); color: var(--faint); }
+
 /* Footer */
 .foot { max-width: var(--page); margin: 140px auto 0; padding: 0 20px 36px; overflow: hidden; }
 .giant { margin: 0; padding-bottom: .12em; font: 700 clamp(4rem, 19vw, 15rem)/.9 var(--mono); letter-spacing: -.06em; color: transparent; -webkit-text-stroke: 1.5px var(--line); white-space: nowrap; user-select: none; }
