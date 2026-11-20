@@ -269,3 +269,58 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 
 /* Phones: the three quick facts sit in a tidy two-column grid. */
 @media (max-width: 520px) { .facts { display: grid; grid-template-columns: 1fr 1fr; } .facts li, .facts li + li { margin: 0; padding: 14px 10px 0 0; border-left: 0; } }
+
+/* Motion: pure CSS, no scripts. The content is fully visible without it: browsers without
+   scroll-driven animations skip the scroll effects, and "reduce motion" turns all of it off (see the top). */
+@keyframes rise { from { opacity: 0; transform: translateY(22px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes float { 50% { transform: translateY(-10px) rotate(-2deg); } }
+@keyframes breathe { 50% { opacity: .9; transform: scale(1.08); } }
+@keyframes fill { from { clip-path: inset(0 100% 0 0); } }
+@keyframes type { from { opacity: 0; } }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
+
+/* Hero: the copy arrives in order, the stick floats in a soft glow. */
+.hero-copy > * { animation: rise .8s cubic-bezier(.2, .7, .2, 1) both; }
+.hero-copy > :nth-child(2) { animation-delay: .08s; }
+.hero-copy > :nth-child(3) { animation-delay: .18s; }
+.hero-copy > :nth-child(4) { animation-delay: .28s; }
+.hero-copy > :nth-child(5) { animation-delay: .38s; }
+.specimen { animation: rise 1s .2s cubic-bezier(.2, .7, .2, 1) both; }
+.bench-plate { overflow: hidden; isolation: isolate; }
+.bench-plate > picture { position: relative; z-index: 1; display: grid; place-items: center; width: 100%; animation: float 6s 1.2s ease-in-out infinite; }
+.bench-plate > picture img { width: 82%; }
+.bench-plate .glow { position: absolute; inset: 18%; z-index: 0; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--violet) 45%, transparent), transparent); opacity: .55; filter: blur(10px); animation: breathe 6s 1.2s ease-in-out infinite; pointer-events: none; }
+.status i { animation: ping 2.4s ease-out infinite; }
+
+/* Hover: things you can touch lift a little. */
+.feature-grid article { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+.feature-grid article:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--violet) 55%, var(--line)); box-shadow: 0 20px 40px -24px var(--violet); }
+.btn { position: relative; overflow: hidden; }
+.btn:not(.ghost)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%); transform: translateX(-120%); transition: transform .6s ease; pointer-events: none; }
+.btn:not(.ghost):hover::after { transform: translateX(120%); }
+
+/* Scroll: sections rise in as they come into view; the demo types itself out; the bars fill. */
+@supports (animation-timeline: view()) {
+  section > .kicker, section > h2, .feature-grid article, .numbers > div, .label, .tree-wrap, .tag, .stamps, .faq details, .bars, .fine, .session-copy .steps li {
+    animation: rise linear both; animation-timeline: view(); animation-range: entry 0% cover 22%;
+  }
+  .feature-grid article:nth-child(2), .numbers > div:nth-child(2), .steps li:nth-child(2) { animation-range: entry 8% cover 26%; }
+  .feature-grid article:nth-child(3), .numbers > div:nth-child(3), .steps li:nth-child(3) { animation-range: entry 16% cover 30%; }
+  .feature-grid article:nth-child(4) { animation-range: entry 24% cover 34%; }
+  .term { view-timeline: --term block; }
+  .term .ln { animation: type linear both; animation-timeline: --term; }
+  .term .ln:nth-of-type(1) { animation-range: cover 6.2% cover 8.4%; }
+  .term .ln:nth-of-type(2) { animation-range: cover 8.4% cover 10.6%; }
+  .term .ln:nth-of-type(3) { animation-range: cover 10.6% cover 12.8%; }
+  .term .ln:nth-of-type(4) { animation-range: cover 12.8% cover 15.0%; }
+  .term .ln:nth-of-type(5) { animation-range: cover 15.0% cover 17.2%; }
+  .term .ln:nth-of-type(6) { animation-range: cover 17.2% cover 19.4%; }
+  .term .ln:nth-of-type(7) { animation-range: cover 19.4% cover 21.6%; }
+  .term .ln:nth-of-type(8) { animation-range: cover 21.6% cover 23.8%; }
+  .term .ln:nth-of-type(9) { animation-range: cover 23.8% cover 26.0%; }
+  .term .ln:nth-of-type(10) { animation-range: cover 26.0% cover 28.2%; }
+  .term .ln:nth-of-type(11) { animation-range: cover 28.2% cover 30.4%; }
+  .bars .blocks { animation: fill linear both; animation-timeline: view(); animation-range: entry 30% cover 40%; }
+  .bars .score { animation: fade linear both; animation-timeline: view(); animation-range: entry 60% cover 42%; }
+}

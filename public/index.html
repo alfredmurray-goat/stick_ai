@@ -58,6 +58,7 @@
       </div>
       <figure class="specimen">
         <div class="bench-plate">
+          <span class="glow" aria-hidden="true"></span>
           <picture>
             <source srcset="/img/brand/logo-light.png" media="(prefers-color-scheme: light)">
             <img src="/img/brand/logo-dark.png" alt="The stick_ai USB stick: a dark stick with a glowing violet edge, a small terminal face on its cap and stick_ai printed on its side" width="425" height="520">
@@ -79,20 +80,20 @@
       </div>
       <div class="term" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
         <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
-<pre><span class="dim">$</span> stick_ai open ~/projects/shop
-<span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes of code sent</span>
+<pre><span class="ln"><span class="dim">$</span> stick_ai open ~/projects/shop</span>
+<span class="ln"><span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes of code sent</span></span>
 
-<span class="you">you ›</span> why does checkout crash when the cart is empty?
+<span class="ln"><span class="you">you ›</span> why does checkout crash when the cart is empty?</span>
 
-<span class="think">  thinking · it only fails at checkout, so the totals…</span>
-<span class="ai">stellan ›</span> <span class="dim">reading src/cart.ts … src/checkout.ts …</span>
-<span class="ai">stellan ›</span> found it: average() divides by items.length,
-          which is 0 for an empty cart.
+<span class="ln"><span class="think">  thinking · it only fails at checkout, so the totals…</span></span>
+<span class="ln"><span class="ai">stellan ›</span> <span class="dim">reading src/cart.ts … src/checkout.ts …</span></span>
+<span class="ln"><span class="ai">stellan ›</span> found it: average() divides by items.length,</span>
+<span class="ln">          which is 0 for an empty cart.</span>
 
-<span class="dim">┌ edit</span> src/checkout.ts
-<span class="dim">│</span> <span class="del">- const avg = total / items.length;</span>
-<span class="dim">│</span> <span class="add">+ const avg = items.length ? total / items.length : 0;</span>
-<span class="dim">└</span> <span class="ask">Allow changes? [y/N]</span> <span class="cursor small" aria-hidden="true"></span></pre>
+<span class="ln"><span class="dim">┌ edit</span> src/checkout.ts</span>
+<span class="ln"><span class="dim">│</span> <span class="del">- const avg = total / items.length;</span></span>
+<span class="ln"><span class="dim">│</span> <span class="add">+ const avg = items.length ? total / items.length : 0;</span></span>
+<span class="ln"><span class="dim">└</span> <span class="ask">Allow changes? [y/N]</span> <span class="cursor small" aria-hidden="true"></span></span></pre>
       </div>
     </section>
 
