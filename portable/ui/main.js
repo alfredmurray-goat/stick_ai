@@ -337,6 +337,7 @@ async function update() {
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
       if (event.kind === "skill") { toast("Skill loaded: " + event.data.names.join(", ")); }
+      if (event.kind === "hook") { toast(event.data.blocked ? `A hook stopped this: ${event.data.blocked}` : event.data.problems.join(" ")); }
       if (event.kind === "tool") { renderTool(event.data); }
       if (event.kind === "task-complete") { byId("thinking-empty").textContent = byId("thinking").textContent ? "" : "This response did not emit separate reasoning. See the tool activity below."; void refreshFiles(); }
       if (event.kind === "file-saved") { void refreshFiles(); }
@@ -562,9 +563,9 @@ const expandedFolders = new Set();
 function toast(text) { byId("toast").textContent = text; byId("toast").hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { byId("toast").hidden = true; }, 3500); }
 function openSettings(tab = "models") {
   for (const button of document.querySelectorAll("[data-settings]")) button.classList.toggle("active", button.dataset.settings === tab);
-  for (const name of ["models","github","mcp","skills","updates"]) byId(`settings-${name}`).hidden = name !== tab;
+  for (const name of ["models","github","mcp","skills","hooks","updates"]) byId(`settings-${name}`).hidden = name !== tab;
   byId("github-panel").open = true;
-  if (["mcp","skills"].includes(tab) && !native) void refreshExtensions();
+  if (["mcp","skills","hooks"].includes(tab) && !native) void refreshExtensions();
   if (!byId("settings-dialog").open) byId("settings-dialog").showModal();
 }
 byId("open-settings").onclick = () => openSettings("models");
@@ -677,7 +678,7 @@ byId("open-skills").onclick = () => openSettings("skills");
 function jsonField(id, fallback) { const text = byId(id).value.trim(); try { return text ? JSON.parse(text) : fallback; } catch { throw new Error("Enter valid JSON for arguments, headers and environment fields."); } }
 function credentialFields(bearer,headers,env) { let h = headers.value.trim() ? JSON.parse(headers.value) : undefined; const token = bearer.value.trim(); if (token) h = {...(h||{}),Authorization:`Bearer ${token}`}; return {...(h ? {headers:h}:{}),...(env.value.trim()?{env:JSON.parse(env.value)}:{})}; }
 async function extensionAction(path,data,message) {
-  if (native) { byId(message).textContent = "Open the workspace first to manage MCP servers and skills."; return; }
+  if (native) { byId(message).textContent = "Open the workspace first to manage MCP servers, skills and hooks."; return; }
   extensionBusy = true; byId(message).textContent = "Working…"; byId("mcp-cancel").hidden = false;
   try { return await api(path,data); } catch(error) { byId(message).textContent = error.message; throw error; }
   finally { extensionBusy = false; byId("mcp-cancel").hidden = true; }
@@ -687,7 +688,7 @@ function actionButton(text,handler) { const button = element("button",text,"seco
 async function refreshExtensions() {
   if (native) return;
   try {
-    const data = await api("/api/extensions"); byId("mcp-server-list").textContent = ""; byId("skills-list").textContent = "";
+    const data = await api("/api/extensions"); byId("mcp-server-list").textContent = ""; byId("skills-list").textContent = ""; renderHooks(data.hooks || []);
     const web = element("article",undefined,"extension-card builtin-card");web.append(element("h4","Web search · Actuent"),element("p",data.webSearch?"on · built in · free":"off","extension-status"),element("p",data.webSearch?"Lite can look things up on the live web: docs, versions, error messages, prices and news. Each search shows you the exact words first; only those go online.":"Lite stays fully offline. Turn this on to let it look things up on the web, with your approval each time."));
     const webToggle = actionButton(data.webSearch?"Turn off web search":"Turn on web search",async()=>{try{await extensionAction("/api/mcp/web-search",{enabled:!data.webSearch},"mcp-message");byId("mcp-message").textContent=data.webSearch?"Web search is off.":"Web search is on. Searches still ask you first.";await refreshExtensions();}catch{}});webToggle.disabled=extensionBusy;web.append(webToggle);byId("mcp-server-list").append(web);
     if (!data.servers.some(s=>!s.builtin)) byId("mcp-server-list").append(element("p","No other servers yet. Add a URL or local program below."));
@@ -706,6 +707,33 @@ async function refreshExtensions() {
     if(data.problem)byId("mcp-message").textContent=data.problem;
   }catch(error){byId("mcp-message").textContent=error.message;}
 }
+// ---------- Hooks ----------
+const hookLabels = { SessionStart: "When a conversation starts", UserPromptSubmit: "When you send a message", PreToolUse: "Before Stellan uses a tool", PostToolUse: "After Stellan uses a tool", Notification: "When Stellan needs your approval", Stop: "When Stellan finishes" };
+function renderHooks(hooks) {
+  const list = byId("hooks-list"); list.textContent = "";
+  if (!hooks.length) list.append(element("p", "No hooks yet. Add one below, for example to hear a sound when Stellan finishes."));
+  for (const hook of hooks) {
+    const card = element("article", undefined, "extension-card");
+    const what = hook.type === "http" ? `notifies ${new URL(hook.url).host}` : "runs a command";
+    card.append(element("h4", hook.name), element("p", `${hookLabels[hook.event] || hook.event}${hook.matcher ? ` · ${hook.matcher}` : ""} · ${what} · ${hook.enabled ? "on" : "off"}`, "extension-status"), element("pre", hook.type === "http" ? hook.url : hook.command));
+    const test = actionButton("Test", async () => { try { const result = await extensionAction("/api/hooks/test", { id: hook.id }, "hooks-message"); byId("hooks-message").textContent = result.problems.length ? result.problems.join(" ") : result.blocked ? `It works, and it would block: ${result.blocked}` : result.context ? `It works. It replied: ${result.context.slice(0, 300)}` : "It works."; } catch {} });
+    const toggle = actionButton(hook.enabled ? "Turn off" : "Turn on", async () => { try { await extensionAction("/api/hooks/enable", { id: hook.id, enabled: !hook.enabled }, "hooks-message"); await refreshExtensions(); byId("hooks-message").textContent = hook.enabled ? "Hook turned off." : "Hook turned on."; } catch {} });
+    const remove = actionButton("Remove", async () => { try { await extensionAction("/api/hooks/remove", { id: hook.id }, "hooks-message"); await refreshExtensions(); byId("hooks-message").textContent = "Hook removed."; } catch {} });
+    for (const button of [test, toggle, remove]) button.disabled = extensionBusy;
+    const row = element("div", undefined, "button-row"); row.append(test, toggle, remove); card.append(row); list.append(card);
+  }
+}
+function hookFormFields() {
+  const event = byId("hook-event").value, http = byId("hook-type").value === "http";
+  byId("hook-matcher-field").hidden = !["PreToolUse", "PostToolUse"].includes(event); byId("hook-command-field").hidden = http; byId("hook-url-field").hidden = !http;
+}
+byId("hook-event").onchange = hookFormFields; byId("hook-type").onchange = hookFormFields;
+byId("hook-add").onclick = async () => {
+  const event = byId("hook-event").value, type = byId("hook-type").value;
+  const data = { name: byId("hook-name").value, event, type, timeout: byId("hook-timeout").value, matcher: ["PreToolUse", "PostToolUse"].includes(event) ? byId("hook-matcher").value : "", ...(type === "http" ? { url: byId("hook-url").value } : { command: byId("hook-command").value }) };
+  try { await extensionAction("/api/hooks/add", data, "hooks-message"); for (const id of ["hook-name", "hook-matcher", "hook-command", "hook-url"]) byId(id).value = ""; byId("hook-form").open = false; await refreshExtensions(); byId("hooks-message").textContent = "Hook added. Use Test to try it."; } catch {}
+};
+byId("open-hooks").onclick = () => openSettings("hooks");
 byId("mcp-refresh").onclick = refreshExtensions;byId("skills-refresh").onclick=refreshExtensions;
 byId("mcp-cancel").onclick=()=>api("/api/cancel",{}).catch(()=>{});
 byId("mcp-transport").onchange=()=>{const local=byId("mcp-transport").value==="stdio";byId("mcp-local-fields").hidden=!local;byId("mcp-remote-fields").hidden=local;};

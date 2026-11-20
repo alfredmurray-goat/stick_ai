@@ -34,7 +34,8 @@
     "docs/DESKTOP.md",
     "docs/UPDATES.md",
     "docs/GITHUB_WORKSPACES.md",
-    "docs/MCP_SKILLS.md"
+    "docs/MCP_SKILLS.md",
+    "docs/HOOKS.md"
   ],
   "scripts": {
     "build": "tsc",

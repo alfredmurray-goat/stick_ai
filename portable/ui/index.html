@@ -34,6 +34,7 @@
   <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></symbol>
   <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M4 6l6 6-6 6M12 18h8"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
@@ -60,6 +61,7 @@
     <div class="local-note"><span class="status-dot"></span> Models run on this computer</div>
     <button id="open-mcp" class="nav-button"><svg class="i"><use href="#i-plug"/></svg> MCP servers</button>
     <button id="open-skills" class="nav-button"><svg class="i"><use href="#i-sparkle"/></svg> Skills</button>
+    <button id="open-hooks" class="nav-button"><svg class="i"><use href="#i-bolt"/></svg> Hooks</button>
     <button id="open-settings" class="nav-button"><svg class="i"><use href="#i-sliders"/></svg> Models &amp; settings</button>
     <button id="theme-toggle" class="nav-button"><svg class="i theme-dark-icon"><use href="#i-sun"/></svg><svg class="i theme-light-icon"><use href="#i-moon"/></svg> <span id="theme-label">Light appearance</span></button>
     <button id="open-updates" class="nav-button"><svg class="i"><use href="#i-download"/></svg> App updates</button>
@@ -157,7 +159,7 @@
 
 <dialog id="settings-dialog" class="settings-dialog">
   <div class="dialog-heading"><div class="app-tile" aria-hidden="true"><img class="tile logo-dark" src="brand/icon-dark.png" alt=""><img class="tile logo-light" src="brand/icon-light.png" alt=""></div><div><h2>Stick AI</h2><p>Your private coding assistant.</p></div><button id="close-settings" class="icon-button" aria-label="Close settings"><svg class="i"><use href="#i-x"/></svg></button></div>
-  <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="updates">Updates</button></nav>
+  <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="hooks">Hooks</button><button data-settings="updates">Updates</button></nav>
 
   <div id="settings-models" class="settings-page">
     <h3>Your local models</h3>
@@ -248,6 +250,24 @@
     </details>
   </div>
 
+  <div id="settings-hooks" class="settings-page" hidden>
+    <h3>Hooks</h3>
+    <p>Run your own command, or tell another app on this computer, when something happens: when you send a message, before or after Stellan uses a tool, when it needs your approval, or when it finishes.</p>
+    <p class="muted">A hook can stop a message or a tool call, or add notes for Stellan. It can never approve a change for you. Commands run on this computer with your permissions, so only add commands you trust. Hooks are saved in the app and never read from a project folder.</p>
+    <div id="hooks-list"></div>
+    <p id="hooks-message" role="status"></p>
+    <details id="hook-form"><summary>Add a hook</summary>
+      <label for="hook-name">Name</label><input id="hook-name" placeholder="Tell me when it's done">
+      <label for="hook-event">When</label><select id="hook-event"><option value="Stop">When Stellan finishes</option><option value="Notification">When Stellan needs your approval</option><option value="UserPromptSubmit">When you send a message</option><option value="PreToolUse">Before Stellan uses a tool</option><option value="PostToolUse">After Stellan uses a tool</option><option value="SessionStart">When a conversation starts</option></select>
+      <div id="hook-matcher-field" hidden><label for="hook-matcher">Only for these tools (optional)</label><input id="hook-matcher" placeholder="write_file|edit_file"></div>
+      <label for="hook-type">What it does</label><select id="hook-type"><option value="command">Run a command</option><option value="http">Notify an app on this computer</option></select>
+      <div id="hook-command-field"><label for="hook-command">Command</label><input id="hook-command" placeholder="say &quot;Stellan is done&quot;" autocomplete="off" spellcheck="false"></div>
+      <div id="hook-url-field" hidden><label for="hook-url">App address</label><input id="hook-url" placeholder="http://127.0.0.1:8765/stick" autocomplete="off" spellcheck="false"></div>
+      <label for="hook-timeout">Time limit (seconds)</label><input id="hook-timeout" type="number" min="1" max="600" value="30">
+      <small>The hook gets the event as JSON: on standard input for a command, or as the request body for an app. Exit code 2, or a reply of {"decision":"block","reason":"…"}, stops the message or tool call; any other output becomes notes for Stellan.</small>
+      <div class="button-row"><button id="hook-add" class="primary small">Add hook</button></div>
+    </details>
+  </div>
   <div id="settings-skills" class="settings-page" hidden>
     <h3>Skills</h3>
     <p>Reusable SKILL.md instructions for planning, reviews, and project workflows. Use /skill-name in your message, or let Lite discover enabled skills.</p>

@@ -2,7 +2,7 @@ import { maxRecommendedBytes } from "../config/models.js";
 import { contextMark, taskContextParts, type ContextSource } from "./context.js";
 import { totalmem } from "node:os";
 import { createDelegate, type Specialist } from "./delegate.js";
-import { errorText, type Message, type Model } from "../model/types.js";
+import { errorText, type Call, type Message, type Model } from "../model/types.js";
 import { parseStep, toolResult } from "../model/protocol.js";
 import { toolSchemas } from "../tools/schema.js";
 import type { Tools } from "../tools/index.js";
@@ -32,6 +32,8 @@ export async function runAgent(options: {
   tools: Pick<Tools, "execute">;
   maxSteps: number;
   extraInstructions?: string;
+  /** Called around each tool call. `before` returns a reason to block it; `after` returns notes to add to its result. Neither can approve anything. */
+  hooks?: { before(call: Call, signal: AbortSignal): Promise<string | undefined>; after(call: Call, result: string, signal: AbortSignal): Promise<string> } | undefined;
   /** Per-task guidance (for example a skill the user picked); sent with the task, not in the system message. */
   taskInstructions?: string;
   activity?: (event: { step: number; phase: "start" | "finish"; tool: string; path?: string; detail?: string; result?: string }) => void;
@@ -69,10 +71,14 @@ export async function runAgent(options: {
       log(`→ ${call.function.name} ${call.function.arguments}`);
       try {
         signal.throwIfAborted();
+        const blocked = delegate.requiresDelegation(call) ? undefined : await options.hooks?.before(call, signal);
         if (delegate.requiresDelegation(call)) { result = "Call delegate_code before creating a file, adding a function or making a change longer than 20 lines; then review and apply the returned code."; }
+        else if (blocked) { result = `Error: A hook blocked this tool call: ${blocked}`; }
         else {
           result = call.function.name === "delegate_code" ? await delegate(call, signal) : await tools.execute(call, signal);
           if (["write_file", "edit_file"].includes(call.function.name) && result.startsWith("Wrote ")) { delegate.applied(); }
+          const notes = await options.hooks?.after(call, result, signal);
+          if (notes) { result += `\n[Hook feedback]\n${notes}`; }
         }
       }
       catch (error) { result = `Error: ${errorText(error)}`; }
