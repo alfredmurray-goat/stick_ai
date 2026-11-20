@@ -300,7 +300,7 @@ Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the p
 - **Review what it writes.** Stellan can make mistakes. In stricter tests it mis-copied long random identifiers.
 - **Lite's chat template.** The supplied Lite GGUF has no embedded template, so the app uses a tested Mistral-v1 formatter. The original training template is unverified.
 - **Unsigned builds.** Gatekeeper, SmartScreen, clean-machine launch and physical USB performance still need manual checks.
-- **Memory is total, not free.** The 8 GB, 16 GB and 24 GB thresholds use total RAM, which doesn't guarantee enough free memory for every task.
+- **Memory is total, not free.** The 8 GB, 16 GB and 24 GB thresholds use total RAM (checked as 7, 15 and 22 GiB, because computers report a little less than they're sold with), which doesn't guarantee enough free memory for every task.
 
 ## Licences
 

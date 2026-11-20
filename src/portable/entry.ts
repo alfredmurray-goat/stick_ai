@@ -1,3 +1,4 @@
+import { liteMinimumBytes } from "../config/models.js";
 import { spawn } from "node:child_process";
 import { openSync, appendFileSync, closeSync } from "node:fs";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
@@ -15,9 +16,9 @@ import { desktopDryRun, launchDesktop } from "./desktop.js";
 import { webApp } from "./web.js";
 
 export function dryRunActions(root: string, platform: string = process.platform, arch: string = process.arch, bytes = totalmem(), noSwap = false): string[] {
-  const target = targetFor(platform, arch); const models = bytes < 8 * 1024 ** 3 ? [] : portableModels(bytes, true);
+  const target = targetFor(platform, arch); const models = bytes < liteMinimumBytes ? [] : portableModels(bytes, true);
   return [
-    bytes < 8 * 1024 ** 3 ? "Memory check would stop launch: this computer needs at least 8 GB; the following actions are a preview only." : "Memory check permits Lite startup.",
+    bytes < liteMinimumBytes ? "Memory check would stop launch: this computer needs at least 8 GB; the following actions are a preview only." : "Memory check permits Lite startup.",
     `Verify the manifest and all static files under ${root}; allow only the absent optional Max file.`,
     `Select ${target}; verify the bundled Node runtime, app, binaries, sidecars and model hashes.`,
     `Use Lite by default; Max ${models.length === 2 ? "is available" : "is hidden and locked"}; swapping ${noSwap ? "is disabled" : "uses one model process at a time"}.`,

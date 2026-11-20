@@ -6,6 +6,9 @@ export const GiB = 1024 ** 3;
 // it after a warning. Computers report a little less than their nominal memory once firmware and integrated
 // graphics take their share, hence 15 GiB for "16 GB" and 22 GiB for "24 GB".
 export const maxMinimumBytes = 15 * GiB;
+// Lite peaks at about 4.5 GB. Computers sold with 8 GB often report 7.6-7.9 GiB once integrated graphics
+// and firmware take their share, so the check is 7 GiB.
+export const liteMinimumBytes = 7 * GiB;
 export const maxRecommendedBytes = 22 * GiB;
 export function maxSlowWarning(totalGB: number): string {
   return `Max may be very slow on this computer, or seem stuck: it has ${totalGB} GB of memory and Max works best with 24 GB or more. A reply can take many minutes. Lite runs well here.`;
