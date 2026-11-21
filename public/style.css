@@ -253,7 +253,11 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 
 /* Footer */
 .foot { max-width: var(--page); margin: 140px auto 0; padding: 0 20px 36px; overflow: hidden; }
-.giant { margin: 0; padding-bottom: .12em; font: 700 clamp(4rem, 19vw, 15rem)/.9 var(--mono); letter-spacing: -.06em; color: transparent; -webkit-text-stroke: 1.5px var(--line); white-space: nowrap; user-select: none; }
+/* The footer banner is ASCII art, as a terminal would print it. 37 columns wide, so its size follows the page width. */
+.giant { margin: 0; padding-bottom: .5em; user-select: none; }
+.giant-prompt { margin: 0 0 10px; font: 400 13px var(--mono); color: var(--faint); }
+.giant-prompt span { color: var(--green); }
+.giant pre { margin: 0; font: 700 min(3.8vw, 50px)/1.08 var(--mono); letter-spacing: 0; white-space: pre; overflow: hidden; background: linear-gradient(100deg, var(--violet-hi), var(--violet) 55%, var(--amber)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; font: 400 12.5px var(--mono); color: var(--faint); }
 .foot-row p { margin: 0; }
 
