@@ -157,6 +157,30 @@
 </aside>
 </div>
 
+<dialog id="tour-dialog" class="settings-dialog tour-dialog" aria-labelledby="tour-title">
+  <div class="dialog-heading"><div class="app-tile" aria-hidden="true"><img class="tile logo-dark" src="brand/icon-dark.png" alt=""><img class="tile logo-light" src="brand/icon-light.png" alt=""></div><div><h2 id="tour-title">Welcome to Stick AI</h2><p id="tour-count">1 of 4</p></div><button id="tour-skip" class="secondary" type="button">Skip</button></div>
+  <section class="tour-step" data-step="1">
+    <h3>Your private coding assistant</h3>
+    <p>Stellan, the AI, runs entirely on this computer from your stick. Your code and your questions never leave it. There's no account and no cloud.</p>
+    <ul class="tour-points"><li><b>Lite</b> explores your project, uses the tools and answers questions.</li><li><b>Max</b> is the bigger model that writes larger pieces of code, when your computer has the memory for it.</li></ul>
+  </section>
+  <section class="tour-step" data-step="2" hidden>
+    <h3>Ask in plain words</h3>
+    <p>Type what you want, for example <i>"Why does checkout crash when the cart is empty?"</i> or <i>"Add a dark mode toggle"</i>. You'll see Stellan think and which files it reads, live in the chat.</p>
+    <p>Press <b>Stop</b> or <b>Esc</b> at any time to cancel.</p>
+  </section>
+  <section class="tour-step" data-step="3" hidden>
+    <h3>Nothing changes without your yes</h3>
+    <p>Every file change shows the exact lines first: red for removed, green for added. Click <b>Allow changes</b> or <b>Keep my file</b>.</p>
+    <p>The same goes for running a command (like your project's tests), a web search or a tool from another app: it waits for your click.</p>
+  </section>
+  <section class="tour-step" data-step="4" hidden>
+    <h3>Choose what to work on</h3>
+    <ul class="tour-points"><li><b>Files</b> in the sidebar shows the project on your stick. Add your files there, or ask Stellan to create some.</li><li><b>Settings → GitHub</b> connects a repository: sign in with a short code and Stellan can open a pull request for you to review.</li><li><b>Settings → Models</b> has <b>Long context mode</b> for big projects, and Stellan rests after 10 quiet minutes to free your computer's memory.</li></ul>
+    <p class="muted">Help and guides: stick-ai.localilabs.com/start</p>
+  </section>
+  <div class="tour-foot"><div class="tour-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div><div class="button-row"><button id="tour-back" class="secondary" type="button">Back</button><button id="tour-next" class="primary small" type="button">Next</button></div></div>
+</dialog>
 <dialog id="settings-dialog" class="settings-dialog">
   <div class="dialog-heading"><div class="app-tile" aria-hidden="true"><img class="tile logo-dark" src="brand/icon-dark.png" alt=""><img class="tile logo-light" src="brand/icon-light.png" alt=""></div><div><h2>Stick AI</h2><p>Your private coding assistant.</p></div><button id="close-settings" class="icon-button" aria-label="Close settings"><svg class="i"><use href="#i-x"/></svg></button></div>
   <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="hooks">Hooks</button><button data-settings="updates">Updates</button></nav>
@@ -182,6 +206,7 @@
         <div class="button-row"><button id="browse-max" class="secondary">Choose GGUF…</button><button id="link-max" class="secondary">Use this file</button><button id="unlink-max" class="secondary">Remove file link</button></div>
       </details>
     </div>
+    <div class="button-row tour-again"><button id="show-tour" class="secondary" type="button" hidden>Show the welcome tour again</button></div>
     <fieldset id="long-context-panel" class="form-group" hidden><legend>Memory</legend>
       <label class="check-label"><input id="long-context" type="checkbox"> Long context mode</label>
       <p id="long-context-size" class="muted"></p>

@@ -30,3 +30,5 @@ Copies a customer downloads or copies to an internal disk may still be flagged.
 ## Box card
 
 [`docs/packaging/first-open-card.html`](packaging/first-open-card.html) is a printable A6 card (105 × 148 mm): getting started on the front, the steps above on the back. [`first-open-card.pdf`](packaging/first-open-card.pdf) is the same card ready to print double-sided (flip on the long edge) at 100% scale. The fonts beside it are Space Grotesk and JetBrains Mono under the SIL Open Font License.
+
+[`docs/packaging/quick-start-guide.html`](packaging/quick-start-guide.html) is a fuller A5 leaflet (148 × 210 mm) for the box: five start steps, a box for the **activation code** (leave it blank for a printed sticker or write the code in), what the stick needs, everyday use, the first-open steps and help. [`quick-start-guide.pdf`](packaging/quick-start-guide.pdf) is ready to print double-sided at 100% scale. The activation step describes one-time activation, which ships in the next app release.

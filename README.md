@@ -107,6 +107,7 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 
 ## Using the workspace
 
+- **Welcome tour.** The first time the workspace opens, a four-step tour explains the models, approvals and where your project lives. Reopen it from Settings → Models. A printable quick-start leaflet for the box is in [`docs/packaging`](docs/packaging/quick-start-guide.pdf).
 - **Ask anything.** Type in the box at the bottom, or start from a suggestion such as *Explore this project* or *Find a bug*. Press ↵ to send and Shift ↵ for a new line.
 - **Approve changes.** When Stellan wants to edit a file, an approval card shows the exact before-and-after lines. Click **Allow changes** or **Keep my file**.
 - **Follow along.** Under each message, a live line shows what Stellan is doing; click it to read its thinking and each step. The **Activity** panel has the full detail. **Stop** or Esc cancels at any time.
