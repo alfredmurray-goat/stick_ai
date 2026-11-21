@@ -110,7 +110,10 @@ export class Hooks {
     }
     return outcome;
   }
+  /** "Allow internet" off: HTTP hooks to other computers are skipped; ones on this computer still run. */
+  online = true;
   private async post(hook: HookConfig, input: string, signal: AbortSignal): Promise<ReturnType<typeof readReply>> {
+    if (!this.online && !["127.0.0.1", "localhost", "[::1]"].includes(new URL(hook.url!).hostname)) { return { context: "", problem: "was skipped because Allow internet is off" }; }
     const response = await fetch(hook.url!, { method: "POST", redirect: "error", headers: { "Content-Type": "application/json" }, body: input, signal: AbortSignal.any([signal, AbortSignal.timeout(hook.timeout * 1000)]) });
     const text = (await response.text()).slice(0, outputLimit);
     if (!response.ok) { return { context: "", problem: `got HTTP ${response.status} from ${new URL(hook.url!).host}` }; }

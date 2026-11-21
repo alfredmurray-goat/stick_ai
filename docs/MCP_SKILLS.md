@@ -30,7 +30,11 @@ appears first under **Settings → MCP** and is on by default.
   programming questions, reading a specific docs page works better than a
   broad search.
 
+While **Allow internet** is off (Settings → Models), web search is unavailable and Stellan is told so.
+
 ## MCP
+
+While **Allow internet** is off, MCP servers on other computers can't be used. Servers that run on this computer (a command, or an address on `127.0.0.1`/`localhost`) keep working.
 
 Add a named local **stdio** program, **Streamable HTTP** endpoint, or legacy
 **SSE** endpoint. Remote endpoints require HTTPS; localhost HTTP is supported.

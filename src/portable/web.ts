@@ -8,7 +8,7 @@ import { GitHubWorkspaces } from "./github-workspace.js";
 import { GitHubError } from "./github-client.js";
 import { GitHubSignIn, githubAppInstallUrl } from "./github-auth.js";
 import { Activation, ActivationError } from "./activation.js";
-import { McpServers, McpError, actuent } from "./mcp.js";
+import { McpServers, McpError, actuent, offlineMessage } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
 import { contextPlan } from "./engine.js";
 import { readExtensionJson, writeExtensionJson } from "./extension-store.js";
@@ -86,14 +86,19 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   for (const load of [() => mcp.load(), () => skills.load(), () => hooks.load()]) { try { await load(); } catch { extensionProblem = "Some extension settings could not be loaded. Review MCP, Skills and Hooks settings."; } }
   // Long context mode keeps far more of the conversation word for word and gives both models bigger
   // windows, at the cost of slower re-reads; it is saved with the app's settings on the stick.
-  let longContext = false, onboarded = false;
-  try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; } catch {}
+  let longContext = false, onboarded = false, internet = true;
+  try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; } catch {}
+  // "Allow internet" (on by default) covers everything that reaches beyond this computer: web search,
+  // GitHub, remote MCP servers and HTTP hooks. The models never need it. Activation is the one exception:
+  // typing the printed code is an explicit request to go online once.
+  const applyInternet = async (): Promise<void> => { hooks.online = internet; await mcp.setOnline(internet); };
+  await applyInternet().catch(log);
   // A sold stick asks for its printed code once before the first model starts (see activation.ts).
   const activation = options.activation;
   let pendingModel: string | undefined;
   if (activation) { await activation.check().catch(log); }
   const needsActivation = (): boolean => Boolean(activation && !activation.active);
-  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded }).catch(log);
+  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
   // Hooks that only report (start, approval needed, finished) run in the background and never hold up the work.
   const hookLife = new AbortController();
@@ -233,7 +238,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -307,6 +312,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         } finally { repositoryOperation = undefined; finishEdit(); repositoryDone = undefined; }
       }
       // Signing in only talks to GitHub's sign-in service, so it may happen while the assistant works.
+      if (!internet && ["/api/github/signin/start", "/api/github/connect", "/api/github/resume", "/api/github/publish"].includes(url.pathname)) { send(response, 400, { error: offlineMessage }); return; }
       if (url.pathname === "/api/github/signin/start") { try { send(response, 200, await signIn.start()); } catch (error) { send(response, 400, { error: error instanceof GitHubError ? error.message : "GitHub sign-in could not start. Check your internet connection and try again." }); } return; }
       if (url.pathname === "/api/github/signin/cancel") { signIn.cancel(); send(response, 200, signIn.view()); return; }
       if (url.pathname === "/api/github/signout") { signIn.signOut(); send(response, 200, signIn.view()); return; }
@@ -343,6 +349,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         catch (error) { send(response, 400, { error: error instanceof ActivationError ? error.message : "Activation didn't work. Try again in a minute." }); return; }
         if (pendingModel) { const model = pendingModel; pendingModel = undefined; phase = "choose"; work = launch(model); }
         send(response, 200, {}); return;
+      }
+      if (url.pathname === "/api/internet" && typeof data.enabled === "boolean") {
+        internet = data.enabled; await applyInternet(); if (!internet) { signIn.cancel(); }
+        await savePreferences(); send(response, 200, {}); return;
       }
       if (url.pathname === "/api/onboarded") { onboarded = true; await savePreferences(); send(response, 200, {}); return; }
       if (url.pathname === "/api/long-context" && typeof data.enabled === "boolean" && !active && !loading && !repositoryOperation) {

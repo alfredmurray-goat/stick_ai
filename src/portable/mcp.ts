@@ -44,15 +44,20 @@ export function mcpFetch(origin:string,fetcher:typeof fetch=fetch):typeof fetch 
   return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
  }) as typeof fetch;
 }
+/** Reached over the network rather than started on this computer. */
+export const remote=(c:McpServerConfig):boolean=>c.transport!=='stdio'&&!['127.0.0.1','localhost','[::1]'].includes(new URL(c.url!).hostname);
+export const offlineMessage='Allow internet is off. Turn it on in Settings → Models to use this.';
 export class McpServers {
- private configs:McpServerConfig[]=[];private webSearch=true;private secrets=new Map<string,Secrets>();private connections=new Map<string,Connection>();private errors=new Map<string,string>();private project:string;
+ private configs:McpServerConfig[]=[];private webSearch=true;private online=true;private secrets=new Map<string,Secrets>();private connections=new Map<string,Connection>();private errors=new Map<string,string>();private project:string;
  constructor(private root:string,project:string,private progress:(server:string,text:string)=>void=()=>{}){this.project=project;}
  async load(){const saved=await readExtensionJson(this.root,'mcp.json');if(saved===undefined)return;if(!record(saved)||saved.format!==1||!Array.isArray(saved.servers)||saved.servers.length>20)throw new McpError('Invalid saved MCP server settings.');this.webSearch=saved.webSearch!==false;this.configs=saved.servers.map(s=>{if(!record(s)||typeof s.id!=='string'||!/^mcp-[a-f0-9-]{36}$/.test(s.id))throw new McpError('Invalid MCP server identity.');return config(s,s.id);});}
  private async save(){await writeExtensionJson(this.root,'mcp.json',{format:1,webSearch:this.webSearch,servers:this.configs});}
- private all(){return this.webSearch?[actuent,...this.configs]:this.configs;}
- get webSearchEnabled(){return this.webSearch;}
+ private all(){return this.webSearch&&this.online?[actuent,...this.configs]:this.configs;}
+ get webSearchEnabled(){return this.webSearch&&this.online;}
+ /** "Allow internet" off: web search and servers on other computers are unavailable; servers on this computer keep working. */
+ async setOnline(enabled:boolean){this.online=enabled;if(!enabled)await Promise.all([actuent,...this.configs].filter(remote).map(c=>this.disconnect(c.id)));}
  async setWebSearch(enabled:boolean){const previous=this.webSearch;this.webSearch=enabled;if(!enabled)await this.disconnect(actuent.id);try{await this.save();}catch(error){this.webSearch=previous;throw error;}}
- private get(id:string){if(id===actuent.id&&!this.webSearch)throw new McpError('Web search is turned off. Turn it on in Settings → MCP.');const result=this.all().find(c=>c.id===id);if(!result)throw new McpError('Choose a configured MCP server.');return result;}
+ private get(id:string){if(id===actuent.id&&!this.online)throw new McpError(offlineMessage);if(id===actuent.id&&!this.webSearch)throw new McpError('Web search is turned off. Turn it on in Settings → MCP.');const result=this.all().find(c=>c.id===id);if(!result)throw new McpError('Choose a configured MCP server.');if(!this.online&&remote(result))throw new McpError(offlineMessage);return result;}
  private redact(id:string,text:string){const secret=this.secrets.get(id);for(const value of [...Object.values(secret?.headers??{}),...Object.values(secret?.env??{})])for(const part of [value,value.replace(/^Bearer\s+/i,'')])if(part)text=text.replaceAll(part,'[redacted]');return text;}
  view(){return this.all().map(c=>{const connection=this.connections.get(c.id);return {...c,status:connection?.rpc.ready&&!connection.rpc.closed?'connected':connection&&!connection.rpc.closed?'connecting':'disconnected',tools:connection?.tools.length??0,hasSessionSecrets:Boolean(Object.keys(this.secrets.get(c.id)?.headers??{}).length+Object.keys(this.secrets.get(c.id)?.env??{}).length),error:this.errors.get(c.id)??'',diagnostic:connection?.diagnostic??''};});}
  async add(input:unknown){if(this.configs.length>=20)throw new McpError('This app supports up to 20 configured MCP servers.');if(!record(input))throw new McpError('Invalid MCP settings.');const id='mcp-'+randomUUID(),next=config(input,id),secret={headers:stringMap(input.headers),env:stringMap(input.env)};this.configs.push(next);this.secrets.set(id,secret);try{await this.save();}catch(error){this.configs.pop();this.secrets.delete(id);throw error;}return id;}

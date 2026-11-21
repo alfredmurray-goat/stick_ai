@@ -9,6 +9,8 @@ Sold sticks ask for the code printed in the box the first time they start. It ne
 3. The website ties the code to that stick and returns a **certificate signed with Ed25519**. Each code has 3 "seats", so one stick that looks slightly different to different computers still works; a 4th different stick is refused.
 4. The certificate is saved in `stellan/logs/activation.json` on the stick and checked **offline** at every start against the public key built into the app (`activationPublicKey` in `src/portable/activation.ts`).
 
+Activation works even when **Allow internet** is turned off in Settings: typing the printed code is the one time the app goes online on purpose.
+
 Copying the stick's files to another stick doesn't carry the activation: the other stick has a different serial. This stops casual sharing; it can't stop a determined expert, because the app is open source. Builds without a public key (development, tests) never ask.
 
 ## Setting it up (owner, once)

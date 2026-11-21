@@ -18,6 +18,7 @@ let retryStart = true;
 let nativeStarted = 0;
 let errorAction = "Retry";
 let polling = false;
+let internetAllowed = null, autoCheckPending = false;
 let stateKey = "";
 let nativeStarting = false;
 let installingUpdate = false;
@@ -327,6 +328,8 @@ async function update() {
     byId("send").disabled = state.phase !== "ready" || state.repositoryBusy;
     byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
     if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
+    if (document.activeElement !== byId("allow-internet")) byId("allow-internet").checked = state.internet !== false;
+    internetAllowed = state.internet !== false; maybeCheckUpdates();
     if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
     if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
@@ -406,6 +409,13 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   }
 })();
 
+// Automatic update checks wait for the first state, so they respect "Allow internet".
+function maybeCheckUpdates() {
+  if (!autoCheckPending || internetAllowed === null) { return; }
+  autoCheckPending = false;
+  if (internetAllowed) { void checkAppUpdates(); }
+  else { byId("update-message").textContent = "Allow internet is off, so the app doesn't check for updates by itself. You can still check here."; }
+}
 async function checkAppUpdates() {
   if (!native || installingUpdate) { return; }
   byId("check-update").disabled = true;
@@ -447,7 +457,7 @@ if (native) {
     lastUpdateFailed = Boolean(settings.lastUpdateFailed);
     byId("auto-updates").checked = settings.enabled;
     byId("update-token").placeholder = settings.hasToken ? "Access saved on this computer" : "GitHub token";
-    if (settings.enabled) { void checkAppUpdates(); }
+    if (settings.enabled) { autoCheckPending = true; maybeCheckUpdates(); }
     else { byId("update-message").textContent = "Automatic checks are off. You can check for app updates here."; }
   }).catch(() => { byId("update-message").textContent = "Updates are unavailable. You can keep using the app offline."; });
 }
@@ -795,6 +805,11 @@ byId("tour-back").onclick = () => showTourStep(Math.max(1, tourStep - 1));
 byId("tour-skip").onclick = () => void finishTour();
 byId("tour-dialog").addEventListener("cancel", () => { void api("/api/onboarded", {}).catch(() => {}); });
 byId("show-tour").onclick = () => { byId("settings-dialog").close(); openTour(); };
+byId("allow-internet").onchange = async () => {
+  const enabled = byId("allow-internet").checked;
+  try { await api("/api/internet", { enabled }); toast(enabled ? "Internet extras are on: web search, GitHub and online MCP servers." : "Allow internet is off. Nothing leaves this computer."); }
+  catch (error) { byId("allow-internet").checked = !enabled; toast(error.message); }
+};
 byId("long-context").onchange = async () => {
   const enabled = byId("long-context").checked;
   try { await api("/api/long-context", { enabled }); toast(enabled ? "Long context mode is on. Restarting the model…" : "Long context mode is off. Restarting the model…"); }
