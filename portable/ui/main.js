@@ -329,6 +329,11 @@ async function update() {
     byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
     if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
     if (document.activeElement !== byId("allow-internet")) byId("allow-internet").checked = state.internet !== false;
+    // Stick AI needs very little space on the computer; below the comfortable amount it skips two speed caches.
+    const disk = state.disk; const mb = (bytes) => `${Math.round(bytes / 1024 ** 2).toLocaleString()} MB`;
+    byId("disk-warning").hidden = !disk || disk.free >= disk.comfortable;
+    if (disk && disk.free < disk.minimum) byId("disk-warning").textContent = `This computer has only ${mb(disk.free)} free. Stick AI needs at least ${mb(disk.minimum)} free to start the model. Free up some space (empty the Bin or Trash, delete large downloads), then click Retry.`;
+    else if (disk && disk.free < disk.comfortable) byId("disk-warning").textContent = `This computer has ${mb(disk.free)} free. Stick AI works, but new conversations start a little slower. With ${mb(disk.comfortable)} free it uses faster start-up caches.`;
     internetAllowed = state.internet !== false; maybeCheckUpdates();
     if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
     if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;

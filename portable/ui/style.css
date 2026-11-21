@@ -579,6 +579,7 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .settings-page details details { background: var(--raised-2); }
 .status-box { padding: 13px 14px; background: var(--raised); border: 0; border-radius: var(--radius); font-size: 13.5px !important; color: var(--text) !important; }
 .warning-box { background: color-mix(in srgb, var(--amber) 14%, var(--raised)); border-left: 3px solid var(--amber); }
+.disk-warning { margin: 12px auto 0; max-width: 760px; }
 .form-group { margin: 14px 0 0; padding: 8px 14px 14px; border: 0; border-radius: var(--radius); background: var(--raised); }
 .form-group legend { float: left; width: 100%; padding: 6px 0 0; margin: 0; font-size: 13.5px; font-weight: 600; color: var(--text); }
 .form-group legend + * { clear: both; }

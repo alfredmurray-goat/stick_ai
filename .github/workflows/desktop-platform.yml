@@ -93,7 +93,7 @@ jobs:
           path: |
             release-assets/llama-build/${{ inputs.server }}
             release-assets/llama.cpp/LICENSE
-          key: desktop-server-${{ inputs.name }}-v0.9.0-static-crt-no-openmp-no-tls${{ inputs.name == 'macos-arm64' && '-metal-no-ui' || '' }}
+          key: desktop-server-${{ inputs.name }}-v0.9.0-static-crt-no-openmp-no-tls${{ inputs.name == 'macos-arm64' && '-metal-no-ui' || '' }}-${{ hashFiles('scripts/llama-split-dir.patch') }}
       # Apple Silicon builds the Metal GPU backend (shaders embedded); other targets stay CPU-only.
       # The app runs with --no-webui, so llama.cpp's downloadable web UI assets are not built.
       - name: Build the pinned Mamba2-compatible server
@@ -104,6 +104,8 @@ jobs:
           git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
           git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
           test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
+          # Locked models: later GGUF splits are read from LLAMA_SPLIT_DIR (src/portable/model-lock.ts).
+          git -C release-assets/llama.cpp apply "$GITHUB_WORKSPACE/scripts/llama-split-dir.patch"
           cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=${{ inputs.name == 'macos-arm64' && 'ON -DGGML_METAL_EMBED_LIBRARY=ON' || 'OFF' }} -DGGML_BLAS=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF
           cmake --build release-assets/llama-build --config Release --target llama-server -j 3
       - uses: actions/cache/save@v4

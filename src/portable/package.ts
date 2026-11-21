@@ -1,3 +1,4 @@
+import { lockedModels, lockedRecords } from "./locked-models.js";
 import { cp, mkdir, writeFile, chmod, lstat, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -59,6 +60,7 @@ export async function buildPlatform(project: string, output: string, target: Tar
       manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111), ...(path === bundledMax.path || path === "models/stellan-1-lite-q4_k_m.gguf" ? { optional: true } : {}) });
     }
     if (input.maxRelease && !input.max) { manifest.files.push({ ...bundledMax }); }
+    if (input.maxRelease) { manifest.files.push(...Object.values(lockedModels).flatMap(lockedRecords)); }
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     await verifyStick(staging, Boolean(input.maxRelease)); await rename(staging, output); return manifest;
   } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }

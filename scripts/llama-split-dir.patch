@@ -1,0 +1,30 @@
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index 485483b..8ef499d 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -9,6 +9,7 @@
+ #include <algorithm>
+ #include <array>
+ #include <cinttypes>
++#include <cstdlib>
+ #include <cstdint>
+ #include <cstring>
+ #include <future>
+@@ -98,9 +99,16 @@ static std::vector<std::string> llama_get_list_splits(const std::string & path,
+         throw std::runtime_error(format("invalid split file: %s", path.c_str()));
+     }
+ 
++    // stick_ai: the first split can be unlocked into a temporary folder while the others stay on the stick.
++    const char * split_dir = getenv("LLAMA_SPLIT_DIR");
+     for (int idx = 0; idx < n_split; ++idx) {
+         int ret = llama_split_path(buf.data(), buf.size(), split_prefix.c_str(), idx, n_split);
+-        paths.push_back(std::string(buf.data(), ret));
++        std::string split(buf.data(), ret);
++        if (idx > 0 && split_dir && *split_dir) {
++            const size_t slash = split.find_last_of("/\\");
++            split = std::string(split_dir) + "/" + (slash == std::string::npos ? split : split.substr(slash + 1));
++        }
++        paths.push_back(split);
+     }
+ 
+     return paths;

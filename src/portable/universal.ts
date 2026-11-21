@@ -1,3 +1,4 @@
+import { lockedModels, lockedRecords } from "./locked-models.js";
 import { chmod, cp, link, lstat, mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -134,6 +135,8 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     }
     if (!withModels) { manifest.files.push({ ...liteRecord, executable: false, optional: true }); }
     if (!inputs.max || !withModels) { manifest.files.push({ ...bundledMax, executable: false, optional: true }); }
+    // Sold sticks may carry the models locked instead (model-lock.ts); either layout passes.
+    if (!withModels) { manifest.files.push(...Object.values(lockedModels).flatMap(lockedRecords)); }
     manifest.files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
     await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     await verifyStick(staging, !inputs.max || !withModels, undefined, true);

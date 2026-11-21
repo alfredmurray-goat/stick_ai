@@ -1,11 +1,12 @@
+import { lockedNames, ModelLockError, unlockModel } from "./model-lock.js";
 import { resolveLocalModel } from "./local-models.js";
 import { writeSync } from "node:fs";
 import { type ServerStatus } from "./progress.js";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { randomBytes } from "node:crypto";
+import { mkdir, readFile, rm, stat, statfs, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
+import { createHash, randomBytes } from "node:crypto";
 import { totalmem } from "node:os";
 import { killProcessTree } from "../sandbox/process.js";
 import { cleanEnvironment } from "../sandbox/backends.js";
@@ -15,6 +16,15 @@ import { ramStatus, type ModelName } from "../config/models.js";
 import { reservePort } from "./ports.js";
 import { executableName, UserError, type Target } from "./platform.js";
 
+// Space on the computer. Stick AI keeps everything on the stick; the only things it writes to this computer
+// are a temporary folder (the unlocked first part of a locked model, ~80 MB each) and two optional speed
+// caches of Lite's reading state (~0.5 GB each). Below `diskComfortable` free the caches are skipped, so the
+// app still works in about 300 MB: new conversations and Lite → Max swaps just re-read a little more.
+export const diskMinimum = 300 * 1024 ** 2;
+export const diskComfortable = 1536 * 1024 ** 2;
+export async function freeBytes(path: string): Promise<number | undefined> {
+  try { const info = await statfs(path); return info.bavail * info.bsize; } catch { return undefined; }
+}
 export interface Switchable {
   stop(): Promise<void>;
   start(model: ModelName, signal: AbortSignal): Promise<void>;
@@ -127,6 +137,8 @@ export class ManagedEngine implements Switchable {
   readonly key = randomBytes(32).toString("hex");
   /** A second engine that keeps Max loaded beside Lite (see keepsBothLoaded); stopped with this one. */
   coder: ManagedEngine | undefined;
+  /** The activation's key for a locked model on this stick (see model-lock.ts). */
+  modelKey: ((model: ModelName) => Buffer | undefined) | undefined;
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
   gpuFailed = false;
@@ -165,11 +177,26 @@ export class ManagedEngine implements Switchable {
     const env = cleanEnvironment(this.temp, process.platform);
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
+    // A locked model's first split is decrypted into this computer's temporary folder once per session;
+    // llama.cpp (patched) reads the rest straight from the stick via LLAMA_SPLIT_DIR.
+    let modelPath = selected.path;
+    if (selected.locked) {
+      const key = this.modelKey?.(model);
+      if (!key) { throw new ModelLockError("Activate this stick to use its models. Restart the app and enter the code from the box."); }
+      const names = lockedNames(basename(selected.locked.model.base)); const unlocked = join(this.temp, "unlocked");
+      modelPath = join(unlocked, names.first);
+      if (!await stat(modelPath).then((info) => info.size === selected.locked!.model.firstSize, () => false)) {
+        await unlockModel(selected.locked.file, unlocked, names.first, key, selected.locked.model.label);
+        const digest = createHash("sha256").update(await readFile(modelPath)).digest("hex");
+        if (digest !== selected.locked.model.firstSha256) { await rm(modelPath, { force: true }); throw new UserError("damaged"); }
+      }
+      env.LLAMA_SPLIT_DIR = dirname(selected.path);
+    }
     const templateArgs = await modelTemplateArgs(this.root, model);
     const planned = model === "stellan-1-max" ? this.plan.max : this.plan.lite;
     const contextSize = this.faster ? Math.min(planned, 4096) : planned;
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
-      "--model", selected.path, "--alias", model, "--ctx-size", String(contextSize),
+      "--model", modelPath, "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
       "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model, this.plainFallback), ...templateArgs, ...(model === "stellan-1-lite" ? ["--slot-save-path", slots] : [])
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -210,6 +237,7 @@ export class ManagedEngine implements Switchable {
     this.child = null; this.active = null; this.onProcess?.(null);
   }
   private async slotAction(action: "save" | "restore", filename = "lite-cache.bin"): Promise<boolean> {
+    if (action === "save") { const free = await freeBytes(this.temp); if (free !== undefined && free < diskComfortable) { return false; } }
     try {
       const response = await fetch(`${this.baseUrl}/slots/0?action=${action}`, { method: "POST", redirect: "error", headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ filename }), signal: AbortSignal.timeout(120000) });
       await response.body?.cancel(); return response.ok;

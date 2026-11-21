@@ -127,6 +127,8 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 - **No telemetry.** There are no analytics or cloud fallbacks.
 - **What does use the network.** The app checks GitHub for signed app updates (you can turn this off), GitHub workspaces talk to GitHub when you connect them, web search sends only the search words or page address you approve to Actuent (never your code or files), and remote MCP servers receive only the calls you approve.
 - **One switch for all of it.** **Settings → Models → Allow internet** is on by default. Turn it off and nothing leaves the computer: no web search, GitHub, remote MCP servers, hooks that notify other computers or automatic update checks. Stellan works exactly the same, because it never needed the internet. (Activating a new stick with its printed code goes online once either way.)
+- **Almost nothing on your computer.** Everything stays on the stick. The app needs about **300 MB free** on the computer (for a temporary folder it deletes when you quit) and uses up to about 1.5 GB more, if there's room, for caches that make new conversations start faster. The window warns you when space is low.
+- **Locked models.** On sold sticks the models only work after activation (see [docs/ACTIVATION.md](docs/ACTIVATION.md#locked-models)).
 - **Integrity checks.** Every app file is checked against a recorded SHA-256 before starting. A changed file is reported, not run.
 
 ## How it works

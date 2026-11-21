@@ -10,7 +10,8 @@ import { GitHubSignIn, githubAppInstallUrl } from "./github-auth.js";
 import { Activation, ActivationError } from "./activation.js";
 import { McpServers, McpError, actuent, offlineMessage } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
-import { contextPlan } from "./engine.js";
+import { contextPlan, diskComfortable, diskMinimum, freeBytes } from "./engine.js";
+import { tmpdir } from "node:os";
 import { readExtensionJson, writeExtensionJson } from "./extension-store.js";
 import { compactWebResult } from "./web-search.js";
 import { Skills, SkillError, parseSkill } from "./skills.js";
@@ -100,6 +101,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   const needsActivation = (): boolean => Boolean(activation && !activation.active);
   const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
+  // Free space on this computer, for the window's warning (see diskMinimum in engine.ts).
+  // Rounded to 50 MB so the long-polled state doesn't change every minute for nothing.
+  const roundedFree = async (): Promise<number | undefined> => { const free = await freeBytes(tmpdir()); return free === undefined ? undefined : Math.floor(free / (50 * 1024 ** 2)) * 50 * 1024 ** 2; };
+  let diskFree = await roundedFree();
+  const diskTimer = setInterval(() => { void roundedFree().then((free) => { diskFree = free; }); }, 60000); diskTimer.unref();
   // Hooks that only report (start, approval needed, finished) run in the background and never hold up the work.
   const hookLife = new AbortController();
   let sessionNotes = "";
@@ -238,7 +244,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -380,5 +386,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

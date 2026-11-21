@@ -91,7 +91,10 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         engine.coder = new ManagedEngine(root, target, coderPort.port, coderTemp, fd, log);
         engine.coder.onProcess = (pid) => notify({ kind: "model_pid", role: "coder", pid });
       }
-      app = await webApp({ root, engine, activation: new Activation(root), bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
+      const activation = new Activation(root);
+      engine.modelKey = (model) => activation.modelKey(model);
+      if (engine.coder) { engine.coder.modelKey = engine.modelKey; }
+      app = await webApp({ root, engine, activation, bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
     };
     if (desktop) {
       await launchDesktop({
