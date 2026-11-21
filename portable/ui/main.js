@@ -498,7 +498,7 @@ function renderRepository(workspace, busy) {
   lastRepository = workspace;
   for (const id of ["github-connect", "github-disconnect", "github-resume", "github-review", "github-publish"]) byId(id).disabled = busy || repositoryBusy;
   byId("github-review").disabled ||= !workspace;
-  byId("github-status").textContent = workspace ? `${workspace.repository} · ${workspace.branch} · ${workspace.commit.slice(0,12)} · ${workspace.authenticated ? "session token connected" : "public read access"}` : "Local project on this stick";
+  byId("github-status").textContent = workspace ? `${workspace.repository} · ${workspace.branch} · ${workspace.commit.slice(0,12)} · ${workspace.authenticated ? "signed in" : "public read access"}` : "Local project on this stick";
   if (workspace?.pullRequest) { byId("github-result").textContent = `Draft pull request: ${workspace.pullRequest.url} — copy this URL into your browser. Further reviewed changes update this pull-request branch.`; }
 }
 async function repositoryAction(action, data) {
@@ -528,6 +528,27 @@ byId("github-resume").onclick = async () => {
 };
 byId("github-disconnect").onclick = async () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before switching workspaces."); return; } try { await repositoryAction("disconnect", {}); clearRepositoryReview(); renderRepository(null, false); byId("github-result").textContent = "Using the local project. Repository changes remain in Saved workspaces."; } catch {} };
 byId("github-refresh").onclick = savedRepositories;
+// ---------- Sign in with GitHub (device flow; the token never reaches this window) ----------
+let signInTimer, signInView = { status: "signed-out" };
+function renderSignIn(view) {
+  signInView = view; const waiting = view.status === "waiting", signed = view.status === "signed-in";
+  byId("github-signin-code").hidden = !waiting; if (waiting) byId("github-user-code").textContent = view.userCode;
+  byId("github-signin").hidden = signed || waiting; byId("github-signout").hidden = !signed; byId("github-install").hidden = !signed;
+  byId("github-signin-status").classList.toggle("ok", signed);
+  byId("github-signin-status").textContent = signed ? `Signed in to GitHub${view.login ? ` as ${view.login}` : ""}. Stick AI can use the repositories you chose for it.` : view.message || "Sign in to work on private repositories and publish changes. Public repositories work without signing in.";
+  clearTimeout(signInTimer); if (waiting) signInTimer = setTimeout(() => void refreshSignIn(), 2000);
+}
+async function refreshSignIn() { if (native) return; try { renderSignIn(await api("/api/github/signin")); } catch {} }
+byId("github-signin").onclick = async () => {
+  try { const view = await api("/api/github/signin/start", {}); renderSignIn(view); if (await copyText(view.userCode)) toast("Code copied. Paste it at github.com/login/device."); }
+  catch (error) { byId("github-signin-status").textContent = error.message; }
+};
+byId("github-signin-cancel").onclick = async () => { try { renderSignIn(await api("/api/github/signin/cancel", {})); } catch {} };
+byId("github-signout").onclick = async () => { try { renderSignIn(await api("/api/github/signout", {})); toast("Signed out of GitHub."); } catch {} };
+byId("github-copy-code").onclick = async () => { if (await copyText(byId("github-user-code").textContent)) toast("Code copied."); };
+byId("github-copy-link").onclick = async () => { if (await copyText(signInView.verificationUri || "https://github.com/login/device")) toast("Link copied. Paste it into your browser."); };
+byId("github-install").onclick = async () => { if (await copyText(signInView.installUrl)) toast("Link copied. Paste it into your browser to choose which repositories Stick AI may use."); };
+byId("github-panel").addEventListener("toggle", () => { if (byId("github-panel").open) void refreshSignIn(); });
 byId("github-cancel").onclick = () => api("/api/cancel", {}).catch(() => {});
 byId("github-review").onclick = async () => {
   clearRepositoryReview();
@@ -566,6 +587,7 @@ function openSettings(tab = "models") {
   for (const name of ["models","github","mcp","skills","hooks","updates"]) byId(`settings-${name}`).hidden = name !== tab;
   byId("github-panel").open = true;
   if (["mcp","skills","hooks"].includes(tab) && !native) void refreshExtensions();
+  if (tab === "github" && !native) void refreshSignIn();
   if (!byId("settings-dialog").open) byId("settings-dialog").showModal();
 }
 byId("open-settings").onclick = () => openSettings("models");

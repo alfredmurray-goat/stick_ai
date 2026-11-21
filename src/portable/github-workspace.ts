@@ -72,6 +72,8 @@ export class GitHubWorkspaces {
     this.current=w;this.client=client;this.reviewed=undefined;return box;
   }
   disconnect():void { this.current=undefined;this.client=new GitHubClient();this.reviewed=undefined; }
+  /** Uses a token gained after connecting (for example by signing in with GitHub) for the open workspace. */
+  useToken(token:string):void { if(token && this.current) this.client=new GitHubClient(token); }
   private async snapshot():Promise<Snapshot> {
     const w=this.current;if(!w)throw new GitHubError('Connect a repository first.');
     const box=await Sandbox.create(join(this.folder(w.id),'files')), tracked=new Map(w.files.map(f=>[f.path,f]));
@@ -113,7 +115,7 @@ export class GitHubWorkspaces {
   }
   async review() { const value=await this.snapshot();this.reviewed=value.digest;return {digest:value.digest,changes:value.changes,workspace:this.view(),alreadyPublished:this.current?.remote?.digest===value.digest}; }
   async publish(reviewDigest:string,title:string,body:string,signal:AbortSignal) {
-    const w=this.current;if(!w || !this.client.authenticated)throw new GitHubError('Connect a GitHub token with Contents and Pull requests write access.');
+    const w=this.current;if(!w || !this.client.authenticated)throw new GitHubError('Sign in with GitHub (or paste a token with Contents and Pull requests write access) before publishing.');
     if(!this.reviewed || this.reviewed!==reviewDigest)throw new GitHubError('Review the current changes before publishing.');
     const snapshot=await this.snapshot();if(snapshot.digest!==reviewDigest)throw new GitHubError('Files changed since review. Review the changes again.');
     if(!snapshot.entries.length)throw new GitHubError('There are no changes to publish.');

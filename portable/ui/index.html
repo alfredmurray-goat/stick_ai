@@ -189,16 +189,27 @@
     <details id="github-panel"><summary>GitHub repository</summary>
       <p>Connect a repository, ask for changes, then review them and create a draft pull request. Your default branch is kept intact. Tasks stop when you close the app.</p>
       <p id="github-status" class="status-box" role="status">Local project</p>
+      <fieldset class="form-group"><legend>GitHub account</legend>
+        <p id="github-signin-status" class="signin-status">Sign in to work on private repositories and publish changes. Public repositories work without signing in.</p>
+        <div id="github-signin-code" class="signin-code" hidden>
+          <p>1. Open <b>github.com/login/device</b> in your browser. <button id="github-copy-link" class="link-button" type="button">Copy link</button></p>
+          <p>2. Enter this code:</p>
+          <p class="device-code"><code id="github-user-code">----</code><button id="github-copy-code" class="secondary" type="button">Copy code</button></p>
+          <p class="muted">Waiting for you to approve it on GitHub… <button id="github-signin-cancel" class="link-button" type="button">Cancel</button></p>
+        </div>
+        <div class="button-row"><button id="github-signin" class="primary small" type="button">Sign in with GitHub</button><button id="github-install" class="secondary" type="button" hidden>Choose repositories</button><button id="github-signout" class="secondary" type="button" hidden>Sign out</button></div>
+      </fieldset>
       <fieldset class="form-group"><legend>Connect a repository</legend>
         <label for="github-repo">Repository URL or owner/repository</label><input id="github-repo" type="text" spellcheck="false" placeholder="owner/repository">
         <label for="github-branch">Base branch <span class="optional">(blank uses the default)</span></label><input id="github-branch" type="text" spellcheck="false" placeholder="main">
+        <details class="token-fallback"><summary>Or paste a personal access token instead</summary>
         <label for="github-token">GitHub fine-grained token <span class="optional">(optional for public repos)</span></label><input id="github-token" type="password" autocomplete="off" spellcheck="false">
-        <small>Public repositories can be read without a token. For private access and publishing, select this repository with Contents and Pull requests: Read and write. The token stays in memory for this session, outside model context and saved projects. No token is needed for app updates.</small>
+        <small>Public repositories can be read without a token. For private access and publishing, select this repository with Contents and Pull requests: Read and write. The token stays in memory for this session, outside model context and saved projects. No token is needed for app updates.</small></details>
         <div class="button-row"><button id="github-connect" class="primary small">Connect new workspace</button><button id="github-disconnect" class="secondary">Use local project</button></div>
       </fieldset>
       <fieldset class="form-group"><legend>Saved workspaces</legend>
         <label for="github-saved" class="sr-only">Saved workspaces</label><select id="github-saved"><option value="">Choose saved workspace</option></select>
-        <div class="button-row"><button id="github-resume" class="secondary">Resume with token above</button><button id="github-refresh" class="secondary">Refresh list</button></div>
+        <div class="button-row"><button id="github-resume" class="secondary">Resume</button><button id="github-refresh" class="secondary">Refresh list</button></div>
       </fieldset>
       <fieldset class="form-group"><legend>Review &amp; publish</legend>
         <div class="button-row"><button id="github-review" class="secondary">Review changes</button><button id="github-cancel" class="secondary" hidden>Cancel GitHub operation</button></div>
