@@ -3,6 +3,7 @@
 //   node scripts/benchmark-humaneval.mjs --server <llama-server> --gguf <file> --model stellan-1-max \
 //        --problems <HumanEval.jsonl> --out <results.json> [--sample 8] [--gpu-layers 999]
 import { spawn, execFile } from "node:child_process";
+import { request } from "node:http";
 import { readFileSync, writeFileSync, mkdtempSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir, totalmem, cpus } from "node:os";
@@ -18,6 +19,20 @@ if (!["stellan-1-lite", "stellan-1-max"].includes(model)) { throw new Error("--m
 const every = Number(values.sample ?? 1);
 const problems = readFileSync(values.problems, "utf8").trim().split("\n").map((line) => JSON.parse(line)).filter((_, index) => index % every === 0);
 const done = existsSync(values.out) ? JSON.parse(readFileSync(values.out, "utf8")) : { model, results: [] };
+// A request that failed (server busy, connection dropped) says nothing about the model: try those again.
+done.results = done.results.filter((result) => !String(result.error ?? "").startsWith("request failed"));
+// Node's fetch gives up on a response that takes more than 300 s to start, which a slow CPU easily exceeds
+// for longer answers (a Kaggle run lost 119 of 149 problems to it). Plain http has no such limit.
+function postJson(url, value, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const req = request(url, { method: "POST", headers: { "content-type": "application/json" } }, (res) => {
+      let text = ""; res.setEncoding("utf8"); res.on("data", (chunk) => { text += chunk; });
+      res.on("end", () => { try { resolve(JSON.parse(text)); } catch { reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 200)}`)); } });
+    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error("no answer within the time limit")));
+    req.on("error", reject); req.end(JSON.stringify(value));
+  });
+}
 const port = values.port;
 // The app's own settings: Lite 8192 context with the Mistral-v1 formatter, Max 4096 context with its embedded template.
 const lite = model === "stellan-1-lite";
@@ -38,8 +53,7 @@ try {
     const messages = [{ role: "system", content: "You are an expert Python programmer." }, { role: "user", content: "Complete the following Python function. Return the complete function, including its signature and any imports it needs, in a single ```python code block with no explanation.\n\n```python\n" + problem.prompt + "```" }];
     const start = Date.now(); let body;
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model, messages, temperature: 0, max_tokens: 768, cache_prompt: true, return_progress: true, stream: false }), signal: AbortSignal.timeout(3 * 3600 * 1000) });
-      body = await response.json();
+      body = await postJson(`http://127.0.0.1:${port}/v1/chat/completions`, { model, messages, temperature: 0, max_tokens: 768, cache_prompt: true, stream: false }, 3 * 3600 * 1000);
     } catch (error) { done.results.push({ task: problem.task_id, passed: false, error: "request failed: " + error.message }); save(); continue; }
     const text = body.choices?.[0]?.message?.content ?? ""; const seconds = (Date.now() - start) / 1000;
     const block = text.match(/```(?:python|py)?\s*\n([\s\S]*?)```/); let code = block ? block[1] : text;

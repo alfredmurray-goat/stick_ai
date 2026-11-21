@@ -26,7 +26,7 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 ### In flight
 
 - **Releases.** Each main build publishes one private draft, `stick-<run>` ("Stick AI — all devices — build N"), with `stick_ai-all-devices.zip` and the signed updates, and uploads the updates to Cloudflare R2. There is no way to publish a public release; the old Mac DMG workflows were removed.
-- **Benchmarks.** Lite scored 120/164 (73.2%) on the full HumanEval (in the README). Max and the agentic tasks still need a machine with more than 16 GB of memory (see Known issues).
+- **Benchmarks.** Lite scored 120/164 (73.2%) on the full HumanEval (in the README). Max: early Kaggle CPU run solved 26 of 30 answered problems (86.7%, shown as preliminary on the site and README); 119 others were lost to Node fetch's 300 s limit, now fixed in `benchmark-humaneval.mjs` (plain http, failed requests retried on resume). The full run is next on Kaggle GPU T4 x2 with Google Drive checkpoints (docs/benchmark/KAGGLE.md). Max and the agentic tasks still need a machine with more than 16 GB of memory (see Known issues).
 
 ## Known issues
 
