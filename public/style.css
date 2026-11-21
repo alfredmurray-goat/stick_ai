@@ -352,3 +352,5 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .chart .s712 .bar { animation-range: entry 60% cover 40%; } .chart .s712 .val { animation-range: cover 36% cover 42%; }
   .chart .s732 .bar { animation-range: entry 75% cover 46%; } .chart .s732 .val { animation-range: cover 42% cover 48%; }
 }
+
+.admin-actions { display: flex; flex-wrap: wrap; gap: 10px; }

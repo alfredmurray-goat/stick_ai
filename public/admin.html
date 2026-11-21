@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Activation desk · stick_ai</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="page">
+    <a class="back" href="/">← stick_ai</a>
+    <h1>Activation desk</h1>
+    <p class="lede">For the owner only. Every action needs the admin password (the <b>ACTIVATION_ADMIN_TOKEN</b> set in Vercel).</p>
+
+    <h2>1. Set up (once)</h2>
+    <form class="notify" method="post" action="/api/activation-admin">
+      <input type="hidden" name="action" value="setup">
+      <label for="t1">Admin password</label><input id="t1" name="token" type="password" required autocomplete="current-password">
+      <button class="btn" type="submit">Set up activation</button>
+    </form>
+
+    <h2>2. Make codes to print</h2>
+    <form class="notify" method="post" action="/api/activation-admin">
+      <input type="hidden" name="action" value="generate">
+      <label for="t2">Admin password</label><input id="t2" name="token" type="password" required autocomplete="current-password">
+      <label for="n">How many codes</label><input id="n" name="count" type="number" min="1" max="500" value="50" required>
+      <button class="btn" type="submit">Make codes</button>
+    </form>
+
+    <h2>3. Help a customer</h2>
+    <form class="notify" method="post" action="/api/activation-admin">
+      <label for="t3">Admin password</label><input id="t3" name="token" type="password" required autocomplete="current-password">
+      <label for="c">Activation code</label><input id="c" name="code" type="text" required placeholder="ABCD-EFGH-JKMN" autocomplete="off">
+      <div class="admin-actions"><button class="btn ghost" type="submit" name="action" value="lookup">Look up</button><button class="btn" type="submit" name="action" value="reset">Reset so it works on a new stick</button></div>
+    </form>
+  </main>
+</body>
+</html>
