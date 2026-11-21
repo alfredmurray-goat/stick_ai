@@ -704,3 +704,8 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 .token-fallback { margin-top: 10px; }
 .token-fallback summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+
+.command-preview { font: 13px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.approval-card.unsandboxed { border-color: color-mix(in srgb, var(--amber) 55%, var(--border)); }
+.approval-card.unsandboxed .approval-sub { color: var(--amber); }
+#long-context-panel .warning-box { margin-top: 8px; }

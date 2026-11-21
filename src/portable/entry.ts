@@ -79,7 +79,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       temp = await mkdtemp(join(tmpdir(), "stick-ai-"));
       const port = await reservePort(); await port.release();
       engine = new ManagedEngine(root, targetFor(process.platform, process.arch), port.port, temp, fd, log);
-      engine.contextSize = faster ? 4096 : 8192;
+      engine.faster = faster;
       engine.onProcess = (pid) => notify({ kind: "model_pid", pid });
       app = await webApp({ root, engine, bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
     };
