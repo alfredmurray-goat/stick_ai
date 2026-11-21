@@ -1,3 +1,4 @@
+import { lockedModelPaths } from "./locked-models.js";
 import { createHash } from "node:crypto";
 import { open, readFile, mkdir, mkdtemp, rm, rename, lstat, realpath, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -121,7 +122,7 @@ async function compatibleModels(root: string, manifest: Manifest): Promise<void>
   const current = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as Manifest;
   const before = current.files.filter((record) => record.path.startsWith("models/"));
   const after = manifest.files.filter((record) => record.path.startsWith("models/"));
-  if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.path === "models/stellan-1.0-q4_k_m.gguf" && record.optional === true)) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
+  if (!before.every((old) => after.some((record) => sameRecord(old, record))) || !after.every((record) => before.some((old) => sameRecord(old, record)) || record.optional === true && (record.path === "models/stellan-1.0-q4_k_m.gguf" || lockedModelPaths.has(record.path)))) { throw new Error("This update requires different models. Keep this version or download a complete package."); }
   // Model-free copies may have no models folder at all; their GGUFs are linked from elsewhere.
   if (!await safeDirectory(join(root, "models")) && !after.every((record) => record.optional === true)) { throw new Error("The installed models are missing"); }
 }
@@ -152,6 +153,8 @@ async function verifyTree(root: string, manifest: Manifest, models: boolean): Pr
     const path = join(root, record.path);
     let info; try { info = await lstat(path); } catch (error) { if (record.optional && record.path.startsWith("models/") && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; } throw error; }
     if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || await realpath(path) !== path) { throw new Error("Unsafe staged update"); }
+    // A locked model split is encrypted: its size is checked here, its decrypted hash when it's unlocked.
+    if (record.locked) { if (info.size !== record.size) { throw new Error("Changed staged update"); } continue; }
     const actual = await hashFile(path);
     if (actual.size !== record.size || actual.sha256 !== record.sha256 || process.platform !== "win32" && record.executable && !(info.mode & 0o111)) { throw new Error("Changed staged update"); }
   }

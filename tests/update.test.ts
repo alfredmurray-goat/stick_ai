@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile, rm, lstat, readdir, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, rm, lstat, readdir, symlink, truncate } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { hashFile, staticFiles, type Manifest } from "../src/portable/integrity.js";
@@ -8,6 +8,7 @@ import { buildUpdateBundle } from "../src/portable/update-package.js";
 import { checkForUpdate, findUpdate, prepareUpdate, applyPreparedUpdate, githubResponse, hostedResponse, readUpdateConfig } from "../src/portable/update.js";
 import { safeUpdatePath, validateConfig, validateUpdateManifest, verifyFeed, type SignedFeed, type UpdateFeed } from "../src/portable/update-format.js";
 import { targets } from "../src/portable/platform.js";
+import { lockedModels, lockedRecords } from "../src/portable/locked-models.js";
 
 const roots: string[] = [];
 const key = generateKeyPairSync("ed25519"); const publicKey = key.publicKey.export({ type: "spki", format: "pem" }).toString();
@@ -33,7 +34,7 @@ async function packageFixture(root: string, sequence: number, model = "saved mod
 function signed(feed: UpdateFeed): SignedFeed {
   const payload = Buffer.from(JSON.stringify(feed)); return { payload: payload.toString("base64"), signature: sign(null, payload, key.privateKey).toString("base64") };
 }
-async function fixture(model?: string, addOptionalMax = false, installedMax = false) {
+async function fixture(model?: string, addOptionalMax = false, installedMax = false, locked: "none" | "offered" | "installed" = "none") {
   const parent = await mkdtemp(join(tmpdir(), "stick-update-test-")); roots.push(parent);
   const root = join(parent, "Stick AI"); const next = join(parent, "new-package");
   const current = await packageFixture(root, 1);
@@ -43,6 +44,15 @@ async function fixture(model?: string, addOptionalMax = false, installedMax = fa
     await writeFile(join(root, "manifest.json"), JSON.stringify(current));
   }
   const manifest = await packageFixture(next, 2, model);
+  // Releases list the locked layout of both models as optional (model-lock.ts); a stick may already carry Lite locked.
+  if (locked !== "none") {
+    manifest.files.push(...Object.values(lockedModels).flatMap(lockedRecords)); await writeFile(join(next, "manifest.json"), JSON.stringify(manifest));
+    if (locked === "installed") {
+      const record = lockedRecords(lockedModels["stellan-1-lite"])[0]!;
+      await writeFile(join(root, record.path), ""); await truncate(join(root, record.path), record.size);
+      current.files.push(record); await writeFile(join(root, "manifest.json"), JSON.stringify(current));
+    }
+  }
   if (addOptionalMax) { manifest.files.push({ path: "models/stellan-1.0-q4_k_m.gguf", sha256: "a".repeat(64), size: 12345678, executable: false, optional: true }); await writeFile(join(next, "manifest.json"), JSON.stringify(manifest)); }
   await writeFile(join(root, "app/project/keep.txt"), "my project"); await writeFile(join(root, "logs/keep.log"), "my logs");
   const bundle = join(parent, "update.gz"); await buildUpdateBundle(next, "linux-x64", bundle);
@@ -199,4 +209,17 @@ it("reads feeds with and without an all-devices bundle but never without the fou
   const config = { ...(await readUpdateConfig(f.root)), target: "universal" as const, feed: hostedFeed };
   vi.stubGlobal("fetch", vi.fn(async () => Response.json(signed(f.feed))));
   expect(await findUpdate(config, "", new AbortController().signal, publicKey)).toBeUndefined();
+});
+
+it("updates sticks to releases that list locked models, whether the stick's models are plain or already locked", async () => {
+  for (const state of ["offered", "installed"] as const) {
+    const f = await fixture(undefined, false, false, state);
+    const work = await prepareUpdate(f.root, "private-token", new AbortController().signal, publicKey);
+    await applyPreparedUpdate(f.root, work, publicKey);
+    expect(await readFile(join(f.root, "app/launcher.cjs"), "utf8")).toBe("app version 2");
+    if (state === "installed") { expect((await lstat(join(f.root, "models/stellan-1-lite-q4_k_m.locked"))).size).toBe(lockedRecords(lockedModels["stellan-1-lite"])[0]!.size); }
+  }
+  const release = manifestWith([...allDevices], [...targets]); release.files.push(...Object.values(lockedModels).flatMap(lockedRecords));
+  expect(validateUpdateManifest(release, "universal").files).toHaveLength(allDevices.length + 4);
+  expect(() => validateUpdateManifest(manifestWith([...allDevices, "models/other.gguf"], [...targets]), "universal")).toThrow("Unexpected model file");
 });
