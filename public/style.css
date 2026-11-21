@@ -369,3 +369,21 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 }
 
 .admin-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Non-tech mode: a pure-CSS switch in the header (the site runs no scripts). Plain-only parts stay hidden
+   until it's on; technical parts hide while it's on. Browsers without :has() never see the switch. */
+.mode { display: inline-flex; align-items: center; gap: 8px; font: 400 12px var(--mono); color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+.mode input { appearance: none; -webkit-appearance: none; position: relative; width: 32px; height: 18px; margin: 0; border-radius: 999px; background: var(--line); cursor: pointer; transition: background .2s ease; }
+.mode input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text); transition: transform .2s ease; }
+.mode input:checked { background: var(--violet); }
+.mode input:checked::before { transform: translateX(14px); background: #fff; }
+.mode input:focus-visible { outline: 2px solid var(--violet-hi); outline-offset: 3px; }
+.mode:hover { color: var(--text); }
+body:not(:has(#plain:checked)) .plain-only { display: none !important; }
+body:has(#plain:checked) .tech-only { display: none !important; }
+@supports not selector(:has(*)) { .plain-only, .mode { display: none !important; } }
+.plain-card { align-self: center; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-2); padding: 26px 28px; display: grid; gap: 12px; color: var(--muted); font-size: 1.04rem; line-height: 1.6; }
+.plain-card p { margin: 0; }
+.plain-card b { color: var(--text); }
+@media (max-width: 520px) { .status { display: none; } .mode { margin-left: auto; } }
+.planet h2 { max-width: 15em; }

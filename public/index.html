@@ -30,29 +30,33 @@
       <span>stick_ai</span>
     </a>
     <nav aria-label="Main">
-      <a href="#session">./how</a>
-      <a href="#features">./features</a>
-      <a href="#bench">./benchmarks</a>
-      <a href="#specs">./specs</a>
-      <a href="#price">./price</a>
-      <a href="#faq">./faq</a>
+      <a href="#session"><span class="tech-only">./how</span><span class="plain-only">How it works</span></a>
+      <a href="#features"><span class="tech-only">./features</span><span class="plain-only">What it does</span></a>
+      <a href="#bench"><span class="tech-only">./benchmarks</span><span class="plain-only">How good is it</span></a>
+      <a href="#specs"><span class="tech-only">./specs</span><span class="plain-only">What you need</span></a>
+      <a href="#price"><span class="tech-only">./price</span><span class="plain-only">Price</span></a>
+      <a href="#faq"><span class="tech-only">./faq</span><span class="plain-only">Questions</span></a>
     </nav>
     <span class="status"><i aria-hidden="true"></i>not on sale yet</span>
+    <label class="mode" title="Explains everything in everyday words"><input type="checkbox" id="plain" role="switch"><span>non-tech mode</span></label>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <p class="kicker">// a private coding assistant on a usb stick</p>
-        <h1>Your code never leaves <span class="nowrap"><em>the&nbsp;stick.</em><span class="cursor" aria-hidden="true"></span></span></h1>
-        <p class="lede">Plug it in, open it, ask. Stellan reads your project, plans the change and waits for your yes before it touches a line. The AI runs on your own computer. There's no account, no cloud and no server to send anything to.</p>
+        <p class="kicker"><span class="tech-only">// a private coding assistant on a usb stick</span><span class="plain-only">// a private AI helper on a USB stick</span></p>
+        <h1><span class="tech-only">Your code never leaves</span><span class="plain-only">Your files never leave</span> <span class="nowrap"><em>the&nbsp;stick.</em><span class="cursor" aria-hidden="true"></span></span></h1>
+        <p class="lede tech-only">Plug it in, open it, ask. Stellan reads your project, plans the change and waits for your yes before it touches a line. The AI runs on your own computer. There's no account, no cloud and no server to send anything to.</p>
+        <p class="lede plain-only">An AI helper, like ChatGPT, that lives on a USB stick. Plug it into your computer and ask it, in everyday words, to build, fix or explain your website, app or code. It shows you exactly what it wants to change and only does it when you say yes. It all happens on your own computer: nothing you type is sent to the internet, and there's no account or subscription.</p>
         <div class="actions">
           <a class="btn" href="#price">€15 · see the launch</a>
           <a class="btn ghost" href="#session">watch it work ↓</a>
         </div>
         <ul class="facts" aria-label="At a glance">
-          <li><b>73.2%</b> HumanEval</li>
-          <li><b>0 bytes</b> of code sent</li>
+          <li class="tech-only"><b>73.2%</b> HumanEval</li>
+          <li class="plain-only"><b>Beats GPT-4</b> (2023) at coding</li>
+          <li class="tech-only"><b>0 bytes</b> of code sent</li>
+          <li class="plain-only"><b>Nothing</b> sent online</li>
           <li><b>Mac · Win · Linux</b> one stick</li>
         </ul>
       </div>
@@ -78,7 +82,12 @@
           <li><span>03</span><div><b>Say yes or no.</b> Every edit and command shows the exact lines first. Your file stays as it was until you allow it.</div></li>
         </ol>
       </div>
-      <div class="term" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
+      <div class="plain-card plain-only">
+        <p><b>Think of it as a careful assistant sitting next to you.</b></p>
+        <p>You say: <i>"Why does my shop's checkout break when the basket is empty?"</i></p>
+        <p>It looks through your files, finds the one line that causes it, and explains it in plain words. Then it shows you the small change it wants to make and asks: <i>"Shall I fix it?"</i> Nothing changes until you click yes.</p>
+      </div>
+      <div class="term tech-only" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
         <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
 <pre><span class="ln"><span class="dim">$</span> stick_ai open ~/projects/shop</span>
 <span class="ln"><span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes of code sent</span></span>
@@ -101,19 +110,20 @@
       <p class="kicker">// built in</p>
       <h2 id="features-title">Small stick, <em>grown-up tools.</em></h2>
       <div class="feature-grid">
-        <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p>Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p></article>
+        <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p class="tech-only">Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p><p class="plain-only">You can see what it's thinking and which files it's looking at while it works, so it never feels like a black box.</p></article>
         <article><span class="feature-tag">memory</span><h3>Rests when you do.</h3><p>After 10 quiet minutes it gives your computer its memory back. Your next message wakes it in seconds, conversation intact.</p></article>
-        <article><span class="feature-tag">hooks</span><h3>Hooks, like Claude Code.</h3><p>Run your own command, or tell another app, when Stellan finishes or needs you. A hook can stop a step. It can never approve one.</p></article>
-        <article><span class="feature-tag">github</span><h3>Works with your GitHub.</h3><p>Connect the app to your GitHub account with a short code, no tokens to set up. Stellan works on the repositories you pick and opens a pull request for you to review.</p></article>
+        <article><span class="feature-tag">hooks</span><h3><span class="tech-only">Hooks, like Claude Code.</span><span class="plain-only">It can tell you when it’s done.</span></h3><p class="tech-only">Run your own command, or tell another app, when Stellan finishes or needs you. A hook can stop a step. It can never approve one.</p><p class="plain-only">It can let another app (or your phone) know when it has finished or needs your answer, so you don't have to sit and watch.</p></article>
+        <article><span class="feature-tag">github</span><h3>Works with your GitHub.</h3><p class="tech-only">Connect the app to your GitHub account with a short code, no tokens to set up. Stellan works on the repositories you pick and opens a pull request for you to review.</p><p class="plain-only">If your code is kept on GitHub (where most developers store their projects), it can work on it there too, and hands its changes back for you to check before anything is final.</p></article>
         <article><span class="feature-tag">speed</span><h3>Answers start sooner.</h3><p>Stellan reads its instructions while you're still typing, so your first reply begins about twice as fast, even on an ordinary laptop.</p></article>
-        <article><span class="feature-tag">web</span><h3>Web search, if you say so.</h3><p>It can look up docs and error messages with Actuent. It asks first every time, and only the search words leave. Your code never does.</p></article>
+        <article><span class="feature-tag">web</span><h3>Web search, if you say so.</h3><p class="tech-only">It can look up docs and error messages with Actuent. It asks first every time, and only the search words leave. Your code never does.</p><p class="plain-only">If it needs to look something up online, it asks you first, every time. Only the search words go out; your files never do. You can switch the internet off completely.</p></article>
       </div>
     </section>
 
     <section class="bench" id="bench" aria-labelledby="bench-title">
       <p class="kicker">// benchmarks</p>
       <h2 id="bench-title">Ahead of Claude 3 Opus and GPT-4 Turbo at coding.* <em>On your own computer.</em></h2>
-      <p class="lede narrow">On HumanEval, the classic coding test, Stellan-1 Lite (7.3 billion parameters) scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. Stellan-1 Max's early result is ahead of 2024's flagships, Claude 3 Opus, Gemini 1.5 Pro and GPT-4 Turbo, at 23.6 billion parameters: a fraction of models from 3× (Llama 3 70B) to an estimated 85× (Claude 3 Opus) its size. *Max's score is an early result from the first 30 answered problems; the full test is under way.</p>
+      <p class="lede narrow plain-only"><b>In plain words:</b> AI companies test their AIs with the same 164 programming puzzles, called HumanEval, and publish the score. We ran the same test on the AIs on the stick. Higher is better. The small AI that lives on your stick scored higher than famous paid AIs from 2023 and 2024, which run on giant computers in data centres and are tens of times bigger.</p>
+      <p class="lede narrow tech-only">On HumanEval, the classic coding test, Stellan-1 Lite (7.3 billion parameters) scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. Stellan-1 Max's early result is ahead of 2024's flagships, Claude 3 Opus, Gemini 1.5 Pro and GPT-4 Turbo, at 23.6 billion parameters: a fraction of models from 3× (Llama 3 70B) to an estimated 85× (Claude 3 Opus) its size. *Max's score is an early result from the first 30 answered problems; the full test is under way.</p>
       <div class="chart" role="table" aria-label="HumanEval pass@1 scores, higher is better">
         <div class="row us prelim s867" role="row">
           <span class="label-cell"><span role="cell" class="name">stellan-1 max · early result</span><span role="cell" class="note">23.6B · your computer · 26 of the first 30 answered problems*</span></span>
@@ -184,6 +194,21 @@
       </details>
     </section>
 
+    <section class="planet" id="planet" aria-labelledby="planet-title">
+      <p class="kicker">// no data centre</p>
+      <h2 id="planet-title">Your questions never visit <em>a data centre.</em></h2>
+      <p class="lede narrow">Cloud AI like ChatGPT and Gemini answers from huge data centres that run around the clock, and many of them are cooled with water. stick_ai answers on the computer you already have, so your questions use none of that.</p>
+      <div class="feature-grid">
+        <article><span class="feature-tag">water</span><h3>No cooling water.</h3><p>Your questions never reach a data centre, so none of the water data centres use for cooling goes into your answers.</p></article>
+        <article><span class="feature-tag">hardware</span><h3>Nothing new to build.</h3><p>It runs on the computer you already own. No servers are built, or kept running day and night, to answer you.</p></article>
+        <article><span class="feature-tag">power</span><h3>Only on when you are.</h3><p>It uses your computer's power only while it's working, and rests by itself after 10 quiet minutes.</p></article>
+      </div>
+      <details class="fine">
+        <summary>To be fair, the small print</summary>
+        <p>Cloud AI has become very efficient per answer. Google reports about 0.24 Wh of electricity and 0.26 ml of water for a typical Gemini text prompt (<a href="https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference">August 2025</a>), and OpenAI about 0.34 Wh for an average ChatGPT question (<a href="https://www.datacenterdynamics.com/en/news/sam-altman-chatgpt-queries-consume-034-watt-hours-of-electricity-and-0000085-gallons-of-water/">June 2025</a>). A laptop working on an answer can use more electricity than that, so we don't claim stick_ai uses less energy per answer. What it avoids is the data centre itself: its cooling water, its servers and keeping them running around the clock.</p>
+      </details>
+    </section>
+
     <section class="specs" id="specs" aria-labelledby="specs-title">
       <div class="label">
         <div class="label-head"><span>SPEC SHEET</span><span>stick_ai · rev 1</span></div>
@@ -201,7 +226,11 @@
         </dl>
         <div class="barcode" aria-hidden="true"></div>
       </div>
-      <div class="tree-wrap">
+      <div class="plain-card plain-only">
+        <p><b>What you need:</b> a normal Mac, Windows or Linux computer from the last few years with at least 8 GB of memory (most do). A computer with 24 GB or more can use the bigger, smarter AI too.</p>
+        <p><b>What you don't need:</b> internet, an account, a subscription or any installing. Plug in the stick and open the app on it.</p>
+      </div>
+      <div class="tree-wrap tech-only">
         <p class="kicker">// what's on it</p>
         <h3>One stick, every computer.</h3>
         <p>The app for each computer sits at the top. Everything they share, including one copy of each model, lives in <code>stellan/</code>.</p>
@@ -258,6 +287,7 @@
     <section class="faq" id="faq" aria-labelledby="faq-title">
       <p class="kicker">// questions</p>
       <h2 id="faq-title">Questions.</h2>
+      <details class="plain-only"><summary>Do I need to know how to code?</summary><p>No. You ask in everyday words, like "add a contact form to my website" or "why is this page broken?", and it explains what it found and what it wants to change before doing anything. It helps most if you have a website, app or code project, or you'd like to start one.</p></details>
       <details><summary>When can I buy it?</summary><p>It isn't on sale yet. Orders open in February 2027 with shipping across the European Union, and in May 2027 for the rest of the world.</p></details>
       <details><summary>How much is it?</summary><p>€15 per stick in the EU, VAT included, and $17 in the rest of the world, plus shipping. It's a one-off price: no subscription.</p></details>
       <details><summary>Is it really better than GPT-4 and Claude 2?</summary><p>On HumanEval, a well-known coding test, Stellan-1 Lite scored 73.2%. GPT-4 scored 67.0% and Claude 2 scored 71.2%, as published by OpenAI and Anthropic. Both were their company's best model until November 2023. Today's newest cloud models score higher still. What makes stick_ai different is that it runs privately, on your own computer.</p></details>
