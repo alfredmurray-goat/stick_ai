@@ -333,7 +333,10 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .chart .us .bar { background: linear-gradient(90deg, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 30px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
 .chart .us .val { color: var(--amber); font-size: 16px; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .chart .axis { margin-left: calc(var(--label) + 20px); display: flex; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); }
-.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; }
+.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; } .s867 { --score: 86.7; }
+/* An early, partial result: striped so it reads as provisional. */
+.chart .prelim .val { margin-right: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(12, 10, 20, .72); }
+.chart .prelim .bar { background: repeating-linear-gradient(135deg, var(--violet-deep) 0 10px, color-mix(in srgb, var(--violet-hi) 70%, transparent) 10px 20px); box-shadow: none; }
 @media (max-width: 620px) {
   .chart { --label: 0px; padding: 20px 14px 16px; gap: 12px; }
   .chart .row { grid-template-columns: 1fr; gap: 6px; }
@@ -351,6 +354,7 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .chart .s670 .bar { animation-range: entry 45% cover 36%; } .chart .s670 .val { animation-range: cover 32% cover 38%; }
   .chart .s712 .bar { animation-range: entry 60% cover 40%; } .chart .s712 .val { animation-range: cover 36% cover 42%; }
   .chart .s732 .bar { animation-range: entry 75% cover 46%; } .chart .s732 .val { animation-range: cover 42% cover 48%; }
+  .chart .s867 .bar { animation-range: entry 85% cover 50%; } .chart .s867 .val { animation-range: cover 46% cover 52%; }
 }
 
 .admin-actions { display: flex; flex-wrap: wrap; gap: 10px; }
