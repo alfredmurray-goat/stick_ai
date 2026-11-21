@@ -77,6 +77,18 @@
   </header>
 
   <div id="conversation-scroll" class="conversation-scroll">
+    <section id="activation" class="welcome" hidden>
+      <div class="welcome-mark" aria-hidden="true"><img class="mark logo-dark" src="brand/icon-dark.png" alt=""><img class="mark logo-light" src="brand/icon-light.png" alt=""></div>
+      <p class="eyebrow">ONE-TIME ACTIVATION</p>
+      <h1>Activate your stick</h1>
+      <p class="welcome-subtitle">Enter the code printed in the quick-start guide in the box. This needs the internet once, for a few seconds. After that Stick AI works offline.</p>
+      <form id="activation-form" class="activation-form">
+        <label for="activation-code" class="sr-only">Activation code</label>
+        <input id="activation-code" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="20" placeholder="ABCD-EFGH-JKMN" required>
+        <button id="activate" class="primary" type="submit">Activate</button>
+      </form>
+      <p id="activation-message" class="welcome-footnote" role="status">The letters O, I, L and U are never used, so you can't mix them up.</p>
+    </section>
     <section id="welcome" class="welcome">
       <div class="welcome-mark" aria-hidden="true"><img class="mark logo-dark" src="brand/icon-dark.png" alt=""><img class="mark logo-light" src="brand/icon-light.png" alt=""></div>
       <p class="eyebrow">YOUR LOCAL CODING WORKSPACE</p>

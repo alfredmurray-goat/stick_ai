@@ -7,6 +7,7 @@ import { friendlyError, type FriendlyError } from "./errors.js";
 import { GitHubWorkspaces } from "./github-workspace.js";
 import { GitHubError } from "./github-client.js";
 import { GitHubSignIn, githubAppInstallUrl } from "./github-auth.js";
+import { Activation, ActivationError } from "./activation.js";
 import { McpServers, McpError, actuent } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
 import { contextPlan } from "./engine.js";
@@ -27,7 +28,7 @@ import { listenLocal } from "./ports.js";
 import { userMessage, UserError } from "./platform.js";
 import type { ManagedEngine } from "./engine.js";
 
-export async function webApp(options: { root: string; engine: ManagedEngine; bytes: number; choices: string[]; noSwap: boolean; desktop?: boolean; faster?: boolean; report(text: string): void; log(error: unknown): void; stop(): Promise<void> }) {
+export async function webApp(options: { root: string; engine: ManagedEngine; activation?: Activation; bytes: number; choices: string[]; noSwap: boolean; desktop?: boolean; faster?: boolean; report(text: string): void; log(error: unknown): void; stop(): Promise<void> }) {
   const { root, engine, report, log } = options;
   const token = randomBytes(32).toString("hex");
   const events: { id: number; kind: string; text?: string; data?: unknown }[] = [];
@@ -87,6 +88,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
   // windows, at the cost of slower re-reads; it is saved with the app's settings on the stick.
   let longContext = false, onboarded = false;
   try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; } catch {}
+  // A sold stick asks for its printed code once before the first model starts (see activation.ts).
+  const activation = options.activation;
+  let pendingModel: string | undefined;
+  if (activation) { await activation.check().catch(log); }
+  const needsActivation = (): boolean => Boolean(activation && !activation.active);
   const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
   // Hooks that only report (start, approval needed, finished) run in the background and never hold up the work.
@@ -227,7 +233,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), longContext, onboarded, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -326,11 +332,18 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
         }
         finally { repositoryOperation = undefined; finishRepository(); repositoryDone = undefined; }
       }
+      if (url.pathname === "/api/start" && needsActivation()) { pendingModel = typeof data.model === "string" && options.choices.includes(data.model) ? data.model : "stellan-1-lite"; phase = "activate"; send(response, 409, { error: "Enter your activation code first." }); return; }
       if (url.pathname === "/api/start" && ["choose", "error"].includes(phase) && typeof data.model === "string" && !repositoryOperation && options.choices.includes(data.model)) { work = launch(data.model); send(response, 202, {}); return; }
       if (url.pathname === "/api/task" && phase === "ready" && typeof data.text === "string" && !repositoryOperation && data.text.trim()) { work = task(data.text.slice(0, 100000)); send(response, 202, {}); return; }
       if (url.pathname === "/api/approve" && typeof data.id === "string") { approvals.get(data.id)?.(data.allow === true); send(response, 200, {}); return; }
       if (url.pathname === "/api/cancel") { active?.abort(); loading?.abort(); repositoryOperation?.abort(); send(response, 200, {}); return; }
       if (url.pathname === "/api/dismiss") { problem = undefined; failure = ""; send(response, 200, {}); return; }
+      if (url.pathname === "/api/activate" && typeof data.code === "string" && activation) {
+        try { await activation.activate(data.code); }
+        catch (error) { send(response, 400, { error: error instanceof ActivationError ? error.message : "Activation didn't work. Try again in a minute." }); return; }
+        if (pendingModel) { const model = pendingModel; pendingModel = undefined; phase = "choose"; work = launch(model); }
+        send(response, 200, {}); return;
+      }
       if (url.pathname === "/api/onboarded") { onboarded = true; await savePreferences(); send(response, 200, {}); return; }
       if (url.pathname === "/api/long-context" && typeof data.enabled === "boolean" && !active && !loading && !repositoryOperation) {
         longContext = data.enabled; engine.plan = contextPlan(options.bytes, longContext);
@@ -357,5 +370,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

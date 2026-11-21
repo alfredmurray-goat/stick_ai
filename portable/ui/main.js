@@ -311,7 +311,9 @@ async function update() {
     // The server holds this request until something changes, so an idle window sends nothing.
     const state = await api(`/api/state?after=${after}${stateKey ? `&wait=${encodeURIComponent(stateKey)}` : ""}`); stateKey = state.key || "";
     availableSkills = state.skills || []; for (const server of state.mcp || []) mcpNames.set(server.id, server.name);
-    byId("welcome").hidden = !(["choose", "error"].includes(state.phase) && !state.problem);
+    const activating = state.phase === "activate" || Boolean(state.activation?.required && !state.activation.active && ["choose", "error"].includes(state.phase));
+    byId("activation").hidden = !activating;
+    byId("welcome").hidden = activating || !(["choose", "error"].includes(state.phase) && !state.problem);
     byId("loading").hidden = state.phase !== "starting";
     byId("chat").hidden = !["ready", "working"].includes(state.phase);
     byId("footer").hidden = byId("chat").hidden;
@@ -765,6 +767,18 @@ byId("hook-add").onclick = async () => {
   try { await extensionAction("/api/hooks/add", data, "hooks-message"); for (const id of ["hook-name", "hook-matcher", "hook-command", "hook-url"]) byId(id).value = ""; byId("hook-form").open = false; await refreshExtensions(); byId("hooks-message").textContent = "Hook added. Use Test to try it."; } catch {}
 };
 byId("open-hooks").onclick = () => openSettings("hooks");
+// ---------- One-time activation ----------
+byId("activation-code").addEventListener("input", (event) => {
+  const raw = event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 12);
+  event.target.value = raw.match(/.{1,4}/g)?.join("-") ?? "";
+});
+byId("activation-form").onsubmit = async (event) => {
+  event.preventDefault(); const message = byId("activation-message");
+  byId("activate").disabled = true; message.classList.remove("error"); message.textContent = "Activating…";
+  try { await api("/api/activate", { code: byId("activation-code").value }); message.textContent = "Activated. Starting Stellan…"; toast("Your stick is activated. Welcome!"); }
+  catch (error) { message.classList.add("error"); message.textContent = error.message; }
+  finally { byId("activate").disabled = false; }
+};
 // ---------- Welcome tour (once, remembered on the stick; reopen from Settings) ----------
 let tourStep = 1, tourChecked = false;
 function showTourStep(step) {
