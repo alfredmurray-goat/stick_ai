@@ -113,15 +113,45 @@
     <section class="bench" id="bench" aria-labelledby="bench-title">
       <p class="kicker">// benchmarks</p>
       <h2 id="bench-title">Better than GPT-4 and Claude 2 at coding. <em>On your laptop.</em></h2>
-      <p class="lede narrow">On HumanEval, the classic coding test, Stellan-1 Lite scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. With 7.3 billion parameters, it's about 99.6% smaller than GPT-4's estimated 1.8 trillion.</p>
+      <p class="lede narrow">On HumanEval, the classic coding test, Stellan-1 Lite (7.3 billion parameters) scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. Stellan-1 Max's early result puts it among 2024's flagships, between Grok-2 and Claude 3 Opus, at 23.6 billion parameters: a fraction of models from 3× (Llama 3 70B) to an estimated 75× (GPT-4) its size.</p>
       <div class="chart" role="table" aria-label="HumanEval pass@1 scores, higher is better">
+        <div class="row s884" role="row">
+          <span class="label-cell"><span role="cell" class="name">grok-2</span><span role="cell" class="note">xAI's best, Aug 2024 · 270B (115B active), counted from its released weights</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">88.4</span></span></span>
+          <span role="cell" class="score">88.4%</span>
+        </div>
         <div class="row us prelim s867" role="row">
-          <span class="label-cell"><span role="cell" class="name">stellan-1 max · early result</span><span role="cell" class="note">24B params · 26 of the first 30 problems answered · full test coming</span></span>
+          <span class="label-cell"><span role="cell" class="name">stellan-1 max · early result</span><span role="cell" class="note">23.6B · your computer · 26 of the first 30 answered problems*</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">86.7*</span></span></span>
           <span role="cell" class="score">86.7%, preliminary: 26 of 30 answered problems</span>
         </div>
+        <div class="row s849" role="row">
+          <span class="label-cell"><span role="cell" class="name">claude 3 opus</span><span role="cell" class="note">Anthropic's best, Mar 2024 · size unpublished</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">84.9</span></span></span>
+          <span role="cell" class="score">84.9%</span>
+        </div>
+        <div class="row s841" role="row">
+          <span class="label-cell"><span role="cell" class="name">gemini 1.5 pro</span><span role="cell" class="note">Google, May 2024 update · size unpublished</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">84.1</span></span></span>
+          <span role="cell" class="score">84.1%</span>
+        </div>
+        <div class="row s837" role="row">
+          <span class="label-cell"><span role="cell" class="name">gpt-4 turbo</span><span role="cell" class="note">OpenAI's best, Nov 2023 · size unpublished</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">83.7</span></span></span>
+          <span role="cell" class="score">83.7%</span>
+        </div>
+        <div class="row s817" role="row">
+          <span class="label-cell"><span role="cell" class="name">llama 3 70b</span><span role="cell" class="note">Meta, Apr 2024 · 70B, published</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">81.7</span></span></span>
+          <span role="cell" class="score">81.7%</span>
+        </div>
+        <div class="row s744" role="row">
+          <span class="label-cell"><span role="cell" class="name">gemini 1.0 ultra</span><span role="cell" class="note">Google's best, Dec 2023 · size unpublished</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">74.4</span></span></span>
+          <span role="cell" class="score">74.4%</span>
+        </div>
         <div class="row us s732" role="row">
-          <span class="label-cell"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="note">7.3B params · your laptop</span></span>
+          <span class="label-cell"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="note">7.3B · your laptop</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">73.2</span></span></span>
           <span role="cell" class="score">73.2%</span>
         </div>
@@ -131,7 +161,7 @@
           <span role="cell" class="score">71.2%</span>
         </div>
         <div class="row s670" role="row">
-          <span class="label-cell"><span role="cell" class="name">gpt-4</span><span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (est.)</span></span>
+          <span class="label-cell"><span role="cell" class="name">gpt-4</span><span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (estimate)</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">67.0</span></span></span>
           <span role="cell" class="score">67.0%</span>
         </div>
@@ -143,15 +173,17 @@
         <div class="axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
       </div>
       <div class="numbers">
-        <div><b>99.6%</b><span>smaller than GPT-4 by its estimated size, and it scores higher</span></div>
+        <div><b>99.6%</b><span>smaller than GPT-4 by its estimated size, and Lite scores higher</span></div>
+        <div><b>3–75×</b><span>the size of the 2024 flagships Max's early result sits among (Llama 3 70B, published, to GPT-4, estimated)</span></div>
         <div><b>~5 s</b><span>for a follow-up step, down from ~95 s, because it remembers the conversation</span></div>
         <div><b>4.1 GB</b><span>Lite's whole model. Runs on an ordinary computer with 8 GB of memory</span></div>
       </div>
       <details class="fine">
         <summary>How we measured, and the small print</summary>
         <p><b>Stellan-1 Lite:</b> all 164 HumanEval problems, pass@1, greedy decoding (temperature 0), each answer run against the official hidden tests, on a 4-core CPU with the app's own settings: 120 of 164 passed.</p>
+        <p><b>Sizes:</b> "published" means the maker stated it; "counted from its released weights" means anyone can count it from the files the maker released (Grok-2's weights, <a href="https://huggingface.co/xai-org/grok-2">published by xAI in 2025</a>); "estimate" is an outside estimate the maker never confirmed; "unpublished" means there's no reliable figure, so we don't give one.</p>
         <p><b>* Stellan-1 Max (early result):</b> same test and settings on a free 4-core cloud machine. Max solved 26 of the 30 problems it answered (86.7%). The run lost the other problems to a time-out in our test script (since fixed), and the ones it did answer were mostly the shorter ones, so the full 164-problem score may well be lower. We'll replace this with the full result as soon as it's measured.</p>
-        <p><b>Other models:</b> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
+        <p><b>Other models:</b> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023), Grok-2 in <a href="https://x.ai/news/grok-2">xAI's Grok-2 announcement</a> (August 2024), GPT-4 Turbo (gpt-4-1106-preview) in <a href="https://github.com/openai/simple-evals">OpenAI's simple-evals</a>, Claude 3 Opus in <a href="https://www.anthropic.com/news/claude-3-family">Anthropic's Claude 3 announcement</a> (March 2024), Gemini 1.5 Pro (May 2024 version) and Gemini 1.0 Ultra in Google's <a href="https://arxiv.org/abs/2403.05530">Gemini 1.5</a> and <a href="https://arxiv.org/abs/2312.11805">Gemini 1.0</a> reports, and Llama 3 70B Instruct in <a href="https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct">Meta's model card</a> (April 2024). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
         <p><b>Model sizes:</b> Stellan-1 Lite has 7.29 billion parameters, counted from its model file. OpenAI has never published GPT-4's size; ~1.8 trillion is the most widely cited estimate, from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">July 2023 SemiAnalysis report</a>, so "99.6% smaller" (7.29B ÷ 1.8T ≈ 0.4%) rests on that estimate. Anthropic has never published Claude 2's size and there's no reliable estimate, so we don't give one.</p>
         <p><b>To be clear:</b> newer cloud models from OpenAI and Anthropic score over 90% on this test (Anthropic reported 92.0% for Claude 3.5 Sonnet in 2024) and are far larger. stick_ai gives you 2023-flagship-level coding help, privately, offline, on your own machine. Stellan-1 Max's full score is still being measured; its early result is marked with *.</p>
       </details>
