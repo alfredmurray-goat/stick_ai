@@ -17,7 +17,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
 [![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
 [![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
-[![HumanEval](https://img.shields.io/badge/HumanEval-Lite%2073.2%25-7C4DFF)](#benchmarks)
+[![HumanEval](https://img.shields.io/badge/HumanEval-Lite%2073.2%25%20%C2%B7%20Max%2086.7%25*-7C4DFF)](#benchmarks)
 [![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -54,14 +54,14 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 Measured with the release Lite GGUF and the app's own llama.cpp server settings, CPU only, on a 4-core cloud machine.
 
-| Benchmark | What it measures | Stellan-1 Lite |
-| --- | --- | --- |
-| **HumanEval, all 164 problems** | Writing a Python function that passes hidden unit tests | **120 / 164 (73.2%)**, pass@1 |
+| Benchmark | What it measures | Stellan-1 Lite | Stellan-1 Max |
+| --- | --- | --- | --- |
+| **HumanEval, all 164 problems** | Writing a Python function that passes hidden unit tests | **120 / 164 (73.2%)**, pass@1 | **86.7%\*** early result: 26 of 30 answered problems |
 
 - **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The 95% confidence interval is about **66% to 79%**.
 - **Against the 2023 flagships.** OpenAI reported [67.0% for GPT-4](https://arxiv.org/abs/2303.08774) and Anthropic [71.2% for Claude 2](https://www.anthropic.com/news/claude-2), each with its own prompts and settings. Newer cloud models score over 90% (Anthropic reported [92.0% for Claude 3.5 Sonnet](https://www.anthropic.com/news/claude-3-5-sonnet) in 2024), and most of the newest ones no longer publish HumanEval at all.
 - **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
-- **Max.** On the 16 GB benchmark machine, Max loaded and read prompts at about 6 tokens a second, but then kept re-reading its 14.3 GB file from disk (about 210 MB/s) and gave no answer within 20 minutes. Its score will be measured on a machine with 32 GB.
+- **\*Max, early result.** On a free 4-core cloud machine (Kaggle, 31 GB), Max solved **26 of the 30** problems it answered (86.7%). The other 119 attempted problems were lost to a 5-minute time-out in the benchmark script (Max wrote about 0.7 tokens a second on that CPU, so longer answers took over 5 minutes); that's fixed, and they're retried on the next run. The answered problems were mostly the shorter ones, so the full score may be lower. The full 164-problem run is next, on Kaggle's free GPUs.
 
 **Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 
