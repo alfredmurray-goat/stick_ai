@@ -25,3 +25,22 @@ The database is the same Upstash store the sign-up form uses.
 
 - **Make codes:** on `/admin`, under **Make codes to print**, choose how many and click **Make codes**. Print one per box, for example in the code box on the quick-start leaflet (`docs/packaging/quick-start-guide.pdf`).
 - **Help a customer:** **Look up** shows whether a code is used and when. **Reset** frees it so it can activate a replacement stick.
+
+## Locked models
+
+Activation also unlocks the models. A sold stick carries each model as two files in `stellan/models`:
+
+- `<model>.locked`: the first part (about 80 MB: the settings, vocabulary and many small but vital pieces of the weights), encrypted with AES-256-GCM.
+- `<model>-00002-of-00002.gguf`: the rest, in the clear but useless without the first part.
+
+The keys are made once on the website (`/admin` → **Set up activation** creates them) and handed to each stick when it activates, sealed with a key derived from that stick's fingerprint and code. At every start the app decrypts the first part into the computer's temporary folder (about 0.3 seconds, ~80 MB), and llama.cpp reads the rest straight from the stick. It's our llama.cpp build with one small patch (`scripts/llama-split-dir.patch`) that lets it find the rest in another folder. Answers and speed are exactly the same as with the plain file (checked word for word).
+
+The split is the same every time, so its hashes are pinned in `src/portable/locked-models.ts`, and the app checks them like every other file. A stick can still carry plain models (for development or your own use); then no key is needed.
+
+### Locking models for selling (owner)
+
+1. Do the one-time setup above first.
+2. Put the plain models in `stellan/models` on one stick, as before, then open the install helper again. It finds the plain models and asks whether to lock them. Type `y`, then the activation desk password (the `ACTIVATION_ADMIN_TOKEN`). It needs the internet and takes a few minutes, mostly for Max.
+3. The helper checks the locked files against the pinned hashes, then deletes the plain ones. Copy `stellan/models` from that stick to your other sticks: the locked files are the same for every stick.
+
+Keep your plain models somewhere safe and private (and set the Hugging Face repositories to private). Locking stops copied files from running elsewhere. It can't stop a determined expert who has an activated stick, because the app is open source.

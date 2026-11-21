@@ -8,6 +8,7 @@ Every build that passes on `main` publishes one **private draft** release, **Sti
   - Mac: Disk Utility → select the stick → Erase → Format **ExFAT**, Scheme **GUID Partition Map**.
   - Windows: right-click the stick in File Explorer → Format → File system **exFAT**.
 - The two models in **`stellan/models`** on the stick, named exactly `stellan-1-lite-q4_k_m.gguf` (Lite) and `stellan-1.0-q4_k_m.gguf` (Max). Releases don't include them: copy them once, and every later release reuses them. They must be the official files; the app checks them against their SHA-256 on the first start.
+- **For sticks you sell, lock the models** so they only work after activation: the install helper offers it when it finds plain models (see [ACTIVATION.md → Locked models](ACTIVATION.md#locked-models)). Lock one stick, then copy its `stellan/models` to the others.
 
 ## Steps
 

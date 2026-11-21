@@ -1,3 +1,5 @@
+import { lockedModels, type LockedModel } from "./locked-models.js";
+import { lockedNames } from "./model-lock.js";
 import { GiB, maxMinimumBytes, maxRecommendedBytes, maxSlowWarning } from "../config/models.js";
 import { constants } from "node:fs";
 import { lstat, open, readFile, realpath, mkdir, rename, rm, stat } from "node:fs/promises";
@@ -10,7 +12,8 @@ import { modelFile } from "./platform.js";
 // stick. A linked file takes precedence; model-free downloads rely on links for both.
 export type ModelKind = "lite" | "max";
 interface ModelLink { format: 1; path: string; relative: boolean; size: number; mtimeMs: number }
-export interface LocalModel { path: string; source: "linked" | "bundled"; name: string }
+/** `locked`: the stick carries the model as an encrypted first split plus a plain rest (model-lock.ts). */
+export interface LocalModel { path: string; source: "linked" | "bundled"; name: string; locked?: { file: string; model: LockedModel } }
 export type LocalMax = LocalModel;
 export interface LiteStatus { available: boolean; name?: string; path?: string; source?: string; message: string }
 export interface LocalModelStatus { available: boolean; eligible: boolean; slow: boolean; slowMessage: string; totalBytes: number; name?: string; path?: string; source?: string; message: string; lite: LiteStatus }
@@ -56,10 +59,14 @@ export async function resolveLocalModel(rootPath: string, kind: ModelKind): Prom
     return { path: file.path, source: "linked", name: basename(file.path) };
   }
   const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { files?: { path: string }[] };
-  if (!manifest.files?.some((file) => file.path === bundledPath(kind))) { return undefined; }
-  const bundled = join(root, bundledPath(kind));
-  try { await stat(bundled); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { return undefined; } throw error; }
-  return { path: bundled, source: "bundled", name: basename(bundled) };
+  const listed = (path: string): boolean => Boolean(manifest.files?.some((file) => file.path === path));
+  const present = async (path: string): Promise<boolean> => { try { await stat(join(root, path)); return true; } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { return false; } throw error; } };
+  if (listed(bundledPath(kind)) && await present(bundledPath(kind))) { const bundled = join(root, bundledPath(kind)); return { path: bundled, source: "bundled", name: basename(bundled) }; }
+  const locked = lockedModels[kind === "lite" ? "stellan-1-lite" : "stellan-1-max"]; const names = lockedNames(locked.base);
+  if (listed(names.locked) && listed(names.rest) && await present(names.locked) && await present(names.rest)) {
+    return { path: join(root, names.rest), source: "bundled", name: basename(bundledPath(kind)), locked: { file: join(root, names.locked), model: locked } };
+  }
+  return undefined;
 }
 export const resolveLocalMax = (root: string) => resolveLocalModel(root, "max");
 export async function linkModelFile(rootPath: string, kind: ModelKind, path: string): Promise<void> {

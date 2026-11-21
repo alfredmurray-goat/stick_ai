@@ -5,15 +5,33 @@ import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const lite = "stellan-1-lite-q4_k_m.gguf", max = "stellan-1.0-q4_k_m.gguf";
+const liteBase = "stellan-1-lite-q4_k_m", maxBase = "stellan-1.0-q4_k_m";
+// A model counts as there if it's plain or locked (an encrypted .locked part plus the rest; see model-lock.ts).
+// If plain models are there, the owner can lock them for selling: it needs the activation desk password.
 const posixCheck = `
+M="$DEST/stellan/models"
+has() { [ -f "$M/$1.gguf" ] || { [ -f "$M/$1.locked" ] && [ -f "$M/$1-00002-of-00002.gguf" ]; }; }
 missing=""
-[ -f "$DEST/stellan/models/${lite}" ] || missing="$missing ${lite}"
-[ -f "$DEST/stellan/models/${max}" ] || missing="$missing ${max}"
+has ${liteBase} || missing="$missing ${lite}"
+has ${maxBase} || missing="$missing ${max}"
 if [ -n "$missing" ]; then
-  printf '%s\\n' "" "Stick AI is on the stick. Now copy these model files into stellan/models on the stick:" "  $missing" "Use exactly these names. Lite is needed; Max is optional."
-else
-  printf '%s\\n' "" "Done. Stick AI and both models are on the stick. Eject it before unplugging."
+  printf '%s\\n' "" "Stick AI is on the stick. Now copy these model files into stellan/models on the stick:" "  $missing" "Use exactly these names. Lite is needed; Max is optional. Then open this helper again."
+  exit 0
 fi
+if [ -f "$M/${lite}" ] || [ -f "$M/${max}" ]; then
+  printf '%s\\n' "" "The models are plain files. For a stick you sell, lock them so they only work after activation." "Lock them now? It needs the internet and the activation desk password, and takes a few minutes." "Type y and press Return, or just press Return to skip:"
+  read -r LOCK || LOCK=""
+  case "$LOCK" in y|Y|yes|YES)
+    case "$(uname -s)-$(uname -m)" in Darwin-arm64) T=macos-arm64;; Darwin-*) T=macos-x64;; *) T=linux-x64;; esac
+    printf '%s' "Activation desk password (it won't show as you type): "; stty -echo 2>/dev/null; read -r STICK_LOCK_PASSWORD; stty echo 2>/dev/null; echo ""
+    export STICK_LOCK_PASSWORD
+    "$DEST/stellan/bin/$T/node" "$DEST/stellan/app/stick-models.cjs" --root "$DEST/stellan" --lock < /dev/null || { unset STICK_LOCK_PASSWORD; echo "The models weren't locked; they're unchanged. Check the message above and try again."; exit 1; }
+    unset STICK_LOCK_PASSWORD
+    printf '%s\\n' "" "Locked. Copy stellan/models from this stick to your other sticks: they're the same for every stick."
+    ;;
+  esac
+fi
+printf '%s\\n' "" "Done. Stick AI and both models are on the stick. Eject it before unplugging."
 `;
 export const macInstaller = `#!/bin/sh
 cd -P "$(dirname "$0")" || exit 1
@@ -75,11 +93,29 @@ export const windowsInstaller = [
   // Not "D:\\": a backslash before a closing quote escapes the quote and garbles every argument after it.
   'robocopy "%SRC%" %DRIVE%:\\ /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP',
   "if errorlevel 8 (echo Copying failed. Check the stick has space and isn't locked. & pause & exit /b 1)",
+  `set "M=%DRIVE%:\\stellan\\models"`,
   `set "MISSING="`,
-  `if not exist "%DRIVE%:\\stellan\\models\\${lite}" set "MISSING=%MISSING% ${lite}"`,
-  `if not exist "%DRIVE%:\\stellan\\models\\${max}" set "MISSING=%MISSING% ${max}"`,
+  `if not exist "%M%\\${lite}" if not exist "%M%\\${liteBase}.locked" set "MISSING=%MISSING% ${lite}"`,
+  `if not exist "%M%\\${max}" if not exist "%M%\\${maxBase}.locked" set "MISSING=%MISSING% ${max}"`,
   "echo.",
-  'if defined MISSING (echo Stick AI is on the stick. Now copy these model files into stellan\\models on the stick:%MISSING% & echo Use exactly these names. Lite is needed; Max is optional.) else (echo Done. Stick AI and both models are on the stick. Eject it before unplugging.)',
+  'if defined MISSING (echo Stick AI is on the stick. Now copy these model files into stellan\\models on the stick:%MISSING% & echo Use exactly these names. Lite is needed; Max is optional. Then open this helper again. & pause & exit /b 0)',
+  `set "PLAIN="`,
+  `if exist "%M%\\${lite}" set "PLAIN=1"`,
+  `if exist "%M%\\${max}" set "PLAIN=1"`,
+  "if not defined PLAIN goto finished",
+  "echo The models are plain files. For a stick you sell, lock them so they only work after activation.",
+  'set "LOCK="',
+  'set /p "LOCK=Lock them now? It needs the internet and the activation desk password. Type y and press Enter, or just press Enter to skip: "',
+  'if /i not "%LOCK%"=="y" goto finished',
+  'set /p "STICK_LOCK_PASSWORD=Activation desk password: "',
+  "cls",
+  '"%DRIVE%:\\stellan\\bin\\windows-x64\\node.exe" "%DRIVE%:\\stellan\\app\\stick-models.cjs" --root "%DRIVE%:\\stellan" --lock < nul',
+  'if errorlevel 1 (set "STICK_LOCK_PASSWORD=" & echo The models weren\'t locked; they\'re unchanged. Check the message above and try again. & pause & exit /b 1)',
+  'set "STICK_LOCK_PASSWORD="',
+  "echo Locked. Copy stellan\\models from this stick to your other sticks: they're the same for every stick.",
+  ":finished",
+  "echo.",
+  "echo Done. Stick AI and both models are on the stick. Eject it before unplugging.",
   "pause",
   ""
 ].join("\r\n");

@@ -1,3 +1,4 @@
+import { lockedModelPaths, optionalModelPaths } from "./locked-models.js";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
@@ -5,7 +6,8 @@ import { join, relative, sep } from "node:path";
 import { Sandbox } from "../sandbox/paths.js";
 import { UserError, llamaRelease, nodeRelease, targets, type Target } from "./platform.js";
 
-export interface FileRecord { path: string; sha256: string; size: number; executable: boolean; optional?: boolean }
+/** `locked`: an encrypted model split; its size is checked here and its decrypted sha256 when it's unlocked. */
+export interface FileRecord { path: string; sha256: string; size: number; executable: boolean; optional?: boolean; locked?: boolean }
 export interface Manifest { format: 1; llamaRelease: string; nodeRelease: string; targets?: Target[]; files: FileRecord[] }
 export async function hashFile(path: string, signal?: AbortSignal): Promise<{ sha256: string; size: number }> {
   const hash = createHash("sha256"); let size = 0;
@@ -58,12 +60,14 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
       try { info = await lstat(path); } catch (error) {
         // Optional model files may be absent (model-free downloads link their own GGUFs);
         // a present model file must still match its recorded hash.
-        if (optionalMax && record.optional && ["models/stellan-1.0-q4_k_m.gguf", "models/stellan-1-lite-q4_k_m.gguf"].includes(record.path) && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
+        // A stick carries each model plain or locked, so the locked layout's files may always be absent.
+        if (record.optional && optionalModelPaths.has(record.path) && (optionalMax || lockedModelPaths.has(record.path)) && (error as NodeJS.ErrnoException).code === "ENOENT") { continue; }
         throw error;
       }
       const resolved = await realpath(path);
       const rel = relative(canonical, resolved);
       if (rel.split(sep)[0] === ".." || info.isSymbolicLink() || !info.isFile() || info.nlink !== 1 && !(allowBuildModelLinks && record.path === "models/stellan-1.0-q4_k_m.gguf")) { throw new UserError("damaged"); }
+      if (record.locked) { if (info.size !== record.size) { issues.push(`Changed file: ${record.path}`); } continue; }
       const known = verified[record.path];
       const reuse = record.path.startsWith("models/") && record.size >= cacheMin && known && known.sha256 === record.sha256 && known.size === info.size && known.mtimeMs === info.mtimeMs;
       const actual = reuse ? { sha256: record.sha256, size: info.size } : await hashFile(path, signal);
