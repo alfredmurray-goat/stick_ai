@@ -14,6 +14,7 @@ import { createInterface } from "node:readline";
 import { friendlyError } from "./errors.js";
 import { desktopDryRun, launchDesktop } from "./desktop.js";
 import { webApp } from "./web.js";
+import { Activation } from "./activation.js";
 
 export function dryRunActions(root: string, platform: string = process.platform, arch: string = process.arch, bytes = totalmem(), noSwap = false): string[] {
   const target = targetFor(platform, arch); const models = bytes < liteMinimumBytes ? [] : portableModels(bytes, true);
@@ -81,14 +82,15 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       engine = new ManagedEngine(root, targetFor(process.platform, process.arch), port.port, temp, fd, log);
       engine.faster = faster;
       engine.onProcess = (pid) => notify({ kind: "model_pid", pid });
-      app = await webApp({ root, engine, bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
+      app = await webApp({ root, engine, activation: new Activation(root), bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
     };
     if (desktop) {
       await launchDesktop({
         verify: async () => { await verifyStick(root, true, lifetime.signal, false, true); },
         prepare,
         startLite: async () => { await app!.start(initialModel); },
-        waitHealthy: async () => { if (engine?.active !== initialModel) { throw new UserError("loading"); } },
+        // An unactivated stick opens the workspace straight away so the code can be entered there.
+        waitHealthy: async () => { if (!app!.awaitingActivation && engine?.active !== initialModel) { throw new UserError("loading"); } },
         openChat: async () => { notify({ kind: "ready", url: app!.url }); },
         stop: async () => { await engine?.stop(); },
         cleanup: async () => {}
