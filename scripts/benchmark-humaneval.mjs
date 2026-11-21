@@ -1,7 +1,7 @@
 // HumanEval (all 164 problems), pass@1 with greedy decoding, each answer executed against the official tests.
 // Uses the same llama.cpp settings as the app. Resumes from the results file if it already exists.
 //   node scripts/benchmark-humaneval.mjs --server <llama-server> --gguf <file> --model stellan-1-max \
-//        --problems <HumanEval.jsonl> --out <results.json> [--sample 8]
+//        --problems <HumanEval.jsonl> --out <results.json> [--sample 8] [--gpu-layers 999]
 import { spawn, execFile } from "node:child_process";
 import { readFileSync, writeFileSync, mkdtempSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +11,7 @@ import { parseArgs } from "node:util";
 import { modelRuntimeArgs } from "../dist/portable/engine.js";
 
 const exec = promisify(execFile);
-const { values } = parseArgs({ options: { server: { type: "string" }, gguf: { type: "string" }, model: { type: "string" }, problems: { type: "string" }, out: { type: "string" }, sample: { type: "string" }, port: { type: "string", default: "18100" } } });
+const { values } = parseArgs({ options: { server: { type: "string" }, gguf: { type: "string" }, model: { type: "string" }, problems: { type: "string" }, out: { type: "string" }, sample: { type: "string" }, port: { type: "string", default: "18100" }, "gpu-layers": { type: "string", default: "0" } } });
 for (const key of ["server", "gguf", "model", "problems", "out"]) { if (!values[key]) { throw new Error(`Missing --${key}`); } }
 const model = values.model;
 if (!["stellan-1-lite", "stellan-1-max"].includes(model)) { throw new Error("--model must be stellan-1-lite or stellan-1-max"); }
@@ -21,7 +21,7 @@ const done = existsSync(values.out) ? JSON.parse(readFileSync(values.out, "utf8"
 const port = values.port;
 // The app's own settings: Lite 8192 context with the Mistral-v1 formatter, Max 4096 context with its embedded template.
 const lite = model === "stellan-1-lite";
-const args = ["--model", values.gguf, "--alias", model, "--ctx-size", lite ? "8192" : "4096", "--host", "127.0.0.1", "--port", port, "--no-webui", "--no-warmup", "--gpu-layers", "0", ...modelRuntimeArgs(model), ...(lite ? ["--no-jinja", "--skip-chat-parsing", "--chat-template", "mistral-v1"] : [])];
+const args = ["--model", values.gguf, "--alias", model, "--ctx-size", lite ? "8192" : "4096", "--host", "127.0.0.1", "--port", port, "--no-webui", "--no-warmup", "--gpu-layers", values["gpu-layers"], ...modelRuntimeArgs(model), ...(lite ? ["--no-jinja", "--skip-chat-parsing", "--chat-template", "mistral-v1"] : [])];
 const started = Date.now();
 const server = spawn(values.server, args, { stdio: ["ignore", "ignore", "pipe"] });
 let serverLog = ""; server.stderr.on("data", (chunk) => { serverLog = (serverLog + chunk).slice(-4000); });
@@ -30,7 +30,7 @@ for (;;) {
   if (server.exitCode !== null) { console.log(serverLog); process.exit(1); }
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-Object.assign(done, { loadSeconds: (Date.now() - started) / 1000, totalMemGB: +(totalmem() / 1024 ** 3).toFixed(1), cpus: cpus().length, cpu: cpus()[0]?.model ?? "" });
+Object.assign(done, { loadSeconds: (Date.now() - started) / 1000, totalMemGB: +(totalmem() / 1024 ** 3).toFixed(1), cpus: cpus().length, cpu: cpus()[0]?.model ?? "", gpuLayers: Number(values["gpu-layers"]) });
 const save = () => writeFileSync(values.out, JSON.stringify(done, null, 2));
 try {
   for (const problem of problems) {
