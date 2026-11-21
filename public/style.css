@@ -343,6 +343,8 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .chart { --label: 0px; padding: 20px 14px 16px; gap: 12px; }
   .chart .row { grid-template-columns: 1fr; gap: 6px; }
   .chart .note { display: none; }
+  /* Phones show only the best-known models; the full list is on wider screens and in the small print. */
+  .chart .minor { display: none; }
   .chart .axis { margin-left: 0; }
 }
 @keyframes grow { from { transform: scaleX(0); } }
