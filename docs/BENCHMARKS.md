@@ -8,6 +8,10 @@ See the README. Run with `scripts/benchmark-humaneval.mjs` (all 164 problems, pa
 
 Max (14.3 GB) can't run on GitHub's free runners (16 GB): it keeps re-reading itself from disk. The **Max benchmark** workflow (`.github/workflows/max-benchmark.yml`) runs the same script on a machine you rent for a few hours, which joins GitHub as a one-job ("ephemeral") self-hosted runner with the `max-bench` label and deletes itself when done.
 
+**Free, no card: Kaggle.** Kaggle's free notebooks have about 30 GB of memory and 4 CPU cores for up to 12 hours. Import [`benchmark/kaggle-max-humaneval.ipynb`](benchmark/kaggle-max-humaneval.ipynb) (**File → Import Notebook**), turn **Internet** on (needs a verified phone number), keep the accelerator on **None**, then **Save Version → Save & Run All**. It runs the same script, pinned llama.cpp, pinned Max and HumanEval as the workflow below, and prints `RESULT: n/164` at the end; `humaneval-max.json` is under **Output**. Set `SAMPLE=4` in the cell for a quicker run of every 4th problem.
+
+**Or rent a machine** that joins GitHub as a runner for the **Max benchmark** workflow:
+
 1. **GitHub runner token** (valid one hour): repository **Settings → Actions → Runners → New self-hosted runner → Linux**. Copy the token from the `./config.sh --url … --token XXXX` line.
 2. **DigitalOcean API token**: **API → Tokens → Generate New Token**, expiry 1 day, **Custom scopes → droplet: delete** (it adds `read` itself). The Droplet uses it only to delete itself at the end. DigitalOcean takes Google Pay (in Chrome) and Apple Pay (in Safari) under **Billing → Payment methods**.
 3. **Create the Droplet**: **Create → Droplets** → region **Amsterdam** or Frankfurt → **Ubuntu 24.04** → **Basic → Regular → 8 vCPU / 32 GB** → **Advanced options → Add initialized data (User data)** → paste [`benchmark/digitalocean-cloud-init.yaml`](benchmark/digitalocean-cloud-init.yaml) with the two tokens filled in → choose any SSH key or password (you won't need it) → **Create Droplet**.
