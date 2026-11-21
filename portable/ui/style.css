@@ -692,3 +692,15 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .tok-attr, .tok-var { color: var(--tok-attr); }
 .tok-key { color: var(--tok-key); }
 .composer textarea:focus-visible, .file-editor:focus-visible { outline: none; }
+
+/* Sign in with GitHub: the device code is large and easy to read out or copy. */
+.signin-status { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.signin-status.ok { color: var(--green); }
+.signin-code { margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--raised); font-size: 13px; }
+.signin-code p { margin: 0 0 8px; }
+.signin-code p:last-child { margin-bottom: 0; }
+.device-code { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.device-code code { font: 700 22px/1 var(--mono); letter-spacing: .12em; padding: 8px 12px; border-radius: 8px; background: var(--code-bg); color: var(--text); user-select: all; }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.token-fallback { margin-top: 10px; }
+.token-fallback summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }

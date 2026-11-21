@@ -6,6 +6,7 @@ import { projectContext } from "../agent/context.js";
 import { friendlyError, type FriendlyError } from "./errors.js";
 import { GitHubWorkspaces } from "./github-workspace.js";
 import { GitHubError } from "./github-client.js";
+import { GitHubSignIn, githubAppInstallUrl } from "./github-auth.js";
 import { McpServers, McpError, actuent } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
 import { compactWebResult } from "./web-search.js";
@@ -88,6 +89,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
     notifyHooks("Notification", { notification_type: "permission_prompt", message: kind === "web" ? `Stellan wants to ${label.toLowerCase()}. Allow it in the app.` : `Stellan wants to call the MCP tool ${label}. Allow it in the app.` });
   });
   const github = new GitHubWorkspaces(join(root, "logs", "github", "workspaces"));
+  const signIn = new GitHubSignIn();
   let repositoryOperation: AbortController | undefined;
   let repositoryDone: Promise<void> | undefined;
   // Everything in the system message that stays the same for the session; per-task skill guidance goes
@@ -237,6 +239,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
         const content = await tools.execute({ id: randomUUID(), type: "function", function: { name: "read_file", arguments: JSON.stringify({ path }) } }, new AbortController().signal);
         send(response, 200, { path, content }); return;
       }
+      if (request.method === "GET" && url.pathname === "/api/github/signin") { send(response, 200, signIn.view()); return; }
       if (request.method === "GET" && url.pathname === "/api/github/workspaces") { send(response, 200, { workspaces: await github.list() }); return; }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
       const chunks: Buffer[] = []; let bodyBytes = 0;
@@ -278,22 +281,30 @@ export async function webApp(options: { root: string; engine: ManagedEngine; byt
           publish("file-saved", data.path); send(response, 200, { result }); return;
         } finally { repositoryOperation = undefined; finishEdit(); repositoryDone = undefined; }
       }
+      // Signing in only talks to GitHub's sign-in service, so it may happen while the assistant works.
+      if (url.pathname === "/api/github/signin/start") { try { send(response, 200, await signIn.start()); } catch (error) { send(response, 400, { error: error instanceof GitHubError ? error.message : "GitHub sign-in could not start. Check your internet connection and try again." }); } return; }
+      if (url.pathname === "/api/github/signin/cancel") { signIn.cancel(); send(response, 200, signIn.view()); return; }
+      if (url.pathname === "/api/github/signout") { signIn.signOut(); send(response, 200, signIn.view()); return; }
       if (url.pathname.startsWith("/api/github/")) {
         if (active || loading || repositoryOperation) { send(response, 409, { error: "Wait for the current task or repository operation, or cancel it first." }); return; }
         const controller = new AbortController(); repositoryOperation = controller;
         let finishRepository!: () => void; repositoryDone = new Promise<void>((resolve) => { finishRepository = resolve; });
         try {
           if (url.pathname === "/api/github/connect" && typeof data.repository === "string" && typeof data.token === "string") {
-            await switchProject(await github.connect(data.repository, typeof data.branch === "string" ? data.branch : "", data.token, controller.signal)); send(response, 200, { workspace: github.view() }); return;
+            await switchProject(await github.connect(data.repository, typeof data.branch === "string" ? data.branch : "", data.token || signIn.token(), controller.signal)); send(response, 200, { workspace: github.view() }); return;
           }
           if (url.pathname === "/api/github/resume" && typeof data.id === "string" && typeof data.token === "string") {
-            await switchProject(await github.resume(data.id, data.token, controller.signal)); send(response, 200, { workspace: github.view() }); return;
+            await switchProject(await github.resume(data.id, data.token || signIn.token(), controller.signal)); send(response, 200, { workspace: github.view() }); return;
           }
           if (url.pathname === "/api/github/disconnect") { github.disconnect(); await switchProject(await Sandbox.create(join(root, "app", "project"))); send(response, 200, {}); return; }
           if (url.pathname === "/api/github/review") { send(response, 200, await github.review()); return; }
-          if (url.pathname === "/api/github/publish" && typeof data.digest === "string" && typeof data.title === "string" && typeof data.body === "string") { send(response, 200, await github.publish(data.digest, data.title, data.body, controller.signal)); return; }
+          if (url.pathname === "/api/github/publish" && typeof data.digest === "string" && typeof data.title === "string" && typeof data.body === "string") { github.useToken(signIn.token()); send(response, 200, await github.publish(data.digest, data.title, data.body, controller.signal)); return; }
           send(response, 400, { error: "Invalid repository request." }); return;
-        } catch (error) { send(response, 400, { error: controller.signal.aborted ? "Repository operation cancelled. Local changes are kept." : error instanceof GitHubError ? error.message : "The repository operation could not finish. Local files are kept. Try again." }); return; }
+        } catch (error) {
+          // A signed-in user only reaches repositories where they installed the Stick AI GitHub App.
+          const hint = error instanceof GitHubError && [403, 404].includes(error.status) && signIn.token() ? ` If this repository is private or you want to publish to it, add it to Stick AI on GitHub: ${githubAppInstallUrl}` : "";
+          send(response, 400, { error: controller.signal.aborted ? "Repository operation cancelled. Local changes are kept." : error instanceof GitHubError ? error.message + hint : "The repository operation could not finish. Local files are kept. Try again." }); return;
+        }
         finally { repositoryOperation = undefined; finishRepository(); repositoryDone = undefined; }
       }
       if (url.pathname === "/api/start" && ["choose", "error"].includes(phase) && typeof data.model === "string" && !repositoryOperation && options.choices.includes(data.model)) { work = launch(data.model); send(response, 202, {}); return; }

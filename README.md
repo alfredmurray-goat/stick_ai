@@ -33,7 +33,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
 - **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
 - **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
-- **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch.
+- **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch. Sign in with GitHub with a short code (no tokens to create), and choose exactly which repositories Stick AI may use.
 - **Web search, built in.** Lite can look things up on the live web with [Actuent](https://actuent.ai): docs, versions, error messages, prices, events and news. It's free, needs no account, and every search shows you the exact words before anything goes online. Turn it off in Settings → MCP.
 - **MCP servers and skills.** Connect local or remote MCP tool servers and reusable SKILL.md workflows. Every MCP call asks first.
 - **Hooks.** Like Claude Code's hooks: run your own command, or notify another app on your computer, when you send a message, before or after Stellan uses a tool, when it needs your approval, or when it finishes. A hook can stop a message or tool call, or add notes for Stellan, but it can never approve anything for you. See [HOOKS.md](docs/HOOKS.md).
