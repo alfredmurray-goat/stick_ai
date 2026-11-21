@@ -22,7 +22,7 @@ Tool hooks can be limited to some tools with a filter, for example `edit_file` o
 ## Two kinds of hook
 
 - **Run a command.** The command runs in your project folder with `/bin/sh` (Mac and Linux) or `cmd.exe` (Windows). The event arrives as JSON on standard input, and `STICK_PROJECT_DIR` and `STICK_HOOK_EVENT` are set.
-- **Notify an app on this computer.** Stick AI sends the event as a JSON `POST` to an address such as `http://127.0.0.1:8765/stick`. Only HTTPS, or plain HTTP to `127.0.0.1`/`localhost`, is allowed. This is how a companion app (for example a voice assistant) can follow along.
+- **Notify an app on this computer.** Stick AI sends the event as a JSON `POST` to an address such as `http://127.0.0.1:8765/stick`. Only HTTPS, or plain HTTP to `127.0.0.1`/`localhost`, is allowed. This is how a companion app (for example a voice assistant) can follow along. While **Allow internet** is off (Settings → Models), hooks that notify another computer over HTTPS are skipped; ones on this computer still run.
 
 Each hook has a time limit (30 s by default, up to 600 s). A hook that runs too long is stopped, and the app shows a short message.
 

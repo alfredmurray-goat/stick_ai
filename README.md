@@ -126,6 +126,7 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 - **Inference is offline.** Prompts, code and answers stay on your computer. The model server listens only on an authenticated local connection.
 - **No telemetry.** There are no analytics or cloud fallbacks.
 - **What does use the network.** The app checks GitHub for signed app updates (you can turn this off), GitHub workspaces talk to GitHub when you connect them, web search sends only the search words or page address you approve to Actuent (never your code or files), and remote MCP servers receive only the calls you approve.
+- **One switch for all of it.** **Settings → Models → Allow internet** is on by default. Turn it off and nothing leaves the computer: no web search, GitHub, remote MCP servers, hooks that notify other computers or automatic update checks. Stellan works exactly the same, because it never needed the internet. (Activating a new stick with its printed code goes online once either way.)
 - **Integrity checks.** Every app file is checked against a recorded SHA-256 before starting. A changed file is reported, not run.
 
 ## How it works
