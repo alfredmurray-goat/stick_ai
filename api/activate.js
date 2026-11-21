@@ -5,7 +5,7 @@
 // different to different computers when its serial can't be read. The reply is a certificate signed with an
 // Ed25519 key kept in the database; the app checks it offline at every start with the public key it ships.
 import { createPrivateKey, sign } from "node:crypto";
-import { normaliseCode, redis, storage } from "./_activation.js";
+import { modelKeys, normaliseCode, redis, storage, wrapModelKey } from "./_activation.js";
 
 const SEATS = 3;
 const json = (res, status, value) => { res.statusCode = status; res.setHeader("Content-Type", "application/json"); res.setHeader("Cache-Control", "no-store"); res.end(JSON.stringify(value)); };
@@ -33,7 +33,10 @@ export default async function handler(req, res) {
     }
     const payload = Buffer.from(JSON.stringify({ v: 1, code, stick, at: new Date().toISOString() })).toString("base64url");
     const signature = sign(null, Buffer.from(payload), createPrivateKey(pem)).toString("base64url");
-    json(res, 200, { certificate: `${payload}.${signature}` });
+    // The keys for the stick's locked models, sealed so they only open on this stick with this code.
+    const models = await modelKeys(db);
+    const keys = models ? Object.fromEntries(Object.entries(models).map(([model, value]) => [model, wrapModelKey(value, stick, code)])) : undefined;
+    json(res, 200, { certificate: `${payload}.${signature}`, ...(keys ? { keys } : {}) });
   } catch {
     json(res, 503, { error: "Activation is busy. Try again in a minute." });
   }

@@ -4,8 +4,9 @@
 //   generate  makes new codes to print, shown as a list
 //   lookup    shows a code's status
 //   reset     frees a code so an honest customer can activate a replacement stick
+//   modelkeys JSON for the owner's "Lock models" helper: the keys that lock the models on sold sticks
 import { generateKeyPairSync, timingSafeEqual, createPrivateKey, createPublicKey } from "node:crypto";
-import { newCode, normaliseCode, pretty, redis, storage } from "./_activation.js";
+import { modelKeys, newCode, normaliseCode, pretty, redis, storage } from "./_activation.js";
 
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 function page(res, status, title, body) {
@@ -23,10 +24,16 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.statusCode = 303; res.setHeader("Location", "/admin"); res.end(); return; }
   const form = typeof req.body === "object" && req.body ? req.body : Object.fromEntries(new URLSearchParams(String(req.body ?? "")));
   if (!(process.env.ACTIVATION_ADMIN_TOKEN || "").length) { page(res, 503, "Not set up", "<p>Add an <b>ACTIVATION_ADMIN_TOKEN</b> environment variable in Vercel (at least 20 characters), then redeploy.</p>"); return; }
-  if (!allowed(form.token)) { await new Promise((resolve) => setTimeout(resolve, 1500)); page(res, 403, "Wrong password", "<p>That admin password isn't right.</p>"); return; }
+  const asJson = form.action === "modelkeys";
+  const reply = (status, title, body, value) => { if (!asJson) { page(res, status, title, body); return; } res.statusCode = status; res.setHeader("Content-Type", "application/json"); res.setHeader("Cache-Control", "no-store"); res.end(JSON.stringify(value ?? { error: title })); };
+  if (!allowed(form.token)) { await new Promise((resolve) => setTimeout(resolve, 1500)); reply(403, "Wrong password", "<p>That admin password isn't right.</p>"); return; }
   const db = storage();
-  if (!db) { page(res, 503, "No database", "<p>Connect Upstash under Storage in Vercel (the same one the sign-up form uses).</p>"); return; }
+  if (!db) { reply(503, "No database", "<p>Connect Upstash under Storage in Vercel (the same one the sign-up form uses).</p>"); return; }
   try {
+    if (asJson) {
+      if (!(await redis(db, "GET", "activation:signing-key"))) { reply(409, "Set up activation first, on the activation desk."); return; }
+      reply(200, "", "", { keys: await modelKeys(db, true) }); return;
+    }
     if (form.action === "setup") {
       let pem = await redis(db, "GET", "activation:signing-key");
       if (!pem) {
@@ -34,6 +41,7 @@ export default async function handler(req, res) {
         await redis(db, "SET", "activation:signing-key", pem, "NX");
         pem = await redis(db, "GET", "activation:signing-key");
       }
+      await modelKeys(db, true);
       const publicKey = createPublicKey(createPrivateKey(pem)).export({ type: "spki", format: "der" }).toString("base64");
       page(res, 200, "Activation is set up", `<p>The app checks certificates with this <b>public</b> key. It's safe to share: send it to whoever builds the app.</p><pre class="tree">${escape(publicKey)}</pre>`);
       return;
@@ -60,6 +68,6 @@ export default async function handler(req, res) {
     const used = sticks ? JSON.parse(sticks).length : 0;
     page(res, 200, pretty(code), `<p>${used ? `Activated on ${used} stick view${used === 1 ? "" : "s"} (of 3), first on ${escape(activatedAt ?? "?")}, last on ${escape(lastAt ?? "?")}.` : "Not activated yet."}</p>`);
   } catch {
-    page(res, 503, "Busy", "<p>The database didn't answer. Try again in a minute.</p>");
+    reply(503, "Busy", "<p>The database didn't answer. Try again in a minute.</p>");
   }
 }
