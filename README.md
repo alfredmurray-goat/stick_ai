@@ -65,16 +65,16 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
   | Model | HumanEval | Size |
   | --- | --- | --- |
   | **Stellan-1 Max** | **86.7%\*** early result | **23.6B** |
-  | Claude 3 Opus (Anthropic, Mar 2024) | [84.9%](https://www.anthropic.com/news/claude-3-family) | unpublished |
+  | Claude 3 Opus (Anthropic, Mar 2024) | [84.9%](https://www.anthropic.com/news/claude-3-family) | ~2T (estimate, [LifeArchitect](https://lifearchitect.ai/models-table-methodology/)) |
   | Gemini 1.5 Pro (Google, May 2024 update) | [84.1%](https://arxiv.org/abs/2403.05530) | unpublished |
-  | GPT-4 Turbo (OpenAI, Nov 2023, gpt-4-1106-preview) | [83.7%](https://github.com/openai/simple-evals) | unpublished |
+  | GPT-4 Turbo (OpenAI, Nov 2023, gpt-4-1106-preview) | [83.7%](https://github.com/openai/simple-evals) | ~630B (estimate from a knowledge-probing study; range 211B to 1.9T) |
   | Llama 3 70B Instruct (Meta, Apr 2024) | [81.7%](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct) | 70B (published) |
-  | Gemini 1.0 Ultra (Google, Dec 2023) | [74.4%](https://arxiv.org/abs/2312.11805) | unpublished |
+  | Gemini 1.0 Ultra (Google, Dec 2023) | [74.4%](https://arxiv.org/abs/2312.11805) | ~1.5T (estimate, [LifeArchitect](https://lifearchitect.ai/models-table-methodology/)) |
   | **Stellan-1 Lite** | **73.2%** | **7.3B** |
   | Claude 2 (Anthropic, Jul 2023) | [71.2%](https://www.anthropic.com/news/claude-2) | unpublished |
-  | GPT-4 (OpenAI, Mar 2023) | [67.0%](https://arxiv.org/abs/2303.08774) | ~1.8T (estimate) |
+  | GPT-4 (OpenAI, Mar 2023) | [67.0%](https://arxiv.org/abs/2303.08774) | ~1.8T (estimate, [SemiAnalysis](https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/)) |
 
-  Max's early result is ahead of models from 3× (Llama 3 70B) to an estimated 75× (GPT-4) its size. With 30 problems its margin of error is wide (roughly ±12 points), so it isn't yet a claim to beat any of them; the full run will settle it.
+  Max's early result is ahead of models from 3× (Llama 3 70B) to an estimated 85× (Claude 3 Opus) its size. Size estimates vary a lot between sources; treat them as rough. With 30 problems its margin of error is wide (roughly ±12 points), so it isn't yet a claim to beat any of them; the full run will settle it.
 - **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
 - **\*Max, early result.** On a free 4-core cloud machine (Kaggle, 31 GB), Max solved **26 of the 30** problems it answered (86.7%). The other 119 attempted problems were lost to a 5-minute time-out in the benchmark script (Max wrote about 0.7 tokens a second on that CPU, so longer answers took over 5 minutes); that's fixed, and they're retried on the next run. The answered problems were mostly the shorter ones, so the full score may be lower. The full 164-problem run is next, on Kaggle's free GPUs.
 
