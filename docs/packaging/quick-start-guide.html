@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>stick_ai — quick start guide</title>
+<!-- Printable A5 leaflet (148 × 210 mm) for the box: front = getting started and the activation code,
+     back = everyday use and help. Open in a browser and print at 100% scale, double-sided, flipping on
+     the long edge. The activation code box is left blank for a printed sticker or a handwritten code. -->
+<style>
+  @font-face { font-family: "Space Grotesk"; src: url("space-grotesk.woff2") format("woff2"); font-weight: 300 700; }
+  @font-face { font-family: "JetBrains Mono"; src: url("jetbrains-mono-400.woff2") format("woff2"); }
+  @page { size: 148mm 210mm; margin: 0; }
+  :root { --ink: #16121f; --muted: #5d566b; --violet: #6a3be0; --soft: #efe8ff; --cream: #fcf8f5; --line: #e4dcef; --amber: #c77a00; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #d9d4e2; color: var(--ink); font: 9.6pt/1.42 "Space Grotesk", system-ui, sans-serif; }
+  .page { width: 148mm; height: 210mm; margin: 8mm auto; padding: 11mm 11mm 9mm; background: var(--cream); position: relative; overflow: hidden; break-after: page; page-break-after: always; display: flex; flex-direction: column; }
+  @media print { html, body { background: none; } .page { margin: 0; } }
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 4mm; align-items: center; margin-bottom: 4mm; }
+  .logo { height: 34mm; width: auto; display: block; }
+  .kicker { font: 400 7.6pt "JetBrains Mono", monospace; color: var(--amber); margin: 0 0 2mm; }
+  h1 { font-size: 21pt; line-height: 1.02; margin: 0 0 2.5mm; letter-spacing: -.02em; }
+  h2 { font-size: 11.5pt; margin: 5mm 0 2mm; }
+  p { margin: 0 0 2.2mm; }
+  .lede { color: var(--muted); }
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  ol.steps > li { counter-increment: step; position: relative; padding-left: 8.5mm; margin-bottom: 3mm; }
+  ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: -.3mm; width: 5.6mm; height: 5.6mm; border-radius: 50%; background: var(--violet); color: #fff; font-weight: 700; font-size: 8.4pt; display: grid; place-items: center; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 8.2pt; background: var(--soft); padding: .2mm 1.2mm; border-radius: 1mm; white-space: nowrap; }
+  .code-box { margin: 4mm 0 3mm; border: .5mm dashed var(--violet); border-radius: 3mm; padding: 3.5mm 4mm; background: #fff; display: grid; grid-template-columns: 1fr auto; gap: 2mm 4mm; align-items: center; }
+  .code-box .label { font: 700 7.4pt "JetBrains Mono", monospace; letter-spacing: .1em; color: var(--violet); text-transform: uppercase; }
+  .code-box .slot { grid-row: 2; height: 12mm; border-bottom: .35mm solid var(--line); font: 700 15pt "JetBrains Mono", monospace; letter-spacing: .14em; color: #c9c1d6; display: flex; align-items: flex-end; padding-bottom: 1mm; }
+  .code-box .hint { grid-column: 2; grid-row: 1 / span 2; width: 34mm; font-size: 7.6pt; color: var(--muted); }
+  .box { border: .35mm solid var(--line); border-radius: 2.4mm; padding: 2.8mm 3.4mm; background: #fff; margin-bottom: 2.6mm; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2.6mm; }
+  .grid2 .box { margin: 0; }
+  .box h3 { margin: 0 0 1.2mm; font-size: 9.6pt; }
+  .box p { font-size: 8.6pt; color: var(--muted); }
+  ul.plain { margin: 0; padding-left: 4mm; font-size: 8.6pt; }
+  .back h1 { font-size: 17pt; margin-bottom: 3mm; }
+  .back h2 { margin: 3.6mm 0 1.6mm; font-size: 10.5pt; }
+  .back .box { padding: 2.4mm 3mm; }
+  ul.plain li { margin-bottom: 1.2mm; }
+  .os { display: inline-block; font: 700 6.8pt "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--ink); padding: .5mm 1.6mm; border-radius: 1mm; margin-right: 1.4mm; }
+  .note { color: var(--muted); font-size: 8.2pt; }
+  .foot { margin-top: auto; padding-top: 3mm; border-top: .35mm dashed var(--line); font-size: 7.8pt; color: var(--muted); display: flex; justify-content: space-between; gap: 4mm; }
+  .foot b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <div class="hero">
+    <div>
+      <p class="kicker">// quick start</p>
+      <h1>Your private coding assistant, on a stick.</h1>
+      <p class="lede">Stellan, the AI, runs entirely on your own computer. Your code and your questions never leave it.</p>
+    </div>
+    <img class="logo" src="../brand/logo-light.png" alt="stick_ai">
+  </div>
+
+  <h2>Start in five steps</h2>
+  <ol class="steps">
+    <li><b>Plug the stick into</b> a Mac, Windows PC or Linux computer.</li>
+    <li><b>Open the app for your computer</b> straight from the stick:<br>
+      <span class="mono">Stick AI</span> Mac · <span class="mono">Stick AI.exe</span> Windows · <span class="mono">stick-ai</span> Linux.<br>
+      <span class="note">If your computer warns you the first time, see the back of this guide.</span></li>
+    <li><b>Enter your activation code</b> (below). The first start needs the internet for a few seconds to activate this stick; after that, it works offline.</li>
+    <li><b>Click Open workspace.</b> The first start takes a few minutes while the models are checked; then it starts in seconds.</li>
+    <li><b>Follow the short welcome tour</b>, then ask Stellan anything about your code.</li>
+  </ol>
+
+  <div class="code-box">
+    <span class="label">Your activation code</span>
+    <span class="slot">XXXX-XXXX-XXXX</span>
+    <span class="hint">One code, one stick. Keep this guide: you need the code again only if support resets your stick.</span>
+  </div>
+
+  <div class="box">
+    <p><b>Needs:</b> 8 GB of memory for Lite. The larger Max model runs from 16 GB and works best with 24 GB or more. Keep the stick plugged in while you work, and quit the app before you unplug it.</p>
+  </div>
+
+  <div class="foot"><span>Help and guides: <b>stick-ai.localilabs.com/start</b></span><span>Turn over →</span></div>
+</section>
+
+<section class="page back">
+  <h1>Every day</h1>
+  <div class="grid2">
+    <div class="box"><h3>Ask in plain words</h3><p>“Why does checkout crash?” or “Add a dark mode toggle.” You see Stellan think and which files it reads, live.</p></div>
+    <div class="box"><h3>You say yes or no</h3><p>Every change shows the exact lines first. Click <b>Allow changes</b> or <b>Keep my file</b>. Commands and web searches ask too.</p></div>
+    <div class="box"><h3>It checks its own work</h3><p>Stellan can run your project's tests, after you allow it, and fix what fails.</p></div>
+    <div class="box"><h3>Works with GitHub</h3><p>Settings → GitHub: sign in with a short code, choose your repositories, and get a pull request to review.</p></div>
+    <div class="box"><h3>Big projects</h3><p>Settings → Models → <b>Long context mode</b> keeps far more in view. It can be slower.</p></div>
+    <div class="box"><h3>Saves your computer</h3><p>After 10 quiet minutes Stellan rests to free memory. Your next message wakes it.</p></div>
+  </div>
+
+  <h2>If your computer warns you the first time</h2>
+  <p class="note">stick_ai isn't signed with a paid Apple or Microsoft certificate, so your computer may ask once. That's expected.</p>
+  <div class="box">
+    <p><span class="os">Mac</span>Click <b>Done</b>, open <b>System Settings → Privacy &amp; Security</b>, click <b>Open Anyway</b> next to Stick AI, then open it again and confirm.</p>
+    <p><span class="os">Windows</span>Click <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p><span class="os">Linux</span>Right-click <span class="mono">stick-ai</span> → Properties → Permissions → <b>Allow executing file as program</b>.</p>
+  </div>
+
+  <h2>Good to know</h2>
+  <ul class="plain">
+    <li><b>Private by design.</b> The internet is only used for activation, app updates, GitHub and web searches you allow. Your code is never sent anywhere.</li>
+    <li><b>Lost your code, or a new stick?</b> Contact us through the website and we'll help you activate again.</li>
+  </ul>
+
+  <div class="foot"><span><b>stick-ai.localilabs.com/start</b></span><span>stick_ai by Localilabs</span></div>
+</section>
+
+</body>
+</html>

@@ -709,3 +709,17 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .approval-card.unsandboxed { border-color: color-mix(in srgb, var(--amber) 55%, var(--border)); }
 .approval-card.unsandboxed .approval-sub { color: var(--amber); }
 #long-context-panel .warning-box { margin-top: 8px; }
+
+/* Welcome tour: four short steps shown the first time the workspace opens. */
+.tour-dialog { width: min(560px, calc(100vw - 32px)); }
+.tour-step { padding: 6px 26px 4px; }
+.tour-step h3 { margin: 6px 0 10px; font-size: 19px; letter-spacing: -.2px; }
+.tour-step p { margin: 0 0 12px; color: var(--muted); line-height: 1.6; }
+.tour-step b { color: var(--text); }
+.tour-points { margin: 0 0 12px; padding-left: 20px; color: var(--muted); line-height: 1.6; }
+.tour-points li { margin-bottom: 8px; }
+.tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 26px 24px; }
+.tour-dots { display: flex; gap: 6px; }
+.tour-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); transition: background .2s, transform .2s; }
+.tour-dots span.on { background: var(--accent); transform: scale(1.25); }
+.tour-again { margin: 4px 0 12px; }

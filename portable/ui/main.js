@@ -325,6 +325,7 @@ async function update() {
     byId("send").disabled = state.phase !== "ready" || state.repositoryBusy;
     byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
     if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
+    if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
     if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
@@ -690,7 +691,7 @@ if (native) {
   byId("new-session").disabled = true;
   for (const id of ["github-connect","github-resume","github-review","github-disconnect","github-refresh","github-publish"]) byId(id).disabled = true;
   byId("github-result").textContent = "Open the workspace first, then connect your repository here.";
-} else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; byId("long-context-panel").hidden = false; }
+} else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; byId("long-context-panel").hidden = false; byId("show-tour").hidden = false; }
 
 const shortcutHint = document.querySelector("#new-session kbd"); if (shortcutHint) shortcutHint.textContent = /Mac/.test(navigator.platform) ? "⌘ N" : "Ctrl N";
 
@@ -764,6 +765,22 @@ byId("hook-add").onclick = async () => {
   try { await extensionAction("/api/hooks/add", data, "hooks-message"); for (const id of ["hook-name", "hook-matcher", "hook-command", "hook-url"]) byId(id).value = ""; byId("hook-form").open = false; await refreshExtensions(); byId("hooks-message").textContent = "Hook added. Use Test to try it."; } catch {}
 };
 byId("open-hooks").onclick = () => openSettings("hooks");
+// ---------- Welcome tour (once, remembered on the stick; reopen from Settings) ----------
+let tourStep = 1, tourChecked = false;
+function showTourStep(step) {
+  tourStep = step;
+  for (const section of document.querySelectorAll(".tour-step")) section.hidden = Number(section.dataset.step) !== step;
+  document.querySelectorAll(".tour-dots span").forEach((dot, index) => dot.classList.toggle("on", index === step - 1));
+  byId("tour-count").textContent = `${step} of 4`; byId("tour-back").hidden = step === 1;
+  byId("tour-next").textContent = step === 4 ? "Start using Stick AI" : "Next";
+}
+function openTour() { showTourStep(1); if (!byId("tour-dialog").open) byId("tour-dialog").showModal(); }
+async function finishTour() { byId("tour-dialog").close(); try { await api("/api/onboarded", {}); } catch {} byId("prompt").focus(); }
+byId("tour-next").onclick = () => { if (tourStep < 4) showTourStep(tourStep + 1); else void finishTour(); };
+byId("tour-back").onclick = () => showTourStep(Math.max(1, tourStep - 1));
+byId("tour-skip").onclick = () => void finishTour();
+byId("tour-dialog").addEventListener("cancel", () => { void api("/api/onboarded", {}).catch(() => {}); });
+byId("show-tour").onclick = () => { byId("settings-dialog").close(); openTour(); };
 byId("long-context").onchange = async () => {
   const enabled = byId("long-context").checked;
   try { await api("/api/long-context", { enabled }); toast(enabled ? "Long context mode is on. Restarting the model…" : "Long context mode is off. Restarting the model…"); }
