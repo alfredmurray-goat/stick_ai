@@ -99,3 +99,30 @@ it("remembers on the stick that the welcome tour was seen, and keeps Long contex
     await second.app.close();
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+it("keeps Max loaded beside Lite only where both fit, and on a Mac GPU only with room to spare", async () => {
+  const { keepsBothLoaded } = await import("../src/portable/engine.js");
+  expect(keepsBothLoaded("linux-x64", 16 * GiB)).toBe(false);
+  expect(keepsBothLoaded("windows-x64", 31 * GiB)).toBe(true);
+  expect(keepsBothLoaded("macos-arm64", 32 * GiB, {})).toBe(false);
+  expect(keepsBothLoaded("macos-arm64", 32 * GiB, { STICK_GPU: "0" })).toBe(true);
+  expect(keepsBothLoaded("macos-arm64", 64 * GiB, {})).toBe(true);
+  expect(keepsBothLoaded("linux-x64", 64 * GiB, { STICK_KEEP_BOTH: "0" })).toBe(false);
+});
+
+it("loads Max once beside Lite and reuses it, and falls back to swapping if it won't start", async () => {
+  const lite = new ManagedEngine("fixture", "linux-x64", 8080, "temp", -1, vi.fn());
+  const coder = new ManagedEngine("fixture", "linux-x64", 8081, "temp/max", -1, vi.fn());
+  const starts: string[] = []; let stops = 0;
+  (coder as unknown as { launch: (model: "stellan-1-max") => Promise<void> }).launch = async (model) => { starts.push(model); coder.active = model; };
+  coder.stop = async () => { stops++; coder.active = null; };
+  lite.coder = coder; lite.active = "stellan-1-lite";
+  const signal = new AbortController().signal; const report = vi.fn();
+  expect(await lite.loadedCoder(signal, report)).toBe(coder);
+  expect(await lite.loadedCoder(signal, report)).toBe(coder);
+  expect(starts).toEqual(["stellan-1-max"]); expect(lite.active).toBe("stellan-1-lite"); expect(report).toHaveBeenCalledTimes(1);
+  await lite.stop(); expect(stops).toBe(1);
+  (coder as unknown as { launch: () => Promise<void> }).launch = async () => { throw new UserError("loading"); };
+  coder.plainFallback = true;
+  expect(await lite.loadedCoder(signal, report)).toBeUndefined(); expect(lite.coder).toBeUndefined();
+});

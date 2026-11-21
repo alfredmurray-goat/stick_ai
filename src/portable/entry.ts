@@ -6,7 +6,7 @@ import { tmpdir, totalmem } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { Sandbox } from "../sandbox/paths.js";
 import { verifyStick } from "./integrity.js";
-import { ManagedEngine } from "./engine.js";
+import { ManagedEngine, isVirtualMac, keepsBothLoaded } from "./engine.js";
 import { reservePort } from "./ports.js";
 import { localModelStatus } from "./local-models.js";
 import { nodeRelease, portableModels, targetFor, userMessage, UserError } from "./platform.js";
@@ -78,10 +78,19 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       const maxPresent = (await localModelStatus(root)).available;
       const choices = portableModels(totalmem(), maxPresent);
       temp = await mkdtemp(join(tmpdir(), "stick-ai-"));
-      const port = await reservePort(); await port.release();
-      engine = new ManagedEngine(root, targetFor(process.platform, process.arch), port.port, temp, fd, log);
+      const target = targetFor(process.platform, process.arch);
+      const both = maxPresent && !faster && !noSwap && keepsBothLoaded(target, totalmem(), process.env, isVirtualMac());
+      // Hold the first port while picking the second so the two servers never get the same one.
+      const port = await reservePort(); const coderPort = both ? await reservePort() : undefined;
+      await port.release(); await coderPort?.release();
+      engine = new ManagedEngine(root, target, port.port, temp, fd, log);
       engine.faster = faster;
       engine.onProcess = (pid) => notify({ kind: "model_pid", pid });
+      if (coderPort) {
+        const coderTemp = join(temp, "max"); await mkdir(coderTemp, { recursive: true, mode: 0o700 });
+        engine.coder = new ManagedEngine(root, target, coderPort.port, coderTemp, fd, log);
+        engine.coder.onProcess = (pid) => notify({ kind: "model_pid", role: "coder", pid });
+      }
       app = await webApp({ root, engine, activation: new Activation(root), bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
     };
     if (desktop) {

@@ -23,6 +23,8 @@ struct Runtime {
     cancelled: bool,
     generation: u64,
     model_pid: Option<u32>,
+    // Max, when it stays loaded beside Lite on computers with 32 GB or more.
+    coder_pid: Option<u32>,
     closing: bool,
     updating: bool,
 }
@@ -98,12 +100,12 @@ pub(crate) fn release_quarantine(path: &Path) {
 }
 
 fn stop(state: &Desktop) {
-    let (mut child, model_pid) = {
+    let (mut child, model_pids) = {
         let mut runtime = state.runtime.lock().unwrap();
         runtime.cancelled = true;
         if let Some(input) = runtime.input.as_mut() { let _ = writeln!(input, "stop"); }
         runtime.input.take();
-        (runtime.child.take(), runtime.model_pid.take())
+        (runtime.child.take(), [runtime.model_pid.take(), runtime.coder_pid.take()])
     };
     if let Some(child) = child.as_mut() {
         let started = Instant::now();
@@ -111,7 +113,7 @@ fn stop(state: &Desktop) {
             if child.try_wait().ok().flatten().is_some() { break; }
             if started.elapsed() >= Duration::from_secs(30) {
                 log(state, "Background service did not stop within the cleanup grace period");
-                if let Some(pid) = model_pid {
+                for pid in model_pids.into_iter().flatten() {
                     #[cfg(target_os = "windows")]
                     {
                         use std::os::windows::process::CommandExt;
@@ -225,7 +227,10 @@ fn spawn_service(state: &Desktop, faster: bool, mode: &str) -> Result<String, St
             if runtime.generation != generation { break; }
             match event.get("kind").and_then(Value::as_str) {
                 Some("progress") => { runtime.status["message"] = event["text"].clone(); }
-                Some("model_pid") => { runtime.model_pid = event["pid"].as_u64().map(|value| value as u32); }
+                Some("model_pid") => {
+                    let pid = event["pid"].as_u64().map(|value| value as u32);
+                    if event["role"].as_str() == Some("coder") { runtime.coder_pid = pid; } else { runtime.model_pid = pid; }
+                }
                 Some("ready") => { runtime.url = event["url"].as_str().map(String::from); }
                 Some("error") => {
                     let error = event["error"].clone();

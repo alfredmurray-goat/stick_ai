@@ -79,6 +79,16 @@ export function gpuLayerArgs(target: Target, model: ModelName, totalBytes: numbe
   const gpu = target === "macos-arm64" && env.STICK_GPU !== "0" && !virtualMachine && (model === "stellan-1-lite" || totalBytes >= 24 * 1024 ** 3);
   return ["--gpu-layers", gpu ? "999" : "0"];
 }
+// With 32 GB or more, Max stays loaded beside Lite after its first job, so a handoff costs neither
+// stopping Lite nor reloading either model from the stick. Lite (~8 GB at its default window) plus
+// Max (~14.3 GB of weights and up to ~2.6 GB of 8-bit cache) need about 25 GB. A Mac that puts both
+// on the GPU needs more, because macOS lets the GPU use only about two thirds of memory.
+export function keepsBothLoaded(target: Target, totalBytes: number, env: NodeJS.ProcessEnv = process.env, virtualMachine = false): boolean {
+  const GiB = 1024 ** 3;
+  if (env.STICK_KEEP_BOTH === "0") { return false; }
+  const metal = gpuLayerArgs(target, "stellan-1-max", totalBytes, env, virtualMachine)[1] !== "0";
+  return totalBytes >= (metal ? 46 : 30) * GiB;
+}
 let virtualMac: boolean | undefined;
 export function isVirtualMac(): boolean {
   if (process.platform !== "darwin") { return false; }
@@ -115,6 +125,8 @@ export class ManagedEngine implements Switchable {
   onModelStart?: () => void;
   onProcess?: (pid: number | null) => void;
   readonly key = randomBytes(32).toString("hex");
+  /** A second engine that keeps Max loaded beside Lite (see keepsBothLoaded); stopped with this one. */
+  coder: ManagedEngine | undefined;
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
   gpuFailed = false;
@@ -186,6 +198,7 @@ export class ManagedEngine implements Switchable {
     } catch (error) { await this.stop(); throw error; }
   }
   async stop(): Promise<void> {
+    await this.coder?.stop();
     const child = this.child;
     if (!child) { return; }
     const exited = child.exitCode !== null || child.signalCode !== null;
@@ -249,11 +262,27 @@ export class ManagedEngine implements Switchable {
     } catch { return undefined; }
   }
   async code(task: string, context: string, signal: AbortSignal, report: (text: string) => void): Promise<string> {
-    return codeWithSwap(this, async () => {
-      const client = new Ollama("stellan-1-max", this.baseUrl, false, ramStatus(), { apiKey: this.key, specialist: true });
+    const write = async (server: ManagedEngine): Promise<string> => {
+      const client = new Ollama("stellan-1-max", server.baseUrl, false, ramStatus(), { apiKey: server.key, specialist: true });
       this.onModelStart?.();
       const result = await client.complete([{ role: "system", content: coderSystem }, { role: "user", content: `Task:\n${task}\n\nRelevant source context:\n${context}` }], signal, (text, thinking) => this.onOutput?.(text, thinking));
       return result.content;
-    }, signal, report);
+    };
+    const coder = await this.loadedCoder(signal, report);
+    return coder ? write(coder) : codeWithSwap(this, () => write(this), signal, report);
+  }
+  /** Max running beside Lite, started on first use; undefined when this computer swaps them instead. */
+  async loadedCoder(signal: AbortSignal, report: (text: string) => void): Promise<ManagedEngine | undefined> {
+    const coder = this.coder;
+    if (!coder || coder.active === "stellan-1-max") { return coder; }
+    report("Loading the coding model. It stays loaded, so later handoffs start at once...");
+    coder.faster = this.faster; coder.plan = this.plan;
+    try { await coder.start("stellan-1-max", signal); return coder; }
+    catch (error) {
+      // Not enough memory after all, or another failure: swap the models for the rest of the session.
+      if (signal.aborted) { throw error; }
+      this.log(error); this.coder = undefined; await coder.stop().catch(this.log);
+      return undefined;
+    }
   }
 }
