@@ -45,7 +45,9 @@ it("builds a Lite-only Intel package with its own template and complete target-s
 it("bounds Lite recurrent-state memory without reducing its configured context window", () => {
   const args = modelRuntimeArgs("stellan-1-lite");
   expect(args).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "512", "--ubatch-size", "256", "--cache-ram", "0", "--ctx-checkpoints", "1"]);
-  expect(args).not.toContain("--ctx-size"); expect(modelRuntimeArgs("stellan-1-max")).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"]);
+  expect(args).not.toContain("--ctx-size"); expect(modelRuntimeArgs("stellan-1-max", true)).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"]);
+  // Max normally adds the 8-bit cache (which needs flash attention) and n-gram speculative decoding.
+  expect(modelRuntimeArgs("stellan-1-max")).toEqual(["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0", "--flash-attn", "on", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--spec-type", "ngram-simple"]);
 });
 
 it("offloads to the Apple Silicon GPU only where it fits, and stays CPU-only elsewhere", () => {

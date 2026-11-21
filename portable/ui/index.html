@@ -182,6 +182,11 @@
         <div class="button-row"><button id="browse-max" class="secondary">Choose GGUF…</button><button id="link-max" class="secondary">Use this file</button><button id="unlink-max" class="secondary">Remove file link</button></div>
       </details>
     </div>
+    <fieldset id="long-context-panel" class="form-group" hidden><legend>Memory</legend>
+      <label class="check-label"><input id="long-context" type="checkbox"> Long context mode</label>
+      <p id="long-context-size" class="muted"></p>
+      <p class="status-box warning-box">Stellan keeps much more of your conversation and files in view. It can be noticeably slower: reading a long conversation again can take minutes on an ordinary laptop, and Max uses more memory. Turning this on or off restarts the model (about 10–60 seconds).</p>
+    </fieldset>
     <p id="running-model-note" class="status-box" hidden>Model files and the GGUF picker are managed from the launch screen. Close and reopen the app to change them. Your project files are kept.</p>
   </div>
 

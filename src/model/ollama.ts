@@ -8,7 +8,7 @@ import { errorText, type Message, type Model, type Reply } from "./types.js";
 
 export class Ollama implements Model {
   private url: string;
-  constructor(private model: string, baseUrl: string, remote = false, ram: RamStatus = ramStatus(), private options: { apiKey?: string; specialist?: boolean; maxTokens?: number } = {}) {
+  constructor(private model: string, baseUrl: string, remote = false, ram: RamStatus = ramStatus(), private options: { apiKey?: string; specialist?: boolean; maxTokens?: number; historyBytes?: number } = {}) {
     assertModelAllowed(model, ram); this.url = endpoint(baseUrl, remote);
   }
   async complete(messages: Message[], signal: AbortSignal, emit: (text: string, thinking: boolean) => void): Promise<Reply> {
@@ -17,7 +17,7 @@ export class Ollama implements Model {
       // return_progress makes the bundled llama.cpp server stream prompt-progress chunks while it
       // reads a long prompt. Without them a slow computer can spend over five minutes before the
       // first token, and Node's fetch drops a response that is silent for 300 s ("fetch failed").
-      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages)), stream: true, ...(this.options.apiKey ? { return_progress: true } : {}), ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
+      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages, this.options.historyBytes)), stream: true, ...(this.options.apiKey ? { return_progress: true } : {}), ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
       try {
         response = await fetch(this.url, {
           method: "POST",

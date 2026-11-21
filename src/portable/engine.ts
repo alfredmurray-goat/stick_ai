@@ -46,8 +46,27 @@ export async function codeWithSwap(engine: Switchable, code: () => Promise<strin
 // Measured on 4 CPU cores: a follow-up step fell from ~95 s to ~5 s; peak memory
 // rose from 4.16 to 4.47 GB. 512/256 batches read prompts ~20% faster than 64/32
 // for +0.06 GB. RAM prompt caching across conversations stays off (--cache-ram 0).
-export function modelRuntimeArgs(model: ModelName): string[] {
-  return model === "stellan-1-lite" ? ["--parallel", "1", "--no-repack", "--batch-size", "512", "--ubatch-size", "256", "--cache-ram", "0", "--ctx-checkpoints", "1"] : ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0"];
+//
+// Max: an 8-bit attention cache (needs flash attention) halves the memory its context costs, and
+// n-gram speculative decoding drafts tokens it has already seen. Rewriting a 25-function file on
+// 4 CPU cores went from 4.3 to 12.4 tokens/s with identical greedy output, and plain prose was
+// unchanged. Lite stays without it: its tool calls carry file text JSON-escaped, so drafts from the
+// source rarely match (5 of 144 accepted, ~5% slower). `plain` drops these extras for the fallback.
+export function modelRuntimeArgs(model: ModelName, plain = false): string[] {
+  if (model === "stellan-1-lite") { return ["--parallel", "1", "--no-repack", "--batch-size", "512", "--ubatch-size", "256", "--cache-ram", "0", "--ctx-checkpoints", "1"]; }
+  return ["--parallel", "1", "--no-repack", "--batch-size", "128", "--ubatch-size", "64", "--cache-ram", "0", ...(plain ? [] : ["--flash-attn", "on", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--spec-type", "ngram-simple"])];
+}
+/** How much each model may see at once, and how much of the conversation the app keeps word for word. */
+export interface ContextPlan { lite: number; max: number; historyBytes: number; projectBytes: number }
+// Lite is a pure Mamba2 model: its memory of the conversation is a fixed-size state, so a larger
+// window costs no RAM (measured 8.0 GB resident at both 8,192 and 131,072 tokens). What a long
+// conversation does cost is time if it ever has to be read again from the start, so the app keeps
+// about 12k tokens word for word and summarises older tasks (compactHistory); Long context mode keeps
+// about 100k. Max stores every token (about 80 KB each with the 8-bit cache), so its window follows RAM.
+export function contextPlan(totalBytes: number, long = false): ContextPlan {
+  const GiB = 1024 ** 3;
+  const max = totalBytes >= 30 * GiB ? (long ? 65536 : 32768) : totalBytes >= 22 * GiB ? (long ? 32768 : 16384) : (long ? 16384 : 8192);
+  return long ? { lite: 262144, max, historyBytes: 393216, projectBytes: 32768 } : { lite: 65536, max, historyBytes: 49152, projectBytes: 8192 };
 }
 // Apple Silicon builds include the Metal GPU backend. Weights are memory-mapped and
 // shared with the GPU, but macOS caps GPU working memory at roughly two thirds of RAM,
@@ -86,7 +105,11 @@ export class ManagedEngine implements Switchable {
   child: ChildProcess | null = null;
   active: ModelName | null = null;
   disposing = false;
-  contextSize = 8192;
+  /** Context sizes for this computer and mode; `faster` (the low-memory fallback) caps them at 4,096. */
+  plan: ContextPlan = contextPlan(totalmem());
+  faster = false;
+  /** Set when Max would not start with its speed settings; it then runs without them for the session. */
+  plainFallback = false;
   activeContextSize = 0;
   onOutput?: (text: string, thinking: boolean) => void;
   onModelStart?: () => void;
@@ -100,12 +123,20 @@ export class ManagedEngine implements Switchable {
     const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem(), process.env, this.detectVirtualMachine());
     try { await this.launch(model, signal, gpu); }
     catch (error) {
+      if (gpu[1] === "0") { await this.retryPlain(model, signal, error); return; }
       // A GPU that cannot load the model (driver, memory or unsupported operation) must not
       // leave the user without a model: retry once on the CPU and keep it for this session.
       if (gpu[1] === "0" || signal.aborted || this.disposing || !(error instanceof UserError) || !["loading", "busy"].includes(error.code)) { throw error; }
       this.gpuFailed = true; this.log(new Error(`GPU start failed for ${model}; retrying on the CPU`));
-      await this.launch(model, signal, ["--gpu-layers", "0"]);
+      try { await this.launch(model, signal, ["--gpu-layers", "0"]); }
+      catch (again) { await this.retryPlain(model, signal, again); }
     }
+  }
+  // Max's speed settings depend on the llama.cpp build; if Max will not start with them, start it once more without.
+  private async retryPlain(model: ModelName, signal: AbortSignal, error: unknown): Promise<void> {
+    if (model !== "stellan-1-max" || this.plainFallback || signal.aborted || this.disposing || !(error instanceof UserError) || !["loading", "busy"].includes(error.code)) { throw error; }
+    this.plainFallback = true; this.log(new Error("Max did not start with its speed settings; retrying without them"));
+    await this.launch(model, signal, ["--gpu-layers", "0"]);
   }
   private async launch(model: ModelName, signal: AbortSignal, gpu: string[]): Promise<void> {
     if (this.disposing) { throw new UserError("general"); }
@@ -123,11 +154,12 @@ export class ManagedEngine implements Switchable {
     env.HOME = this.temp; env.USERPROFILE = this.temp; env.TMPDIR = this.temp; env.TEMP = this.temp; env.TMP = this.temp;
     env.XDG_CACHE_HOME = this.temp; env.XDG_CONFIG_HOME = this.temp; env.XDG_DATA_HOME = this.temp;
     const templateArgs = await modelTemplateArgs(this.root, model);
-    const contextSize = model === "stellan-1-max" ? Math.min(this.contextSize, 4096) : this.contextSize;
+    const planned = model === "stellan-1-max" ? this.plan.max : this.plan.lite;
+    const contextSize = this.faster ? Math.min(planned, 4096) : planned;
     const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", selected.path, "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
-      "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model), ...templateArgs, ...(model === "stellan-1-lite" ? ["--slot-save-path", slots] : [])
+      "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model, this.plainFallback), ...templateArgs, ...(model === "stellan-1-lite" ? ["--slot-save-path", slots] : [])
     ], { cwd: this.temp, env, detached: process.platform !== "win32", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
     this.onProcess?.(child.pid ?? null);

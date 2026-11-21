@@ -323,7 +323,9 @@ async function update() {
     if (!filesLoaded && state.phase === "ready") void refreshFiles();
     byId("stop").hidden = state.desktop;
     byId("send").disabled = state.phase !== "ready" || state.repositoryBusy;
-    byId("session-model").textContent = state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite";
+    byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
+    if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
+    if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
     progress(state.progress, ["starting", "working"].includes(state.phase));
@@ -346,7 +348,8 @@ async function update() {
       if (event.kind === "approval") {
         const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         const web = event.data.kind === "web", search = web && event.data.title === "Search the web";
-        for (const [label, allow] of [[web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
+        const shell = event.data.kind === "shell";
+        for (const [label, allow] of [[shell ? "Don’t run" : web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [shell ? "Run it" : web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
@@ -374,6 +377,11 @@ function diffLines(before, after) {
 function approvalCard(data) {
   const card = document.createElement("article"), head = document.createElement("div"), text = document.createElement("div"), title = document.createElement("h3"), sub = document.createElement("span");
   card.className = "approval-card"; card.dataset.approval = data.id; head.className = "approval-head"; sub.className = "approval-sub";
+  if (data.kind === "shell") {
+    card.className = `approval-card${data.isolated ? "" : " unsandboxed"}`; title.textContent = "Run this command?"; sub.textContent = data.note;
+    text.append(title, sub); head.append(icon("terminal"), text); card.append(head);
+    const preview = document.createElement("pre"); preview.className = "command-preview"; preview.textContent = data.after; card.append(preview); return card;
+  }
   const web = data.kind === "web", mcp = data.kind === "mcp" || web; const editing = !mcp && Boolean(data.before);
   title.textContent = web ? (data.title === "Search the web" ? "Search the web for this?" : "Read this web page?") : mcp ? `Allow MCP call: ${data.title}?` : `Save changes to ${data.file}?`;
   const lines = (value) => value.split("\n").length;
@@ -603,7 +611,7 @@ byId("sidebar-toggle").onclick = () => { if (innerWidth <= 860) document.body.cl
 byId("activity-toggle").onclick = () => { if (innerWidth <= 620) document.body.classList.toggle("inspector-open"); else document.body.classList.toggle("inspector-hidden"); };
 function inspectorTab(file) { byId("activity-panel").hidden = file; byId("file-panel").hidden = !file; byId("tab-file").classList.toggle("active", file); byId("tab-activity").classList.toggle("active", !file); document.body.classList.remove("inspector-hidden"); if (innerWidth <= 620) document.body.classList.add("inspector-open"); }
 byId("tab-file").onclick = () => inspectorTab(true); byId("tab-activity").onclick = () => inspectorTab(false);
-const toolTitle = (tool) => ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Command request",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[tool] || tool;
+const toolTitle = (tool) => ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Run command",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[tool] || tool;
 const toolIcon = (tool) => ({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass"})[tool] || "sparkle";
 function renderTool(data) {
   turnStep(data, toolTitle(data.tool), toolIcon(data.tool));
@@ -682,7 +690,7 @@ if (native) {
   byId("new-session").disabled = true;
   for (const id of ["github-connect","github-resume","github-review","github-disconnect","github-refresh","github-publish"]) byId(id).disabled = true;
   byId("github-result").textContent = "Open the workspace first, then connect your repository here.";
-} else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; }
+} else { byId("quick-max").hidden = true; byId("running-model-note").hidden = false; byId("running-update-note").hidden = false; byId("long-context-panel").hidden = false; }
 
 const shortcutHint = document.querySelector("#new-session kbd"); if (shortcutHint) shortcutHint.textContent = /Mac/.test(navigator.platform) ? "⌘ N" : "Ctrl N";
 
@@ -756,6 +764,11 @@ byId("hook-add").onclick = async () => {
   try { await extensionAction("/api/hooks/add", data, "hooks-message"); for (const id of ["hook-name", "hook-matcher", "hook-command", "hook-url"]) byId(id).value = ""; byId("hook-form").open = false; await refreshExtensions(); byId("hooks-message").textContent = "Hook added. Use Test to try it."; } catch {}
 };
 byId("open-hooks").onclick = () => openSettings("hooks");
+byId("long-context").onchange = async () => {
+  const enabled = byId("long-context").checked;
+  try { await api("/api/long-context", { enabled }); toast(enabled ? "Long context mode is on. Restarting the model…" : "Long context mode is off. Restarting the model…"); }
+  catch (error) { byId("long-context").checked = !enabled; toast(error.message); }
+};
 byId("mcp-refresh").onclick = refreshExtensions;byId("skills-refresh").onclick=refreshExtensions;
 byId("mcp-cancel").onclick=()=>api("/api/cancel",{}).catch(()=>{});
 byId("mcp-transport").onchange=()=>{const local=byId("mcp-transport").value==="stdio";byId("mcp-local-fields").hidden=!local;byId("mcp-remote-fields").hidden=local;};

@@ -10,7 +10,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 vi.mock("../src/portable/local-models.js", () => ({ resolveLocalModel: vi.fn(async (_root: string, kind: string) => ({ path: `/external/${kind === "max" ? "Max" : "Lite"}.gguf`, name: `${kind === "max" ? "Max" : "Lite"}.gguf`, source: "linked" })) }));
 vi.mock("../src/portable/ports.js", () => ({ reservePort: vi.fn(async () => ({ release: async () => {} })) }));
-import { ManagedEngine } from "../src/portable/engine.js";
+import { ManagedEngine, contextPlan } from "../src/portable/engine.js";
 import { runProcess } from "../src/sandbox/process.js";
 
 function child() {
@@ -26,6 +26,7 @@ it("keeps loading past the former startup and inactivity deadlines, then accepts
     return Response.json({ data: [{ id: "stellan-1-max" }] });
   }));
   const engine = new ManagedEngine("fixture", "linux-x64", 8080, "temporary", -1, vi.fn());
+  engine.plan = contextPlan(16 * 1024 ** 3);
   const loading = engine.start("stellan-1-max", new AbortController().signal);
   await vi.advanceTimersByTimeAsync(600000);
   expect(engine.child).toBe(process); expect(engine.active).toBeNull();
@@ -33,7 +34,7 @@ it("keeps loading past the former startup and inactivity deadlines, then accepts
   expect(engine.active).toBe("stellan-1-max");
   const args = mocks.spawn.mock.calls[0]![1] as string[];
   expect(args[args.indexOf("--model") + 1]).toBe("/external/Max.gguf");
-  expect(args[args.indexOf("--ctx-size") + 1]).toBe("4096");
+  expect(args[args.indexOf("--ctx-size") + 1]).toBe("8192");
   await engine.stop();
 });
 it("cancels a model that remains loading without waiting for a readiness deadline", async () => {

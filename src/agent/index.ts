@@ -1,5 +1,5 @@
 import { maxRecommendedBytes } from "../config/models.js";
-import { contextMark, taskContextParts, type ContextSource } from "./context.js";
+import { contextLimit, contextMark, taskContextParts, type ContextSource } from "./context.js";
 import { totalmem } from "node:os";
 import { createDelegate, type Specialist } from "./delegate.js";
 import { errorText, type Call, type Message, type Model } from "../model/types.js";
@@ -19,6 +19,55 @@ export function agentInstructions(extra: string, paired: boolean): string {
 }
 // The file list is sent again only when it changed since the last task of the same conversation.
 const sentLists = new WeakMap<Message[], string>();
+
+const summaryMark = "<conversation_summary>";
+const bytes = (message: Message): number => Buffer.byteLength(message.content);
+const isTask = (message: Message): boolean => message.role === "user" && !message.content.startsWith("<tool_result>") && !message.content.startsWith(summaryMark);
+function summaryOf(turn: Message[]): string {
+  const task = turn[0]!.content.split(contextMark)[0]!.replace(/\s+/g, " ").trim();
+  const steps: string[] = [];
+  let answer = "";
+  for (const message of turn.slice(1)) {
+    if (message.role !== "assistant") { continue; }
+    for (const match of message.content.matchAll(/<tool_call>([\s\S]*?)<\/tool_call>/g)) {
+      try { const call = JSON.parse(match[1]!) as { name?: unknown; arguments?: Record<string, unknown> }; const target = call.arguments?.path ?? call.arguments?.query ?? call.arguments?.command; steps.push(`${String(call.name)}${typeof target === "string" ? ` ${target.slice(0, 80)}` : ""}`); } catch {}
+    }
+    const done = /<done>([\s\S]*?)(?:<\/done>|$)/.exec(message.content); if (done) { answer = done[1]!.replace(/\s+/g, " ").trim(); }
+  }
+  const uniqueSteps = [...new Set(steps)];
+  return `- The user asked: "${task.slice(0, 300)}${task.length > 300 ? "…" : ""}"${uniqueSteps.length ? `\n  You used: ${uniqueSteps.slice(0, 12).join("; ")}${uniqueSteps.length > 12 ? "; …" : ""}` : ""}${answer ? `\n  Your answer: ${answer.slice(0, 400)}${answer.length > 400 ? "…" : ""}` : ""}`;
+}
+// Smart compaction: when a new task starts and the conversation is over its budget, older tasks are
+// replaced by a short summary (what was asked, which files and tools were used, what was answered)
+// and the most recent tasks stay word for word. It runs only between tasks, so the start of every
+// request inside a task stays identical for the prompt cache; the one summary is short to re-read.
+// It is built from the conversation itself rather than by asking the model: on a laptop CPU a model
+// summary of a long conversation would take minutes, while this takes no time and invents nothing.
+export function compactHistory(messages: Message[], budget: number): number {
+  const total = messages.reduce((sum, message) => sum + bytes(message), 0);
+  if (total <= budget) { return 0; }
+  const starts = messages.map((message, index) => isTask(message) ? index : -1).filter((index) => index >= 0);
+  if (starts.length < 2) { return 0; }
+  // Keep the newest tasks that fit in half the budget (always at least the last one) word for word.
+  let keepFrom = starts.at(-1)!;
+  for (let i = starts.length - 2; i >= 0; i--) {
+    const size = messages.slice(starts[i]!).reduce((sum, message) => sum + bytes(message), 0);
+    if (size > budget / 2) { break; }
+    keepFrom = starts[i]!;
+  }
+  const old = messages.slice(0, keepFrom);
+  const earlier = old.filter((message) => message.role === "user" && message.content.startsWith(summaryMark)).map((message) => message.content.slice(summaryMark.length).replace(/<\/conversation_summary>[\s\S]*$/, "").replace(/^Earlier in this conversation[^\n]*\n/, "").trim());
+  const turns: Message[][] = [];
+  for (const message of old) { if (isTask(message)) { turns.push([message]); } else if (turns.length && !message.content.startsWith(summaryMark)) { turns.at(-1)!.push(message); } }
+  if (!turns.length) { return 0; }
+  let lines = [...earlier, ...turns.map(summaryOf)].join("\n");
+  if (Buffer.byteLength(lines) > budget / 4) { lines = "…\n" + lines.slice(-Math.floor(budget / 4)); }
+  messages.splice(0, keepFrom,
+    { role: "user", content: `${summaryMark}Earlier in this conversation (summarised to save memory; read files again for their exact contents):\n${lines}</conversation_summary>` },
+    { role: "assistant", content: "<done>Noted. I'll re-read files when I need their exact contents.</done>" });
+  sentLists.delete(messages);
+  return turns.length;
+}
 export function taskMessage(task: string, messages: Message[], context: { list: string; named: string }, taskInstructions = ""): string {
   const list = messages.length && sentLists.get(messages) === context.list ? "" : context.list;
   if (context.list) { sentLists.set(messages, context.list); }
@@ -34,6 +83,8 @@ export async function runAgent(options: {
   extraInstructions?: string;
   /** Called around each tool call. `before` returns a reason to block it; `after` returns notes to add to its result. Neither can approve anything. */
   hooks?: { before(call: Call, signal: AbortSignal): Promise<string | undefined>; after(call: Call, result: string, signal: AbortSignal): Promise<string> } | undefined;
+  /** Conversation budget in bytes: above it, older tasks are summarised before a new task (see compactHistory). */
+  historyBytes?: number | undefined;
   /** Per-task guidance (for example a skill the user picked); sent with the task, not in the system message. */
   taskInstructions?: string;
   activity?: (event: { step: number; phase: "start" | "finish"; tool: string; path?: string; detail?: string; result?: string }) => void;
@@ -51,6 +102,8 @@ export async function runAgent(options: {
   const paired = specialist.available && !specialist.noSwap && specialist.totalBytes >= maxRecommendedBytes;
   const project = options.context ? await taskContextParts(options.task, options.context.source, options.context.maxBytes, signal) : { list: "", named: "" };
   const instructions = agentInstructions(options.extraInstructions ?? "", paired);
+  const compacted = compactHistory(messages, options.historyBytes ?? contextLimit());
+  if (compacted) { log(`Summarised ${compacted} earlier task${compacted === 1 ? "" : "s"} to keep the conversation within its memory.`); }
   await commit([{ role: "user", content: taskMessage(options.task, messages, project, options.taskInstructions) }]);
   for (let step = 0; step < options.maxSteps; step++) {
     signal.throwIfAborted();
@@ -66,7 +119,7 @@ export async function runAgent(options: {
     else {
       const call = parsed.step.call;
       let argumentsView: Record<string, unknown> = {}; try { const value: unknown = JSON.parse(call.function.arguments); if (value && typeof value === "object" && !Array.isArray(value)) argumentsView = value as Record<string, unknown>; } catch {}
-      const activity = { step, tool: call.function.name, ...(typeof argumentsView.path === "string" ? { path: argumentsView.path.slice(0, 2000) } : {}), ...(typeof argumentsView.server === "string" ? { detail: `${argumentsView.server} · ${argumentsView.tool ?? "tool discovery"}` } : typeof argumentsView.name === "string" && call.function.name === "use_skill" ? { detail: argumentsView.name } : typeof argumentsView.query === "string" ? { detail: argumentsView.query.slice(0, 500) } : typeof argumentsView.task === "string" ? { detail: argumentsView.task.slice(0, 500) } : {}) };
+      const activity = { step, tool: call.function.name, ...(typeof argumentsView.path === "string" ? { path: argumentsView.path.slice(0, 2000) } : {}), ...(typeof argumentsView.server === "string" ? { detail: `${argumentsView.server} · ${argumentsView.tool ?? "tool discovery"}` } : typeof argumentsView.name === "string" && call.function.name === "use_skill" ? { detail: argumentsView.name } : typeof argumentsView.command === "string" ? { detail: argumentsView.command.slice(0, 500) }: typeof argumentsView.query === "string" ? { detail: argumentsView.query.slice(0, 500) } : typeof argumentsView.task === "string" ? { detail: argumentsView.task.slice(0, 500) } : {}) };
       options.activity?.({ ...activity, phase: "start" });
       log(`→ ${call.function.name} ${call.function.arguments}`);
       try {

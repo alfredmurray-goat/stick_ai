@@ -22,7 +22,7 @@ it("exposes friendly startup errors and allows manually selecting faster setting
     expect((await service.api("/api/state")).problem.action).toBe("Retry");
     await expect(service.app.start()).rejects.toThrow("private startup details");
     const state = await service.api("/api/state"); expect(state.problem.action).toBe("Retry"); expect(state.problem.message).not.toContain("private startup details");
-    await service.api("/api/faster", {}); expect(service.engine.contextSize).toBe(4096);
+    await service.api("/api/faster", {}); expect(service.engine.faster).toBe(true);
   } finally { await service.close(); }
 });
 it("cancels model loading while keeping the local app service available", async () => {
