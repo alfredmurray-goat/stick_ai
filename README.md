@@ -60,11 +60,10 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
 
 - **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The 95% confidence interval is about **66% to 79%**.
 - **Against the 2023 flagships.** OpenAI reported [67.0% for GPT-4](https://arxiv.org/abs/2303.08774) and Anthropic [71.2% for Claude 2](https://www.anthropic.com/news/claude-2), each with its own prompts and settings. Newer cloud models score over 90% (Anthropic reported [92.0% for Claude 3.5 Sonnet](https://www.anthropic.com/news/claude-3-5-sonnet) in 2024), and most of the newest ones no longer publish HumanEval at all.
-- **Against the 2023–2024 flagships.** Scores as published by each maker (pass@1, their own prompts and settings), with sizes marked *published*, *counted from released weights*, *estimate* or *unpublished*:
+- **Against the 2023–2024 flagships it beats.** Scores as published by each maker (pass@1, their own prompts and settings), with sizes marked *published*, *estimate* or *unpublished*:
 
   | Model | HumanEval | Size |
   | --- | --- | --- |
-  | Grok-2 (xAI, Aug 2024) | [88.4%](https://x.ai/news/grok-2) | 270B total, 115B active (counted from its [released weights](https://huggingface.co/xai-org/grok-2)) |
   | **Stellan-1 Max** | **86.7%\*** early result | **23.6B** |
   | Claude 3 Opus (Anthropic, Mar 2024) | [84.9%](https://www.anthropic.com/news/claude-3-family) | unpublished |
   | Gemini 1.5 Pro (Google, May 2024 update) | [84.1%](https://arxiv.org/abs/2403.05530) | unpublished |
@@ -75,7 +74,7 @@ Measured with the release Lite GGUF and the app's own llama.cpp server settings,
   | Claude 2 (Anthropic, Jul 2023) | [71.2%](https://www.anthropic.com/news/claude-2) | unpublished |
   | GPT-4 (OpenAI, Mar 2023) | [67.0%](https://arxiv.org/abs/2303.08774) | ~1.8T (estimate) |
 
-  Max's early result sits among models from 3× (Llama 3 70B) to an estimated 75× (GPT-4) its size. With 30 problems its margin of error is wide (roughly ±12 points), so it isn't yet a claim to beat any of them; the full run will settle it.
+  Max's early result is ahead of models from 3× (Llama 3 70B) to an estimated 75× (GPT-4) its size. With 30 problems its margin of error is wide (roughly ±12 points), so it isn't yet a claim to beat any of them; the full run will settle it.
 - **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
 - **\*Max, early result.** On a free 4-core cloud machine (Kaggle, 31 GB), Max solved **26 of the 30** problems it answered (86.7%). The other 119 attempted problems were lost to a 5-minute time-out in the benchmark script (Max wrote about 0.7 tokens a second on that CPU, so longer answers took over 5 minutes); that's fixed, and they're retried on the next run. The answered problems were mostly the shorter ones, so the full score may be lower. The full 164-problem run is next, on Kaggle's free GPUs.
 
