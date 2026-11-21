@@ -335,7 +335,7 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .chart .us .bar { background: linear-gradient(90deg, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 30px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
 .chart .us .val { color: var(--amber); font-size: 16px; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .chart .axis { margin-left: calc(var(--label) + 20px); display: flex; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); }
-.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; } .s744 { --score: 74.4; } .s817 { --score: 81.7; } .s837 { --score: 83.7; } .s841 { --score: 84.1; } .s849 { --score: 84.9; } .s867 { --score: 86.7; } .s884 { --score: 88.4; }
+.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s732 { --score: 73.2; } .s744 { --score: 74.4; } .s817 { --score: 81.7; } .s837 { --score: 83.7; } .s841 { --score: 84.1; } .s849 { --score: 84.9; } .s867 { --score: 86.7; }
 /* An early, partial result: striped so it reads as provisional. */
 .chart .prelim .val { margin-right: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(12, 10, 20, .72); }
 .chart .prelim .bar { background: repeating-linear-gradient(135deg, var(--violet-deep) 0 10px, color-mix(in srgb, var(--violet-hi) 70%, transparent) 10px 20px); box-shadow: none; }
@@ -352,17 +352,17 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
   .chart .bar { animation: grow cubic-bezier(.2, .8, .2, 1) both; animation-timeline: --chart; }
   .chart .val { animation: pop ease-out both; animation-timeline: --chart; }
   /* Bars grow from the bottom of the chart (lowest score) to the top. */
-  .chart .row:nth-child(1) .bar { animation-range: entry 80% cover 52%; } .chart .row:nth-child(1) .val { animation-range: cover 48% cover 54%; }
-  .chart .row:nth-child(2) .bar { animation-range: entry 75% cover 50%; } .chart .row:nth-child(2) .val { animation-range: cover 46% cover 52%; }
-  .chart .row:nth-child(3) .bar { animation-range: entry 70% cover 48%; } .chart .row:nth-child(3) .val { animation-range: cover 44% cover 50%; }
-  .chart .row:nth-child(4) .bar { animation-range: entry 65% cover 46%; } .chart .row:nth-child(4) .val { animation-range: cover 42% cover 48%; }
-  .chart .row:nth-child(5) .bar { animation-range: entry 60% cover 44%; } .chart .row:nth-child(5) .val { animation-range: cover 40% cover 46%; }
-  .chart .row:nth-child(6) .bar { animation-range: entry 55% cover 42%; } .chart .row:nth-child(6) .val { animation-range: cover 38% cover 44%; }
-  .chart .row:nth-child(7) .bar { animation-range: entry 50% cover 40%; } .chart .row:nth-child(7) .val { animation-range: cover 36% cover 42%; }
-  .chart .row:nth-child(8) .bar { animation-range: entry 45% cover 38%; } .chart .row:nth-child(8) .val { animation-range: cover 34% cover 40%; }
-  .chart .row:nth-child(9) .bar { animation-range: entry 40% cover 36%; } .chart .row:nth-child(9) .val { animation-range: cover 32% cover 38%; }
-  .chart .row:nth-child(10) .bar { animation-range: entry 35% cover 34%; } .chart .row:nth-child(10) .val { animation-range: cover 30% cover 36%; }
-  .chart .row:nth-child(11) .bar { animation-range: entry 30% cover 32%; } .chart .row:nth-child(11) .val { animation-range: cover 28% cover 34%; }
+  .chart .row:nth-child(1) .bar { animation-range: entry 75% cover 50%; } .chart .row:nth-child(1) .val { animation-range: cover 46% cover 52%; }
+  .chart .row:nth-child(2) .bar { animation-range: entry 70% cover 48%; } .chart .row:nth-child(2) .val { animation-range: cover 44% cover 50%; }
+  .chart .row:nth-child(3) .bar { animation-range: entry 65% cover 46%; } .chart .row:nth-child(3) .val { animation-range: cover 42% cover 48%; }
+  .chart .row:nth-child(4) .bar { animation-range: entry 60% cover 44%; } .chart .row:nth-child(4) .val { animation-range: cover 40% cover 46%; }
+  .chart .row:nth-child(5) .bar { animation-range: entry 55% cover 42%; } .chart .row:nth-child(5) .val { animation-range: cover 38% cover 44%; }
+  .chart .row:nth-child(6) .bar { animation-range: entry 50% cover 40%; } .chart .row:nth-child(6) .val { animation-range: cover 36% cover 42%; }
+  .chart .row:nth-child(7) .bar { animation-range: entry 45% cover 38%; } .chart .row:nth-child(7) .val { animation-range: cover 34% cover 40%; }
+  .chart .row:nth-child(8) .bar { animation-range: entry 40% cover 36%; } .chart .row:nth-child(8) .val { animation-range: cover 32% cover 38%; }
+  .chart .row:nth-child(9) .bar { animation-range: entry 35% cover 34%; } .chart .row:nth-child(9) .val { animation-range: cover 30% cover 36%; }
+  .chart .row:nth-child(10) .bar { animation-range: entry 30% cover 32%; } .chart .row:nth-child(10) .val { animation-range: cover 28% cover 34%; }
+}
 }
 }
 
