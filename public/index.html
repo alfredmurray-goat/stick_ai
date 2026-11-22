@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>stick_ai · A private coding assistant on a USB stick</title>
-  <meta name="description" content="stick_ai is a €15 USB stick with a private coding assistant. It beat GPT-4 (2023) and Claude 2 (2023) on the HumanEval coding test and runs entirely on your own computer. EU orders from February 2027, worldwide from May 2027.">
+  <meta name="description" content="stick_ai is a €15 USB stick with a private coding assistant. Stellan-1 Lite scored 73.2% and Max 80.5% on HumanEval pass@1. Both run on your own computer. EU orders from February 2027, worldwide from May 2027.">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0e0c14" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#fcf8f5" media="(prefers-color-scheme: light)">
@@ -53,8 +53,8 @@
           <a class="btn ghost" href="#session">watch it work ↓</a>
         </div>
         <ul class="facts" aria-label="At a glance">
-          <li class="tech-only"><b>73.2%</b> HumanEval</li>
-          <li class="plain-only"><b>Beats GPT-4</b> (2023) at coding</li>
+          <li class="tech-only"><b>80.5%</b> HumanEval pass@1 · Max</li>
+          <li class="plain-only"><b>80.5% pass@1</b> on the HumanEval coding test</li>
           <li class="tech-only"><b>0 bytes</b> of code sent</li>
           <li class="plain-only"><b>Nothing</b> sent online</li>
           <li><b>Mac · Win · Linux</b> one stick</li>
@@ -129,76 +129,51 @@
 
     <section class="bench" id="bench" aria-labelledby="bench-title">
       <p class="kicker">// benchmarks</p>
-      <h2 id="bench-title">Ahead of Claude 3 Opus and GPT-4 Turbo at coding.* <em>On your own computer.</em></h2>
-      <p class="lede narrow plain-only"><b>In plain words:</b> AI companies test their AIs with the same 164 programming puzzles, called HumanEval, and publish the score. We ran the same test on the AIs on the stick. Higher is better. The small AI that lives on your stick scored higher than famous paid AIs from 2023 and 2024, which run on giant computers in data centres and are tens of times bigger.</p>
-      <p class="lede narrow tech-only">On HumanEval, the classic coding test, Stellan-1 Lite (7.3 billion parameters) scored higher than GPT-4 and Claude 2, OpenAI's and Anthropic's best models until November 2023. Stellan-1 Max's early result is ahead of 2024's flagships, Claude 3 Opus, Gemini 1.5 Pro and GPT-4 Turbo, at 23.6 billion parameters: a fraction of models from 3× (Llama 3 70B) to an estimated 85× (Claude 3 Opus) its size. *Max's score is an early result from the first 30 answered problems; the full test is under way.</p>
+      <h2 id="bench-title">80.5% on HumanEval pass@1. <em>On your own computer.</em></h2>
+      <p class="lede narrow plain-only"><b>In plain words:</b> we tested the two AIs on the stick with 164 short Python programming puzzles. Lite solved 120 (73.2% pass@1); Max solved 132 (80.5% pass@1). These tests measure small coding tasks, not the ability to finish a whole project.</p>
+      <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. The chart compares pass@1 only: no best-of-100 results. Historical scores use different prompts and setups. A repository-level SWE-bench evaluation is next.</p>
       <div class="chart" role="table" aria-label="HumanEval pass@1 scores, higher is better">
-        <div class="row us prelim s867" role="row">
-          <span class="label-cell"><span role="cell" class="name">stellan-1 max · early result</span><span role="cell" class="note">23.6B · your computer · 26 of the first 30 answered problems*</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">86.7*</span></span></span>
-          <span role="cell" class="score">86.7%, preliminary: 26 of 30 answered problems</span>
-        </div>
-        <div class="row s849" role="row">
-          <span class="label-cell"><span role="cell" class="name">claude 3 opus</span><span role="cell" class="note">Anthropic's best, Mar 2024 · ~2T params (estimate)</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">84.9</span></span></span>
-          <span role="cell" class="score">84.9%</span>
-        </div>
-        <div class="row s841" role="row">
-          <span class="label-cell"><span role="cell" class="name">gemini 1.5 pro</span><span role="cell" class="note">Google, May 2024 update · size unpublished</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">84.1</span></span></span>
-          <span role="cell" class="score">84.1%</span>
-        </div>
         <div class="row s837" role="row">
-          <span class="label-cell"><span role="cell" class="name">gpt-4 turbo</span><span role="cell" class="note">OpenAI's best, Nov 2023 · ~630B params (estimate)</span></span>
+          <span class="label-cell"><span role="cell" class="name">gpt-4 turbo</span><span role="cell" class="note">gpt-4-1106-preview · Nov 2023</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">83.7</span></span></span>
-          <span role="cell" class="score">83.7%</span>
+          <span role="cell" class="score">83.7% pass@1</span>
         </div>
         <div class="row s817 minor" role="row">
           <span class="label-cell"><span role="cell" class="name">llama 3 70b</span><span role="cell" class="note">Meta, Apr 2024 · 70B, published</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">81.7</span></span></span>
-          <span role="cell" class="score">81.7%</span>
+          <span role="cell" class="score">81.7% pass@1</span>
         </div>
-        <div class="row s744 minor" role="row">
-          <span class="label-cell"><span role="cell" class="name">gemini 1.0 ultra</span><span role="cell" class="note">Google's best, Dec 2023 · ~1.5T params (estimate)</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">74.4</span></span></span>
-          <span role="cell" class="score">74.4%</span>
+        <div class="row us s805" role="row">
+          <span class="label-cell"><span role="cell" class="name">stellan-1 max</span><span role="cell" class="note">23.6B · local inference · 132 of all 164 problems</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">80.5</span></span></span>
+          <span role="cell" class="score">80.5% pass@1, 132 of 164 problems</span>
         </div>
         <div class="row us s732" role="row">
           <span class="label-cell"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="note">7.3B · your laptop</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">73.2</span></span></span>
-          <span role="cell" class="score">73.2%</span>
+          <span role="cell" class="score">73.2% pass@1</span>
         </div>
         <div class="row s712" role="row">
           <span class="label-cell"><span role="cell" class="name">claude 2</span><span role="cell" class="note">Anthropic's best, Jul–Nov 2023 · size unpublished</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">71.2</span></span></span>
-          <span role="cell" class="score">71.2%</span>
-        </div>
-        <div class="row s670" role="row">
-          <span class="label-cell"><span role="cell" class="name">gpt-4</span><span role="cell" class="note">OpenAI's best, Mar–Nov 2023 · ~1.8T params (estimate)</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">67.0</span></span></span>
-          <span role="cell" class="score">67.0%</span>
-        </div>
-        <div class="row s481 minor" role="row">
-          <span class="label-cell"><span role="cell" class="name">gpt-3.5</span><span role="cell" class="note">OpenAI, 2022</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">48.1</span></span></span>
-          <span role="cell" class="score">48.1%</span>
+          <span role="cell" class="score">71.2% pass@1</span>
         </div>
         <div class="axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
       </div>
       <div class="numbers">
-        <div><b>99.6%</b><span>smaller than GPT-4 by its estimated size, and Lite scores higher</span></div>
-        <div><b>3–85×</b><span>the size of the flagships Max's early result beats (Llama 3 70B, published, to Claude 3 Opus, estimated)</span></div>
+        <div><b>73.2%</b><span>Lite’s HumanEval pass@1: 120 of all 164 problems</span></div>
+        <div><b>80.5%</b><span>Max’s completed HumanEval pass@1 score: 132 of 164 problems</span></div>
         <div><b>~5 s</b><span>for a follow-up step, down from ~95 s, because it remembers the conversation</span></div>
         <div><b>4.1 GB</b><span>Lite's whole model. Runs on an ordinary computer with 8 GB of memory</span></div>
       </div>
       <details class="fine">
         <summary>How we measured, and the small print</summary>
         <p><b>Stellan-1 Lite:</b> all 164 HumanEval problems, pass@1, greedy decoding (temperature 0), each answer run against the official hidden tests, on a 4-core CPU with the app's own settings: 120 of 164 passed.</p>
-        <p><b>Sizes:</b> "published" means the maker stated it; "estimate" is an outside estimate the maker never confirmed; "unpublished" means there's no reliable figure, so we don't give one. The estimates vary a lot between sources, so treat them as rough: GPT-4 ~1.8T from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">2023 SemiAnalysis report</a>; GPT-4 Turbo ~630B from a knowledge-probing study (range 211B to 1.9T), Claude 3 Opus ~2T and Gemini 1.0 Ultra ~1.5T from <a href="https://lifearchitect.ai/models-table-methodology/">LifeArchitect</a>. We found no reliable estimate for Gemini 1.5 Pro or Claude 2.</p>
-        <p><b>* Stellan-1 Max (early result):</b> same test and settings on a free 4-core cloud machine. Max solved 26 of the 30 problems it answered (86.7%). The run lost the other problems to a time-out in our test script (since fixed), and the ones it did answer were mostly the shorter ones, so the full 164-problem score may well be lower. We'll replace this with the full result as soon as it's measured.</p>
-        <p><b>Other models:</b> scores as published by their makers: GPT-4 and GPT-3.5 in <a href="https://arxiv.org/abs/2303.08774">OpenAI's GPT-4 Technical Report</a> (March 2023, 0-shot), Claude 2 in <a href="https://www.anthropic.com/news/claude-2">Anthropic's Claude 2 announcement</a> (July 2023), GPT-4 Turbo (gpt-4-1106-preview) in <a href="https://github.com/openai/simple-evals">OpenAI's simple-evals</a>, Claude 3 Opus in <a href="https://www.anthropic.com/news/claude-3-family">Anthropic's Claude 3 announcement</a> (March 2024), Gemini 1.5 Pro (May 2024 version) and Gemini 1.0 Ultra in Google's <a href="https://arxiv.org/abs/2403.05530">Gemini 1.5</a> and <a href="https://arxiv.org/abs/2312.11805">Gemini 1.0</a> reports, and Llama 3 70B Instruct in <a href="https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct">Meta's model card</a> (April 2024). GPT-4 was OpenAI's top model until <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo</a> (6 November 2023); Claude 2 was Anthropic's until <a href="https://www.anthropic.com/news/claude-2-1">Claude 2.1</a> (21 November 2023). Each company used its own prompts and setup, so treat this as a guide, not a strict head-to-head.</p>
-        <p><b>Model sizes:</b> Stellan-1 Lite has 7.29 billion parameters, counted from its model file. OpenAI has never published GPT-4's size; ~1.8 trillion is the most widely cited estimate, from a <a href="https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/">July 2023 SemiAnalysis report</a>, so "99.6% smaller" (7.29B ÷ 1.8T ≈ 0.4%) rests on that estimate. Anthropic has never published Claude 2's size and there's no reliable estimate, so we don't give one.</p>
-        <p><b>To be clear:</b> newer cloud models from OpenAI and Anthropic score over 90% on this test (Anthropic reported 92.0% for Claude 3.5 Sonnet in 2024) and are far larger. stick_ai gives you 2023-flagship-level coding help, privately, offline, on your own machine. Stellan-1 Max's full score is still being measured; its early result is marked with *.</p>
+
+        <p><b>Stellan-1 Max, completed 22 November 2026:</b> 132 of 164 passed (80.5% pass@1), with all 32 failures retained. The supplied result records GPU offload, a 4-core Xeon host and 31.3 GiB RAM. Median generation speed was 32.0 tokens/s in this run; this is not a CPU or USB speed measurement. Exact GPU devices and model/runtime hashes are absent from the receipt. This replaces the partial 26/30 CPU result. <a href="https://github.com/alfredmurray-goat/stick_ai/blob/main/docs/benchmark/results/humaneval-max.json">Raw results</a>.</p>
+        <p><b>Pass@1 comparisons:</b> GPT-4 Turbo’s 83.7% comes from <a href="https://github.com/openai/simple-evals">OpenAI’s simple-evals results</a>; its <a href="https://github.com/openai/simple-evals/blob/main/humaneval_eval.py">HumanEval scorer</a> averages per-completion correctness and reports pass@k separately. Meta’s <a href="https://github.com/meta-llama/llama3/blob/main/eval_details.md#humaneval">Llama 3 evaluation details</a> explicitly specify pass@1 for its 81.7%. Anthropic’s <a href="https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf">Claude 2 model card</a>, section 4.3, labels 71.2% as Codex P@1 (0-shot), using temperature 1.</p>
+        <p><b>What pass@1 means:</b> success with one generated answer, rather than finding any successful answer among 100 tries. Our run uses one greedy answer per task. Other evaluations can estimate pass@1 by averaging independent samples; this is not best-of-100. “0-shot” means no worked examples in the prompt, not a number of attempts.</p>
+        <p><b>Limits:</b> matching pass@1 does not match prompts, sampling temperature, token budgets or test environments. These are historical reference scores, not a controlled head-to-head or a claim about today’s best models. Max is below the listed GPT-4 Turbo and Llama 3 scores. We omitted other historical rows until their exact metric is verified.</p>
       </details>
     </section>
 
@@ -308,7 +283,7 @@
       <details><summary>Why do some replies take a while?</summary><p>The app checks the model files on the first start and loads the selected model. After that, reply times depend on your processor, available memory, stick speed and the size of the task. Follow-up steps can reuse work the model has already done. Watch the progress and thinking in the conversation; you can cancel the current step without closing the app.</p></details>
       <details><summary>Can I use the same stick on different computers?</summary><p>Yes. The same stick includes apps for supported Macs, Windows PCs and Linux computers, sharing the model files on the stick. Close the app and safely eject the stick before moving it. Each computer still needs to meet the operating-system and memory requirements.</p></details>
       <details><summary>Can it change files without asking me?</summary><p>It can read and search inside your project to understand the task. Saving or editing files, running commands and calling connected tools require your approval. File changes are shown as a before-and-after comparison. Review what you allow and keep backups or version history: AI can still make mistakes.</p></details>
-      <details><summary>How should I read the benchmark scores?</summary><p>Our reported Stellan-1 Lite result is 120 out of 164 HumanEval coding problems, or 73.2%. That measures short Python functions against tests, not whether it can build an entire app or solve every task. Scores from other models may use different prompts and settings, and Max's reported result is still preliminary. <a href="https://github.com/alfredmurray-goat/stick_ai#benchmarks">Read the results and their limits</a>, and check the code Stellan proposes.</p></details>
+      <details><summary>How should I read the benchmark scores?</summary><p>Our reported Stellan-1 Lite result is 120 out of 164 HumanEval coding problems, or 73.2% pass@1. That measures short Python functions against tests, not whether it can build an entire app or solve every task. Scores from other models may use different prompts and settings, and Max scored 132 out of 164 (80.5% pass@1) in its completed run. <a href="https://github.com/alfredmurray-goat/stick_ai#benchmarks">Read the results and their limits</a>, and check the code Stellan proposes.</p></details>
       <details><summary>What if my computer blocks the app on first open?</summary><p>The current test builds are not signed with a trusted Apple or Microsoft certificate, so your computer may block them or ask for confirmation. Only open a copy from a source you trust. <a href="/start">Follow the first-open guide</a> for your computer; a security prompt alone is not proof that an app is safe.</p></details>
       <details><summary>Does it copy the AI onto my computer?</summary><p>The full model files stay on the stick. While working, the app uses your computer's memory and temporary working files, and it can write app logs. Your operating system may also keep its own caches or swap data. You don't need to install Node.js or Ollama to use the prepared stick.</p></details>
       <details><summary>Does it work with GitHub?</summary><p>Yes. In the app, open <b>Settings → GitHub</b>, click <b>Sign in with GitHub</b> and enter the short code it shows at github.com/login/device: no tokens or passwords to copy. There's no account on this website; the connection is between the app on your computer and GitHub. You choose exactly which repositories Stick AI may use. It downloads a copy to work on, and when you're happy it opens a draft pull request for you to review. It never changes your main branch, and the sign-in is kept only while the app is open, never saved to the stick.</p></details>
