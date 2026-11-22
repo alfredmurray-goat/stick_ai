@@ -17,7 +17,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)](#install)
 [![Linux x64](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#install)
 [![Runs offline](https://img.shields.io/badge/inference-100%25%20offline-2EA44F)](#privacy)
-[![HumanEval](https://img.shields.io/badge/HumanEval-Lite%2073.2%25%20%C2%B7%20Max%2086.7%25*-7C4DFF)](#benchmarks)
+[![HumanEval](https://img.shields.io/badge/HumanEval-Lite%2073.2%25%20%C2%B7%20Max%2080.5%25-7C4DFF)](#benchmarks)
 [![Desktop builds](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml/badge.svg)](https://github.com/alfredmurray-goat/stick_ai/actions/workflows/desktop.yml)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -52,31 +52,27 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 ## Benchmarks
 
-Measured with the release Lite GGUF and the app's own llama.cpp server settings, CPU only, on a 4-core cloud machine.
+Measured with the release GGUFs and the llama.cpp benchmark harness: Lite on a 4-core CPU; Max with GPU offload enabled on Kaggle (4-core Xeon host, 31.3 GiB RAM).
 
 | Benchmark | What it measures | Stellan-1 Lite | Stellan-1 Max |
 | --- | --- | --- | --- |
-| **HumanEval, all 164 problems** | Writing a Python function that passes hidden unit tests | **120 / 164 (73.2%)**, pass@1 | **86.7%\*** early result: 26 of 30 answered problems |
+| **HumanEval, all 164 problems** | Writing a Python function that passes hidden unit tests | **120 / 164 (73.2%)**, pass@1 | **132 / 164 (80.5%)**, pass@1 |
 
 - **How it was run.** One greedy attempt per problem (temperature 0), with every answer executed against HumanEval's official tests. The 95% confidence interval is about **66% to 79%**.
-- **Against the 2023 flagships.** OpenAI reported [67.0% for GPT-4](https://arxiv.org/abs/2303.08774) and Anthropic [71.2% for Claude 2](https://www.anthropic.com/news/claude-2), each with its own prompts and settings. Newer cloud models score over 90% (Anthropic reported [92.0% for Claude 3.5 Sonnet](https://www.anthropic.com/news/claude-3-5-sonnet) in 2024), and most of the newest ones no longer publish HumanEval at all.
-- **Against the 2023–2024 flagships it beats.** Scores as published by each maker (pass@1, their own prompts and settings), with sizes marked *published*, *estimate* or *unpublished*:
+- **Metric: pass@1.** Our run uses one greedy completion per problem, with no test-feedback repairs or best-of-N selection. Every comparison below has explicit pass@1 evidence in its primary evaluation documentation. “0-shot” describes prompt examples and does not establish pass@1. A pass@1 estimate averaged over independent samples is still single-sample success probability; it is not pass@100 or best-of-100.
 
-  | Model | HumanEval | Size |
+  | Model | HumanEval pass@1 | Primary metric evidence |
   | --- | --- | --- |
-  | **Stellan-1 Max** | **86.7%\*** early result | **23.6B** |
-  | Claude 3 Opus (Anthropic, Mar 2024) | [84.9%](https://www.anthropic.com/news/claude-3-family) | ~2T (estimate, [LifeArchitect](https://lifearchitect.ai/models-table-methodology/)) |
-  | Gemini 1.5 Pro (Google, May 2024 update) | [84.1%](https://arxiv.org/abs/2403.05530) | unpublished |
-  | GPT-4 Turbo (OpenAI, Nov 2023, gpt-4-1106-preview) | [83.7%](https://github.com/openai/simple-evals) | ~630B (estimate from a knowledge-probing study; range 211B to 1.9T) |
-  | Llama 3 70B Instruct (Meta, Apr 2024) | [81.7%](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct) | 70B (published) |
-  | Gemini 1.0 Ultra (Google, Dec 2023) | [74.4%](https://arxiv.org/abs/2312.11805) | ~1.5T (estimate, [LifeArchitect](https://lifearchitect.ai/models-table-methodology/)) |
-  | **Stellan-1 Lite** | **73.2%** | **7.3B** |
-  | Claude 2 (Anthropic, Jul 2023) | [71.2%](https://www.anthropic.com/news/claude-2) | unpublished |
-  | GPT-4 (OpenAI, Mar 2023) | [67.0%](https://arxiv.org/abs/2303.08774) | ~1.8T (estimate, [SemiAnalysis](https://the-decoder.com/gpt-4-architecture-datasets-costs-and-more-leaked/)) |
+  | GPT-4 Turbo (`gpt-4-1106-preview`, Nov 2023) | **83.7%** | [OpenAI results](https://github.com/openai/simple-evals#results), [scoring code](https://github.com/openai/simple-evals/blob/main/humaneval_eval.py): mean per-completion correctness, plus separate pass@k metrics |
+  | Llama 3 70B Instruct (Apr 2024) | **81.7%** | [Model card](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct), [evaluation details: HumanEval pass@1](https://github.com/meta-llama/llama3/blob/main/eval_details.md#humaneval) |
+  | **Stellan-1 Max** | **80.5% (132/164)** | One greedy attempt per problem; [raw results](docs/benchmark/results/humaneval-max.json) |
+  | **Stellan-1 Lite** | **73.2% (120/164)** | One greedy attempt per problem |
+  | Claude 2 (Jul 2023) | **71.2%** | [Anthropic model card, §4.3, p.10](https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf): “Codex P@1 (0-shot)”, temperature 1 |
 
-  Max's early result is ahead of models from 3× (Llama 3 70B) to an estimated 85× (Claude 3 Opus) its size. Size estimates vary a lot between sources; treat them as rough. With 30 problems its margin of error is wide (roughly ±12 points), so it isn't yet a claim to beat any of them; the full run will settle it.
-- **For context.** On the full set, Mistral's Codestral Mamba 7B reports [75.0%](https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1) and Qwen2.5-Coder-7B-Instruct reports [88.4%](https://arxiv.org/pdf/2409.12186). Those runs used different prompts and settings, so this isn't a strict head-to-head.
-- **\*Max, early result.** On a free 4-core cloud machine (Kaggle, 31 GB), Max solved **26 of the 30** problems it answered (86.7%). The other 119 attempted problems were lost to a 5-minute time-out in the benchmark script (Max wrote about 0.7 tokens a second on that CPU, so longer answers took over 5 minutes); that's fixed, and they're retried on the next run. The answered problems were mostly the shorter ones, so the full score may be lower. The full 164-problem run is next, on Kaggle's free GPUs.
+  These are historical independent evaluations. Matching pass@1 does not equalize prompts, temperatures, code extraction, token budgets or test environments. Max is below the listed Turbo and Llama results. Other historical rows were removed pending explicit metric verification; that does not establish that their scores used best-of-N.
+- **Max, completed run (22 November 2026).** **132/164 (80.5%)**, all task IDs present once; 32 failures retained. The supplied receipt records GPU offload (`gpuLayers: 999`), a 4-core Intel Xeon host and 31.3 GiB RAM. Median generation speed was **32.0 tokens/s** for this run; it is not a CPU or USB speed claim. The receipt does not record exact GPU devices or runtime/model hashes, so those cannot be independently reconstructed from it. [Raw results](docs/benchmark/results/humaneval-max.json). This supersedes the biased 26/30 partial CPU result. Harness failures remain failures; no score adjustment was made.
+- **Next evaluation.** [SWE-bench Verified pilot](docs/benchmark/SWE_BENCH.md): a reproducible repository-patch baseline for Lite and Max, graded separately with the official harness. No SWE-bench result is claimed yet.
+
 
 **Speed in the real app.** The same two-message task (read two files, explain them, then read a third) took **850 s before** the prompt-cache change and **421 s after**, on the same machine. Writing an answer after a file read went from 172 s to 36 s.
 

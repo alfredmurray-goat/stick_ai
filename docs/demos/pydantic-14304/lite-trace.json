@@ -1,0 +1,1295 @@
+[
+  {
+    "event": "token",
+    "id": 1183,
+    "text": " The"
+  },
+  {
+    "event": "token",
+    "id": 10847,
+    "text": " bug"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 1137,
+    "text": " that"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 1488,
+    "text": "ex"
+  },
+  {
+    "event": "token",
+    "id": 13624,
+    "text": "clude"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 6389,
+    "text": " parameter"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 2018,
+    "text": " being"
+  },
+  {
+    "event": "token",
+    "id": 5336,
+    "text": " passed"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 9530,
+    "text": "handler"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 1676,
+    "text": " function"
+  },
+  {
+    "event": "token",
+    "id": 1163,
+    "text": " with"
+  },
+  {
+    "event": "token",
+    "id": 1164,
+    "text": " an"
+  },
+  {
+    "event": "token",
+    "id": 3759,
+    "text": " index"
+  },
+  {
+    "event": "token",
+    "id": 1070,
+    "text": " of"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 29501,
+    "text": "-"
+  },
+  {
+    "event": "token",
+    "id": 29508,
+    "text": "1"
+  },
+  {
+    "event": "token",
+    "id": 10197,
+    "text": "`."
+  },
+  {
+    "event": "token",
+    "id": 1619,
+    "text": " This"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 13866,
+    "text": " causing"
+  },
+  {
+    "event": "token",
+    "id": 1032,
+    "text": " a"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 2230,
+    "text": "Value"
+  },
+  {
+    "event": "token",
+    "id": 2476,
+    "text": "Error"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 12933,
+    "text": " Neg"
+  },
+  {
+    "event": "token",
+    "id": 1965,
+    "text": "ative"
+  },
+  {
+    "event": "token",
+    "id": 18621,
+    "text": " indices"
+  },
+  {
+    "event": "token",
+    "id": 4341,
+    "text": " cannot"
+  },
+  {
+    "event": "token",
+    "id": 1115,
+    "text": " be"
+  },
+  {
+    "event": "token",
+    "id": 2075,
+    "text": " used"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 26250,
+    "text": " exclude"
+  },
+  {
+    "event": "token",
+    "id": 5675,
+    "text": " items"
+  },
+  {
+    "event": "token",
+    "id": 1124,
+    "text": " on"
+  },
+  {
+    "event": "token",
+    "id": 10982,
+    "text": " uns"
+  },
+  {
+    "event": "token",
+    "id": 2100,
+    "text": "ized"
+  },
+  {
+    "event": "token",
+    "id": 7622,
+    "text": " iter"
+  },
+  {
+    "event": "token",
+    "id": 3329,
+    "text": "ables"
+  },
+  {
+    "event": "token",
+    "id": 10197,
+    "text": "`."
+  },
+  {
+    "event": "token",
+    "id": 1183,
+    "text": " The"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 1488,
+    "text": "ex"
+  },
+  {
+    "event": "token",
+    "id": 13624,
+    "text": "clude"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 6389,
+    "text": " parameter"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 1032,
+    "text": " a"
+  },
+  {
+    "event": "token",
+    "id": 1576,
+    "text": " set"
+  },
+  {
+    "event": "token",
+    "id": 1070,
+    "text": " of"
+  },
+  {
+    "event": "token",
+    "id": 2602,
+    "text": " field"
+  },
+  {
+    "event": "token",
+    "id": 3723,
+    "text": " names"
+  },
+  {
+    "event": "token",
+    "id": 1210,
+    "text": " or"
+  },
+  {
+    "event": "token",
+    "id": 18621,
+    "text": " indices"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 26250,
+    "text": " exclude"
+  },
+  {
+    "event": "token",
+    "id": 1245,
+    "text": " from"
+  },
+  {
+    "event": "token",
+    "id": 11395,
+    "text": " serial"
+  },
+  {
+    "event": "token",
+    "id": 2605,
+    "text": "ization"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 1328,
+    "text": " In"
+  },
+  {
+    "event": "token",
+    "id": 1224,
+    "text": " this"
+  },
+  {
+    "event": "token",
+    "id": 1990,
+    "text": " case"
+  },
+  {
+    "event": "token",
+    "id": 29493,
+    "text": ","
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 1488,
+    "text": "ex"
+  },
+  {
+    "event": "token",
+    "id": 13624,
+    "text": "clude"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 1576,
+    "text": " set"
+  },
+  {
+    "event": "token",
+    "id": 6644,
+    "text": " contains"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 12352,
+    "text": " integer"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 29501,
+    "text": "-"
+  },
+  {
+    "event": "token",
+    "id": 29508,
+    "text": "1"
+  },
+  {
+    "event": "token",
+    "id": 7619,
+    "text": "`,"
+  },
+  {
+    "event": "token",
+    "id": 1458,
+    "text": " which"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 13866,
+    "text": " causing"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2886,
+    "text": " error"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 2319,
+    "text": "To"
+  },
+  {
+    "event": "token",
+    "id": 7061,
+    "text": " fix"
+  },
+  {
+    "event": "token",
+    "id": 1224,
+    "text": " this"
+  },
+  {
+    "event": "token",
+    "id": 10847,
+    "text": " bug"
+  },
+  {
+    "event": "token",
+    "id": 29493,
+    "text": ","
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 9530,
+    "text": "handler"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 1676,
+    "text": " function"
+  },
+  {
+    "event": "token",
+    "id": 1791,
+    "text": " should"
+  },
+  {
+    "event": "token",
+    "id": 1115,
+    "text": " be"
+  },
+  {
+    "event": "token",
+    "id": 12220,
+    "text": " modified"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 5037,
+    "text": " handle"
+  },
+  {
+    "event": "token",
+    "id": 7855,
+    "text": " negative"
+  },
+  {
+    "event": "token",
+    "id": 18621,
+    "text": " indices"
+  },
+  {
+    "event": "token",
+    "id": 14522,
+    "text": " grace"
+  },
+  {
+    "event": "token",
+    "id": 3839,
+    "text": "fully"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 3155,
+    "text": " One"
+  },
+  {
+    "event": "token",
+    "id": 3340,
+    "text": " possible"
+  },
+  {
+    "event": "token",
+    "id": 5933,
+    "text": " solution"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 10071,
+    "text": " ignore"
+  },
+  {
+    "event": "token",
+    "id": 1475,
+    "text": " any"
+  },
+  {
+    "event": "token",
+    "id": 7855,
+    "text": " negative"
+  },
+  {
+    "event": "token",
+    "id": 18621,
+    "text": " indices"
+  },
+  {
+    "event": "token",
+    "id": 1072,
+    "text": " and"
+  },
+  {
+    "event": "token",
+    "id": 4456,
+    "text": " continue"
+  },
+  {
+    "event": "token",
+    "id": 10225,
+    "text": " processing"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 9177,
+    "text": " remaining"
+  },
+  {
+    "event": "token",
+    "id": 5675,
+    "text": " items"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 7648,
+    "text": " Another"
+  },
+  {
+    "event": "token",
+    "id": 5933,
+    "text": " solution"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 1066,
+    "text": " to"
+  },
+  {
+    "event": "token",
+    "id": 8002,
+    "text": " raise"
+  },
+  {
+    "event": "token",
+    "id": 1032,
+    "text": " a"
+  },
+  {
+    "event": "token",
+    "id": 3228,
+    "text": " custom"
+  },
+  {
+    "event": "token",
+    "id": 2886,
+    "text": " error"
+  },
+  {
+    "event": "token",
+    "id": 3696,
+    "text": " message"
+  },
+  {
+    "event": "token",
+    "id": 18656,
+    "text": " indicating"
+  },
+  {
+    "event": "token",
+    "id": 1137,
+    "text": " that"
+  },
+  {
+    "event": "token",
+    "id": 7855,
+    "text": " negative"
+  },
+  {
+    "event": "token",
+    "id": 18621,
+    "text": " indices"
+  },
+  {
+    "event": "token",
+    "id": 1228,
+    "text": " are"
+  },
+  {
+    "event": "token",
+    "id": 1227,
+    "text": " not"
+  },
+  {
+    "event": "token",
+    "id": 5438,
+    "text": " allowed"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 16191,
+    "text": "Here"
+  },
+  {
+    "event": "token",
+    "id": 1117,
+    "text": " is"
+  },
+  {
+    "event": "token",
+    "id": 1164,
+    "text": " an"
+  },
+  {
+    "event": "token",
+    "id": 3525,
+    "text": " example"
+  },
+  {
+    "event": "token",
+    "id": 1070,
+    "text": " of"
+  },
+  {
+    "event": "token",
+    "id": 1678,
+    "text": " how"
+  },
+  {
+    "event": "token",
+    "id": 1040,
+    "text": " the"
+  },
+  {
+    "event": "token",
+    "id": 2320,
+    "text": " `"
+  },
+  {
+    "event": "token",
+    "id": 9530,
+    "text": "handler"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 1676,
+    "text": " function"
+  },
+  {
+    "event": "token",
+    "id": 1597,
+    "text": " could"
+  },
+  {
+    "event": "token",
+    "id": 1115,
+    "text": " be"
+  },
+  {
+    "event": "token",
+    "id": 12220,
+    "text": " modified"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 14708,
+    "text": "``"
+  },
+  {
+    "event": "token",
+    "id": 29600,
+    "text": "`"
+  },
+  {
+    "event": "token",
+    "id": 18435,
+    "text": "python"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 2038,
+    "text": "def"
+  },
+  {
+    "event": "token",
+    "id": 1969,
+    "text": " ser"
+  },
+  {
+    "event": "token",
+    "id": 5216,
+    "text": "ialize"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 17473,
+    "text": "sequence"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 16596,
+    "text": "via"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 2471,
+    "text": "list"
+  },
+  {
+    "event": "token",
+    "id": 29500,
+    "text": "("
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 3055,
+    "text": "   "
+  },
+  {
+    "event": "token",
+    "id": 1131,
+    "text": " v"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 5690,
+    "text": " Any"
+  },
+  {
+    "event": "token",
+    "id": 29493,
+    "text": ","
+  },
+  {
+    "event": "token",
+    "id": 10462,
+    "text": " handler"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 7189,
+    "text": " core"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 11026,
+    "text": "schema"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 21190,
+    "text": "Serializer"
+  },
+  {
+    "event": "token",
+    "id": 5669,
+    "text": "Function"
+  },
+  {
+    "event": "token",
+    "id": 20972,
+    "text": "Wrap"
+  },
+  {
+    "event": "token",
+    "id": 4957,
+    "text": "Handler"
+  },
+  {
+    "event": "token",
+    "id": 29493,
+    "text": ","
+  },
+  {
+    "event": "token",
+    "id": 5699,
+    "text": " info"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 7189,
+    "text": " core"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 11026,
+    "text": "schema"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 21814,
+    "text": "Serialization"
+  },
+  {
+    "event": "token",
+    "id": 2663,
+    "text": "Info"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 29499,
+    "text": ")"
+  },
+  {
+    "event": "token",
+    "id": 3961,
+    "text": " ->"
+  },
+  {
+    "event": "token",
+    "id": 5690,
+    "text": " Any"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 3055,
+    "text": "   "
+  },
+  {
+    "event": "token",
+    "id": 5675,
+    "text": " items"
+  },
+  {
+    "event": "token",
+    "id": 29515,
+    "text": ":"
+  },
+  {
+    "event": "token",
+    "id": 2042,
+    "text": " list"
+  },
+  {
+    "event": "token",
+    "id": 29560,
+    "text": "["
+  },
+  {
+    "event": "token",
+    "id": 10421,
+    "text": "Any"
+  },
+  {
+    "event": "token",
+    "id": 29561,
+    "text": "]"
+  },
+  {
+    "event": "token",
+    "id": 1095,
+    "text": " ="
+  },
+  {
+    "event": "token",
+    "id": 4748,
+    "text": " []"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 3055,
+    "text": "   "
+  },
+  {
+    "event": "token",
+    "id": 1960,
+    "text": " value"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 1891,
+    "text": "type"
+  },
+  {
+    "event": "token",
+    "id": 1095,
+    "text": " ="
+  },
+  {
+    "event": "token",
+    "id": 1980,
+    "text": " type"
+  },
+  {
+    "event": "token",
+    "id": 29500,
+    "text": "("
+  },
+  {
+    "event": "token",
+    "id": 29496,
+    "text": "v"
+  },
+  {
+    "event": "token",
+    "id": 29499,
+    "text": ")"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "token",
+    "id": 3055,
+    "text": "   "
+  },
+  {
+    "event": "token",
+    "id": 25826,
+    "text": " mapped"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 15419,
+    "text": "origin"
+  },
+  {
+    "event": "token",
+    "id": 1095,
+    "text": " ="
+  },
+  {
+    "event": "token",
+    "id": 1086,
+    "text": " S"
+  },
+  {
+    "event": "token",
+    "id": 6460,
+    "text": "EQ"
+  },
+  {
+    "event": "token",
+    "id": 29547,
+    "text": "U"
+  },
+  {
+    "event": "token",
+    "id": 16451,
+    "text": "ENCE"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 1785,
+    "text": "OR"
+  },
+  {
+    "event": "token",
+    "id": 2921,
+    "text": "IG"
+  },
+  {
+    "event": "token",
+    "id": 1543,
+    "text": "IN"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 11767,
+    "text": "MAP"
+  },
+  {
+    "event": "token",
+    "id": 29491,
+    "text": "."
+  },
+  {
+    "event": "token",
+    "id": 1295,
+    "text": "get"
+  },
+  {
+    "event": "token",
+    "id": 29500,
+    "text": "("
+  },
+  {
+    "event": "token",
+    "id": 2199,
+    "text": "value"
+  },
+  {
+    "event": "token",
+    "id": 29498,
+    "text": "_"
+  },
+  {
+    "event": "token",
+    "id": 1891,
+    "text": "type"
+  },
+  {
+    "event": "token",
+    "id": 29499,
+    "text": ")"
+  },
+  {
+    "event": "token",
+    "id": 781,
+    "text": "\n"
+  },
+  {
+    "event": "finished",
+    "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+    "verify_ms": 21201.6,
+    "prompt_ms": 91810.8,
+    "first_token_ms": 91810.9,
+    "decode_ms": 35127.7,
+    "generated": 256,
+    "state_bytes": 276299776,
+    "threads": 2,
+    "cpu_ms": 228179,
+    "peak_rss_bytes": 4446875648
+  }
+]

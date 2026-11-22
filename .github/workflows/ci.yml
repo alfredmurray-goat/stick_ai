@@ -22,6 +22,9 @@ jobs:
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - name: SWE benchmark runner checks
+        if: runner.os == 'Linux'
+        run: python3 tests/benchmark-swe.test.py
       - run: npm run build
       - run: node scripts/dry-run-stick.ts
       - run: node scripts/dry-run-desktop.ts

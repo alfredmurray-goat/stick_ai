@@ -4,7 +4,13 @@
 
 See the README. Run with `scripts/benchmark-humaneval.mjs` (all 164 problems, pass@1, greedy, each answer executed against the official tests) and the app's own llama.cpp settings.
 
-## Max: HumanEval on a rented 32 GB machine
+## Max: completed HumanEval
+
+The owner supplied the complete result on 22 November 2026: **132/164 (80.5%)**. [Raw receipt](benchmark/results/humaneval-max.json). All 164 unique task IDs are present, including failures. The receipt records GPU offload, 31.3 GiB RAM, four Xeon CPU cores, 8.075 s loading and a 32.0 tokens/s median generation speed. Exact GPU devices, binary/model hashes and per-task generated answers were not recorded; do not invent them. This supersedes the partial 26/30 CPU result.
+
+For repository-level evaluation, see [SWE-bench Verified](benchmark/SWE_BENCH.md).
+
+## Reproducing Max HumanEval
 
 Max (14.3 GB) can't run on GitHub's free runners (16 GB): it keeps re-reading itself from disk. The **Max benchmark** workflow (`.github/workflows/max-benchmark.yml`) runs the same script on a machine you rent for a few hours, which joins GitHub as a one-job ("ephemeral") self-hosted runner with the `max-bench` label and deletes itself when done.
 
