@@ -59,3 +59,29 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 - **Pinned versions:** llama.cpp `cd959bae99ff4bed22bef2604f45241c09bbb8c8` (`llamaRelease` v0.9.0), Node.js 24.22.1, Lite GGUF sha256 `84328c45…`, Max GGUF sha256 `05f00035…` (see `src/portable/max-release.ts`).
 - **Lite server settings** (`modelRuntimeArgs` in `src/portable/engine.ts`): one slot, 512/256 batches, prompt cache on, one context checkpoint, no cross-conversation RAM cache. Peak memory on the release Lite is about 4.5 GB.
 - **Where model files are found:** a linked file in `logs/lite-model.json` or `logs/max-model.json` wins over a bundled file in `models/`.
+
+## Deferred model training and runtime research (22 November 2026)
+
+Requested by the owner: revisit reinforcement learning for **both Stellan-1 Lite and Stellan-1 Max later**. This is a saved direction, not approval to start training, rent hardware, spend money or change the shipped models.
+
+### Reinforcement learning: later
+
+- Finish and retain the current benchmarks first. Keep evaluation problems separate from training data and compare each candidate with its unchanged Stellan baseline.
+- Lite remains the orchestrator. Reward successful task completion, correct tool selection and arguments, valid `<tool_call>` / `<done>` formatting, useful delegation, recovery from tool errors and respecting approval boundaries.
+- Max remains the coding specialist. Reward code that passes independent tests, follows the request and produces correct, appropriately scoped changes. It does not gain direct tools or control of the agent loop.
+- Use sandboxed, resource-limited code execution for training rewards, with no network and no access to private projects or credentials. Guard against reward hacking and leaked evaluation answers.
+- Recover and preserve each original training checkpoint, tokenizer, configuration and any LoRA adapter before designing the training run. Prefer those over the distributed Q4 GGUFs. Confirm Lite's base-model provenance and chat template.
+- Select the training framework separately for Mamba2 Lite and Devstral/Mistral-derived Max. Tunix is a possible research option, but neither architecture is currently listed as a ready-made supported family; do not assume compatibility or migrate the models without a validated pilot.
+- Begin with a small controlled experiment, then check coding quality, agent reliability, response length, latency, memory use and regressions after export to the actual shipped runtime. Reinforcement learning does not itself guarantee faster inference.
+- Review the training-data licences and provider terms before using new examples. Preserve the project's MIT code licence and existing model attributions.
+
+### Runtime speed: research before committing to a fork
+
+The owner asked whether our own Ollama or llama.cpp could make Stellan faster. The app already bundles a pinned, patched llama.cpp, so a specialised Stick AI distribution is feasible without replacing the inference engine from scratch. No runtime rewrite or fork implementation was requested yet.
+
+- Profile the exact Lite and Max GGUFs on real Intel Mac, Apple Silicon, Windows and Linux hardware. Separate model load, prompt processing, first-token latency, generation, model switching and peak RAM/VRAM; include cold USB starts and warm runs.
+- First validate existing acceleration, architecture-specific kernels, thread/batch settings, stable prompt caching and smaller relevant context. Preserve the split-model patch, integrity checks, cancellation and localhost-only model serving.
+- Treat Lite's Mamba2 and Max's transformer architecture separately. Do not assume transformer-only optimisations or Lite-as-draft speculative decoding will work between these models.
+- Max's measured disk thrashing on a 16 GB machine is a model-fit limit: changing wrappers or rebranding llama.cpp will not make the weights fit. Smaller quantisation/model variants require quality and compatibility evaluation.
+- Prefer a small reproducible patch set on a pinned upstream commit, with benchmark evidence and retained licence notices. Only maintain a long-lived fork or write new kernels if profiling identifies a worthwhile bottleneck.
+- No promised speed multiplier until measured on representative hardware.
