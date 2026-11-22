@@ -1,4 +1,6 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, mkdtemp, rm, appendFile } from 'node:fs/promises';
@@ -20,6 +22,9 @@ async function fixture(architecture = 'mamba2') {
   return { root, model, executable, executableSha256: hash(await readFile(executable)), sha256: hash(await readFile(model)), threads: 2, context: 128 };
 }
 const enabled = Boolean(executable && python);
+// Numerical fixture models are tiny; RAM-policy boundaries are tested separately.
+mock.method(os, 'totalmem', () => 32 * 1024 ** 3);
+syncBuiltinESMExports();
 
 test('persistent bridge matches fresh requests and reuses prefixes for both architectures', { skip: !enabled }, async () => {
   for (const architecture of ['mamba2', 'llama']) {
@@ -72,9 +77,16 @@ test('idle sessions release their owned process and tampered models are refused'
     assert.equal(session.active, false);
     await session.close();
     session = await openNativeSession(options);
-    await appendFile(options.model, 'tampered');
-    await assert.rejects(session.generate('A', { maxTokens: 1 }), /response|changed/);
-    await session.close(); session = undefined;
+    if (process.platform === 'win32') {
+      // The Windows read mapping denies writes while the model is in use.
+      await assert.rejects(appendFile(options.model, 'tampered'), /EBUSY|EACCES|EPERM/);
+      await session.close(); session = undefined;
+      await appendFile(options.model, 'tampered');
+    } else {
+      await appendFile(options.model, 'tampered');
+      await assert.rejects(session.generate('A', { maxTokens: 1 }), /response|changed/);
+      await session.close(); session = undefined;
+    }
     await assert.rejects(openNativeSession(options), /hash mismatch/);
   } finally { await session?.close(); await rm(options.root, { recursive: true, force: true }); }
 });
