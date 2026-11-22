@@ -1,67 +1,88 @@
 # Stellan Runtime
 
-An independent inference-engine experiment for Stellan, written by localilabs in C++20 under the repository's MIT licence. This code does not link, launch or depend on llama.cpp, ggml, Ollama or a model framework. It reads the published GGUF format and implements its own numerical routines. No third-party implementation code or new package dependencies are included.
+An independent C++20 inference-engine experiment by localilabs, under the repository's MIT licence. The engine does not link or launch llama.cpp, ggml or Ollama. Its optional Node.js bridge uses only built-in modules from the app's existing Node runtime. No new npm dependencies or third-party implementation code are included.
 
-This lives on `experimental/stellan-runtime`. The working desktop app, packaging, model security and existing inference engine are unchanged. This is a developer prototype, not a replacement engine that can run the assistant yet. It is not shipped in desktop releases. There is no speedup claim.
+Work stays on `experimental/stellan-runtime`. The production app still uses its existing engine. This prototype is **not a drop-in desktop replacement**, has no production HTTP server or GPU backend yet, and must not be advertised as faster or more secure than the existing engine.
 
-## First milestone
+## What works and what has been checked
 
-- Read-only memory mapping using POSIX mmap or Windows file mapping, without expanding all weights into RAM.
-- Little-endian GGUF v2/v3 parsing, bounded metadata, overflow checks, alignment and tensor-range validation, duplicate and overlap rejection.
-- Single-thread matrix-vector kernels for F32, F16, Q8_0 and Q4_K. Q4_K scales, minima and packed weights are consumed directly; the kernel does not allocate an expanded floating-point matrix.
-- A grouped Mamba2 recurrent-state primitive, independently tested against the sequence's explicit closed-form sum, with an in-memory state-copy/resume check.
-- Developer commands to inspect a GGUF and benchmark an individual matrix with machine-readable timings and an output checksum.
-- Native numeric and malformed-file tests, with a separate CI matrix for Apple Silicon Mac, Intel Mac, Windows x64 and Linux x64, plus Linux sanitizers.
+| Component | Implemented | Verification |
+| --- | --- | --- |
+| GGUF | Read-only POSIX/Windows mapping; v2/v3; bounded metadata, UTF-8, dimensions, offsets and overlap checks | Truncation, corruption, seeded mutation and overflow fixtures |
+| Quantized math | F32/F16/Q8_0/Q4_K/Q6_K; packed weights remain packed | Independent packed-format references; scalar and vector paths |
+| Acceleration | AVX2/FMA/F16C on capable x64 CPUs; NEON on ARM64; persistent CPU workers | Linux numerical tests; cross-platform compilation and fixture CI |
+| Activation quantization | Per-256-value signed 8-bit inputs, shared across matrix rows, with cached group sums | Compared against the represented floating-point inputs; end-to-end quality still needs broad evaluation |
+| Lite | Embeddings, complete Mamba2 blocks, convolution, recurrent state, gating, group RMS normalization, output projection and greedy decoding | Real pinned Lite GGUF generated a Python add function; independent full-layer numerical fixtures |
+| Max | Separate transformer path: grouped-query attention, RoPE, SwiGLU, residuals, FP16 KV cache and greedy decoding | Independent numerical fixtures through multiple positions and layers; full Max weights have not been run here |
+| Tokenizers | SentencePiece BPE for Lite; Unicode-aware Tekken byte BPE for Max | Max matched eight local Hugging Face tokenizers reference cases including code, Danish, Chinese and emoji; synthetic regression tests |
+| Integrity | Trusted executable hash checked by the bridge; trusted model SHA256 required before native inference | Tampered executable/model rejection; NIST vectors and Python hashlib comparisons at padding boundaries |
+| RAM lock | Lite available at 8 GB; Max blocked below 16 GB with explicit force override and warning | 8 GB, 15.9 GB and 16 GB plan tests; native guard for large model files |
 
-Q4_K_M is a mixed-tensor model preset, not a single tensor encoding. Such files also contain other storage types, including Q6_K. Inspection understands F32, F16, BF16, Q4_0, Q4_1, Q5_0, Q5_1, Q8_0 and Q2_K through Q6_K tensor sizes; computation currently supports only the four formats listed above. Unknown types and unsupported kernels fail explicitly. This is not full Q4_K_M inference support.
+The real Lite has 64 Mamba2 layers, embedding width 4096, inner width 8192, 128 heads, 8 groups and state width 128. Its official file is 4,147,481,440 bytes, SHA256 `84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e`.
 
-The Mamba2 primitive accepts already transformed per-head time steps and negative decay values, grouped B/C coefficients, a per-head skip parameter and caller-owned recurrent state. It implements one recurrent update, not the complete model layer. Projections, convolution, time-step bias/softplus, gating and normalisation remain to be integrated and checked against the exact Lite checkpoint.
+The audited Max header describes 40 transformer layers, embedding width 5120, 32 query heads, 8 KV heads, head width 128, FFN width 32768 and a 131072-entry Tekken vocabulary. The official Max file is 14,333,915,200 bytes, SHA256 `05f00035de8a3893601cec2644f921be240938aab4ff4736ed2f1b6dbcda8dc1`. Header inspection and fixture execution are not proof that the full checkpoint works.
+
+Q4_K_M is a mixture of tensor formats; both Q4_K and Q6_K computation are required. Other formats may be inspected but are refused for execution. Encrypted/split release models, production activation and signatures are not integrated into this engine yet. Use complete plain GGUFs only for these development tests. Never commit weights or keys.
 
 ## Build and test
 
-Use a 64-bit C++20 compiler, CMake 3.20 or later and Python 3.10 or later for tests. These are developer tools, not new end-user requirements.
+Use a 64-bit C++20 compiler, CMake 3.20 or later, Python 3.10 or later for tests, and the repository's Node.js 24.22.1. These are developer tools; consumer app installation requirements have not changed.
 
 ```sh
 cmake -S experimental/stellan-runtime -B experimental/stellan-runtime/build -DCMAKE_BUILD_TYPE=Release
 cmake --build experimental/stellan-runtime/build --config Release --parallel 2
 ctest --test-dir experimental/stellan-runtime/build -C Release --output-on-failure
+node --test experimental/stellan-runtime/tests/node-checks.mjs
 ```
 
-For a Linux/macOS machine without CMake:
+The executable is `build/stellan-runtime` on Linux/macOS and `build/Release/stellan-runtime.exe` with Visual Studio, relative to this directory. The separate workflow tests Apple Silicon Mac, Intel Mac, Windows x64, Ubuntu, and Linux address/undefined-behaviour sanitizers. CI fixtures do not establish physical-device performance or GPU support.
 
-```sh
-c++ -std=c++20 -O3 -Wall -Wextra -Wpedantic -Werror experimental/stellan-runtime/src/runtime.cpp experimental/stellan-runtime/src/main.cpp -o /tmp/stellan-runtime
-c++ -std=c++20 -O3 -Wall -Wextra -Wpedantic -Werror -I experimental/stellan-runtime/src experimental/stellan-runtime/src/runtime.cpp experimental/stellan-runtime/tests/core.cpp -o /tmp/stellan-runtime-tests
-/tmp/stellan-runtime-tests
-python3 experimental/stellan-runtime/tests/gguf.py /tmp/stellan-runtime
-```
+`STELLAN_RUNTIME_SCALAR=1` disables vector kernels for comparison. `STELLAN_RUNTIME_PRECISE=1` uses floating-point activations instead of the fast quantized input path; weight files are unchanged in either mode. Quantization can change logits and generated text. Every speed result must name the mode and include quality evaluation.
 
-The CMake executable is `experimental/stellan-runtime/build/stellan-runtime` on Linux/macOS or `experimental/stellan-runtime/build/Release/stellan-runtime.exe` with Visual Studio. For example, on Linux/macOS:
+## Developer commands
 
 ```sh
 experimental/stellan-runtime/build/stellan-runtime inspect /path/to/model.gguf
-experimental/stellan-runtime/build/stellan-runtime tensorbench /path/to/model.gguf blk.0.ffn_down.weight 10
+experimental/stellan-runtime/build/stellan-runtime hash /path/to/model.gguf
+experimental/stellan-runtime/build/stellan-runtime tensorbench /path/to/model.gguf blk.0.ssm_in.weight 10
 ```
 
-Select an actual two-dimensional tensor name from `inspect`. Repetitions range from 1 to 100. The benchmark limits a tensor to 256 MiB and each dimension to 1,048,576. It reports mapping/header time, the first matrix-vector call, warm median matrix-vector time, bytes processed and checksum. The activation vector is deterministic: `((i % 17) - 8) / 8`. SIGINT stops between calls; an individual kernel call finishes first. This developer interface may show diagnostic details; it is not a consumer UI.
+Inspection prints architecture and tensor layouts, not vocabulary or file contents. Tensor benchmarks measure a single matrix with deterministic inputs, not assistant speed. The `generation_supported: false` inspection field remains conservative: the engine has not passed production qualification.
 
-An inspected file must be a complete, plain GGUF. Encrypted first splits from sold sticks and split-model resolution are not implemented. This utility does not decrypt models, fetch weights, contact a server or change files. Model files must not be edited or truncated while mapped. No tokenizer vocabulary or file contents are printed; `inspect` does print architecture and tensor names and dimensions. Hash/integrity verification remains mandatory before any eventual production integration; this standalone parser is not an integrity verifier.
+For actual text generation, use the Node bridge with trusted hashes from your own build/verified release inputs:
 
-## Next milestones
+```sh
+node experimental/stellan-runtime/run.mjs \
+  --engine experimental/stellan-runtime/build/stellan-runtime \
+  --engine-sha256 TRUSTED_EXECUTABLE_SHA256 \
+  --model /path/to/stellan-1-lite-q4_k_m.gguf \
+  --sha256 84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e \
+  --prompt '<s>[INST] Write a Python function add(a, b). [/INST]' \
+  --tokens 64 --threads 2 --context 8192
+```
 
-1. Audit the exact Lite tensor names, shapes, quantization mixture, tokenizer and training template. Implement remaining needed storage kernels, starting with Q6_K, with independent reference comparisons.
-2. Add tokenization, embeddings, complete Mamba2 layers, normalisation, sampling and cached sequential state. Compare intermediate layers, logits and greedy output to the same plain GGUF in the pinned existing engine. Generate a real Lite response before treating this as model support.
-3. Add a persistent worker pool and architecture-specific vector kernels. Profile first; validate scalar/vector agreement and test on real hardware. Investigate chunked Mamba2 prompt processing separately from single-token recurrence.
-4. Implement Max's transformer path only after Lite parity: attention, RoPE, KV caching and all required storage kernels. Validate Lite and Max independently; do not assume either can act as the other's speculative draft.
-5. Add a localhost-only streaming server, cancellation, request admission, memory budgeting and progress reporting. Keep the existing model-integrity, activation, split-model and approval boundaries when wiring it to the app behind an opt-in switch.
-6. Compare full end-to-end tasks against the pinned bundled llama.cpp on the same hardware, weights, context, output length and CPU/GPU settings. Record cold USB load, time to first token, prompt throughput, decode throughput, peak RAM/VRAM, swap time and code correctness. A tensor microbenchmark is not an assistant-speed result.
+For Max, change the model file and trusted model hash to the Max values above. The bridge chooses its Tekken tokenizer and the native transformer executor. Under 16 GiB, `--force-max` is required and prints a warning. It does not make the weights fit in memory. The bridge preserves incomplete UTF-8 token fragments with a streaming decoder, sends token IDs over a pipe and never sends prompts to a network service.
 
-The priority is an accurate Lite engine with measurable bottlenecks, then speed. A fresh engine does not remove the memory needed to hold Max's weights; smaller models or quantization need their own quality checks. Reinforcement learning for both models is deferred separately in [HANDOVER.md](../../HANDOVER.md).
+The native diagnostic commands are `generate MODEL SHA256 PROMPT [TOKENS] [THREADS] [CONTEXT]` for Lite, or `decode MODEL SHA256 COMMA_SEPARATED_IDS [TOKENS] [THREADS] [CONTEXT]` for either architecture. `-` reads IDs from stdin, avoiding Windows command-line length limits. Native Max raw-text tokenization is deliberately refused; use the bridge's Tekken tokenizer. The CLI writes newline-delimited JSON progress, tokens and timings. `hash` supports nonempty files; empty-input hashing is covered in core tests.
 
-## Format and mathematical references
+Max's default KV context is 8192, configurable downwards in the bridge. Its FP16 cache uses about 1.25 GiB at that setting, in addition to weights and working memory. Lite's recurrent state/history is 276,299,776 bytes, independent of prompt length. Context and allocation budgets fail explicitly. Models must not be modified or truncated while mapped.
 
-- [GGUF specification](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md).
-- [GGML quantization storage definitions](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h), used to understand file layout, not copied as implementation code.
-- [Mamba-2 paper](https://arxiv.org/abs/2405.21060) and [authors' model description](https://github.com/state-spaces/mamba).
+Each bridge request currently starts a new native process and re-verifies the model. The native state and workers remain alive within that request, not between tool calls. This startup cost is a known blocker for app integration. SIGINT/SIGTERM cancel generation; the bridge terminates an unresponsive child after two seconds. A child is never started with a shell. This developer interface can show diagnostics; it is not the consumer UI.
 
-These references describe interoperability and mathematics. This experiment has no linked third-party libraries; the repository's MIT licence and third-party notices remain unchanged.
+## Evidence and replacement gate
+
+See [EVIDENCE.md](EVIDENCE.md) for the actual Linux probes, their limitations and remaining work. No measured Max speed, physical Mac/Windows speed, lower host load, or general superiority is claimed.
+
+`node experimental/stellan-runtime/promotion.mjs REPORT.json` rejects missing platform/model evidence, mismatched settings, regressions and unvalidated security/packaging checks. Reports need at least five paired repetitions, twenty completed agent tasks, the same verified weights/prompts/context/sampling/hardware, the actual shipped baseline configuration, and evidence links. Median first-token latency and CPU time/peak resident memory must improve by at least 5%, generation throughput by at least 5%, without a cold-start regression.
+
+This is a structural eligibility check, not independent proof of the assertions in a report, a security audit or an automatic merger. Inspect the raw results and exact candidate commit. A short CPU probe, a CI virtual machine, disabling the baseline's normal GPU acceleration, or a smaller context cannot establish that the app is better. Main must keep its existing engine until all conditions are met for both models.
+
+The next priorities are persistent model processes and stable prompt caching, batched prompt processing, faster integrity verification using the existing trusted app pipeline, complete checkpoint/agent validation for Max on sufficient RAM, physical-device profiling, GPU execution, encrypted/split model support, secure streaming serving and desktop integration. Keep approvals and all privacy/integrity/activation checks when integrating. The deferred reinforcement learning and unnamed open-source demonstration plan are in [HANDOVER.md](../../HANDOVER.md).
+
+## References
+
+The implementation uses the published [GGUF format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md), [quantization storage layouts](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h), [Mamba-2 mathematics](https://arxiv.org/abs/2405.21060), standard transformer operations and SHA256. These are interoperability/mathematical references, not copied runtime implementations. Optional local comparisons against existing engines or Hugging Face tokenizers do not add those libraries to this runtime or its shipped dependencies. The repository's MIT licence and existing third-party notices remain applicable.
+
+## Verification startup improvement
+
+The portable SHA-256 path checks every byte as before, with less per-block overhead and no new dependencies. On this development host, alternating full-Lite verification runs measured median **19.05 s → 12.12 s**. This improves model verification only; it does not establish faster generation or superiority to llama.cpp. See [the measurement and limitations](EVIDENCE.md#verification-optimization-22-november-2026) and [raw timings](evidence/verification-probe.json).

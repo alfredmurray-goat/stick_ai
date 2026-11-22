@@ -1,0 +1,47 @@
+{
+  "purpose": "development CPU SHA-256 verification only; not inference or production qualification",
+  "modelBytes": 4147481440,
+  "expectedModelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "compiler": "GCC 14.2 Release -O3",
+  "smallProbeBytes": 33554432,
+  "smallProbeTrials": [
+    {
+      "old": 0.14836894599920925,
+      "new": 0.10062923799978307
+    },
+    {
+      "new": 0.10691245399993932,
+      "old": 0.14839229799963505
+    },
+    {
+      "old": 0.14515837100043427,
+      "new": 0.10716714600039268
+    },
+    {
+      "new": 0.10567296699991857,
+      "old": 0.15750408900021284
+    },
+    {
+      "old": 0.15281311300077505,
+      "new": 0.10298121199957677
+    }
+  ],
+  "binaries": {
+    "before": "220fb88fb356c12a2fe96a6f70f3748efcf419533c084575746ec5170a28cb12",
+    "after": "f08e2cfe6cbdb4f4e0ad44b67965d7f3601b8d7f9fd92883f935460a32f576f4"
+  },
+  "fullModelTrials": [
+    {
+      "before": 20.10555701300018,
+      "after": 12.146205688999544
+    },
+    {
+      "after": 12.087226915999963,
+      "before": 18.001313643000685
+    }
+  ],
+  "beforeMedianSeconds": 19.053435328000432,
+  "afterMedianSeconds": 12.116716302499754,
+  "reductionPercent": 36.40665793903663
+}

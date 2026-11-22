@@ -9,3 +9,4 @@ src-tauri/gen/
 
 release-assets/
 experimental/stellan-runtime/build/
+experimental/stellan-runtime/tests/__pycache__/

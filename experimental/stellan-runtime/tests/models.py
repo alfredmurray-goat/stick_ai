@@ -1,0 +1,189 @@
+import hashlib
+import json
+import math
+import random
+import struct
+import subprocess
+import unittest
+
+import gguf as fixtures
+
+EXECUTABLE = fixtures.EXECUTABLE
+model = fixtures.model
+string = fixtures.string
+
+
+def vector(values):
+    return list(struct.unpack("<" + "f" * len(values), struct.pack("<" + "f" * len(values), *values)))
+
+
+def dense(weights, values):
+    return [sum(a * b for a, b in zip(row, values)) for row in weights]
+
+
+def norm(values, weights):
+    scale = 1 / math.sqrt(sum(x * x for x in values) / len(values) + 1e-5)
+    return [x * scale * w for x, w in zip(values, weights)]
+
+
+def silu(x):
+    return x / (1 + math.exp(-x))
+
+
+class Fixture:
+    def __init__(self, architecture):
+        self.random = random.Random(8234)
+        self.weights = {}
+        self.tensors = []
+        self.architecture = architecture
+        tokens = ["<unk>", "<s>", "</s>"] + [f"<0x{i:02X}>" for i in range(256)]
+        self.metadata = [
+            ("general.architecture", 8, string(architecture)),
+            ("tokenizer.ggml.model", 8, string("llama")),
+            ("tokenizer.ggml.bos_token_id", 4, struct.pack("<I", 1)),
+            ("tokenizer.ggml.eos_token_id", 4, struct.pack("<I", 2)),
+            ("tokenizer.ggml.tokens", 9, struct.pack("<IQ", 8, len(tokens)) + b"".join(string(t) for t in tokens)),
+            ("tokenizer.ggml.scores", 9, struct.pack("<IQ", 6, len(tokens)) + struct.pack("<" + "f" * len(tokens), *([0] * len(tokens)))),
+            ("tokenizer.ggml.token_type", 9, struct.pack("<IQ", 5, len(tokens)) + struct.pack("<" + "i" * len(tokens), *([2, 3, 3] + [6] * 256)))
+        ]
+        config = {"embedding_length": 4, "block_count": 2, "attention.layer_norm_rms_epsilon": 1e-5}
+        if architecture == "mamba2":
+            config.update({"ssm.inner_size": 8, "ssm.state_size": 2, "ssm.time_step_rank": 2, "ssm.group_count": 1, "ssm.conv_kernel": 4})
+        else:
+            config.update({"attention.head_count": 2, "attention.head_count_kv": 1, "attention.key_length": 2, "attention.value_length": 2, "feed_forward_length": 6, "rope.dimension_count": 2, "rope.freq_base": 10000.0})
+        for key, value in config.items():
+            self.metadata.append((architecture + "." + key, 6 if isinstance(value, float) else 4, struct.pack("<f" if isinstance(value, float) else "<I", value)))
+        self.add("token_embd.weight", [4, 259])
+        self.add("output.weight", [4, 259])
+        self.add("output_norm.weight", [4], ones=True)
+        for layer in range(2):
+            prefix = f"blk.{layer}."
+            self.add(prefix + "attn_norm.weight", [4], ones=True)
+            if architecture == "mamba2":
+                self.add(prefix + "ssm_in.weight", [4, 22])
+                self.add(prefix + "ssm_out.weight", [8, 4])
+                self.add(prefix + "ssm_conv1d.weight", [4, 12])
+                self.add(prefix + "ssm_conv1d.bias", [12])
+                self.add(prefix + "ssm_dt.bias", [2])
+                self.add(prefix + "ssm_a", [1, 2], values=[-0.2, -0.3])
+                self.add(prefix + "ssm_d", [1, 2], values=[0.1, 0.2])
+                self.add(prefix + "ssm_norm.weight", [8, 1], ones=True)
+            else:
+                for name, shape in [("attn_q.weight", [4, 4]), ("attn_k.weight", [4, 2]), ("attn_v.weight", [4, 2]), ("attn_output.weight", [4, 4]), ("ffn_gate.weight", [4, 6]), ("ffn_up.weight", [4, 6]), ("ffn_down.weight", [6, 4])]:
+                    self.add(prefix + name, shape)
+                self.add(prefix + "ffn_norm.weight", [4], ones=True)
+        self.state = [[[0.0] * 2 for _ in range(8)] for _ in range(2)]
+        self.history = [[[0.0] * 3 for _ in range(12)] for _ in range(2)]
+        self.keys = [[], []]
+        self.values = [[], []]
+
+    def add(self, name, shape, ones=False, values=None):
+        count = math.prod(shape)
+        values = vector(values if values is not None else [1.0 if ones else self.random.uniform(-0.25, 0.25) for _ in range(count)])
+        self.weights[name] = [values[i:i + shape[0]] for i in range(0, count, shape[0])] if len(shape) == 2 else values
+        self.tensors.append((name, shape, 0, struct.pack("<" + "f" * count, *values)))
+
+    def bytes(self):
+        return model(self.tensors, self.metadata)
+
+    def step(self, token):
+        w = self.weights
+        hidden = w["token_embd.weight"][token][:]
+        for layer in range(2):
+            prefix = f"blk.{layer}."
+            x = norm(hidden, w[prefix + "attn_norm.weight"])
+            if self.architecture == "mamba2":
+                projected = dense(w[prefix + "ssm_in.weight"], x)
+                conv = []
+                for ch in range(12):
+                    window = self.history[layer][ch] + [projected[8 + ch]]
+                    self.history[layer][ch] = window[1:]
+                    conv.append(silu(sum(a * b for a, b in zip(window, w[prefix + "ssm_conv1d.weight"][ch])) + w[prefix + "ssm_conv1d.bias"][ch]))
+                mixed = []
+                for ch in range(8):
+                    head = ch // 4
+                    dt = math.log1p(math.exp(projected[20 + head] + w[prefix + "ssm_dt.bias"][head]))
+                    decay = math.exp(dt * w[prefix + "ssm_a"][head][0])
+                    for n in range(2):
+                        self.state[layer][ch][n] = decay * self.state[layer][ch][n] + dt * conv[8 + n] * conv[ch]
+                    y = sum(conv[10 + n] * self.state[layer][ch][n] for n in range(2)) + w[prefix + "ssm_d"][head][0] * conv[ch]
+                    mixed.append(y * silu(projected[ch]))
+                mixed = norm(mixed, w[prefix + "ssm_norm.weight"][0])
+                update = dense(w[prefix + "ssm_out.weight"], mixed)
+                hidden = [a + b for a, b in zip(hidden, update)]
+            else:
+                q = dense(w[prefix + "attn_q.weight"], x)
+                k = dense(w[prefix + "attn_k.weight"], x)
+                v = dense(w[prefix + "attn_v.weight"], x)
+                position = len(self.keys[layer])
+                for values in (q, k):
+                    for i in range(0, len(values), 2):
+                        a, b = values[i:i + 2]
+                        values[i:i + 2] = [a * math.cos(position) - b * math.sin(position), a * math.sin(position) + b * math.cos(position)]
+                self.keys[layer].append(list(struct.unpack("<" + "e" * len(k), struct.pack("<" + "e" * len(k), *k))))
+                self.values[layer].append(list(struct.unpack("<" + "e" * len(v), struct.pack("<" + "e" * len(v), *v))))
+                attention = []
+                for head in range(2):
+                    scores = [sum(a * b for a, b in zip(q[head * 2:head * 2 + 2], key)) / math.sqrt(2) for key in self.keys[layer]]
+                    probabilities = [math.exp(score - max(scores)) for score in scores]
+                    probabilities = [p / sum(probabilities) for p in probabilities]
+                    attention.extend([sum(p * value[i] for p, value in zip(probabilities, self.values[layer])) for i in range(2)])
+                hidden = [a + b for a, b in zip(hidden, dense(w[prefix + "attn_output.weight"], attention))]
+                x = norm(hidden, w[prefix + "ffn_norm.weight"])
+                gate = [silu(a) * b for a, b in zip(dense(w[prefix + "ffn_gate.weight"], x), dense(w[prefix + "ffn_up.weight"], x))]
+                hidden = [a + b for a, b in zip(hidden, dense(w[prefix + "ffn_down.weight"], gate))]
+        return dense(w["output.weight"], norm(hidden, w["output_norm.weight"]))
+
+
+class ExecutionTests(unittest.TestCase):
+    setUp = fixtures.GGUFTests.setUp
+    tearDown = fixtures.GGUFTests.tearDown
+    invoke = fixtures.GGUFTests.invoke
+    def test_both_architectures_against_independent_reference(self):
+        for architecture in ("mamba2", "llama"):
+            for threads in (1, 3):
+                with self.subTest(architecture=architecture, threads=threads):
+                    fixture = Fixture(architecture)
+                    data = fixture.bytes()
+                    digest = hashlib.sha256(data).hexdigest()
+                    result = self.invoke(data, "decode", digest, "1,68", "4", str(threads))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    events = [json.loads(line) for line in result.stdout.splitlines()]
+                    generated = [event for event in events if event["event"] == "token"]
+                    fixture.step(1)
+                    logits = fixture.step(68)
+                    for event in generated:
+                        expected = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)[:10]
+                        self.assertEqual([item["id"] for item in event["top"]], expected)
+                        for item in event["top"]:
+                            self.assertAlmostEqual(item["logit"], logits[item["id"]], delta=0.0001)
+                        logits = fixture.step(expected[0])
+                    self.assertEqual(events[-1]["model_sha256"], digest)
+                    self.assertGreater(events[-1]["state_bytes"], 0)
+
+    def test_hash_mismatch_blocks_execution(self):
+        result = self.invoke(Fixture("mamba2").bytes(), "decode", "0" * 64, "1", "1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hash mismatch", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_unimplemented_transformer_features_are_refused(self):
+        fixture = Fixture("llama")
+        fixture.metadata.append(("llama.attention.sliding_window", 4, struct.pack("<I", 32)))
+        data = fixture.bytes()
+        result = self.invoke(data, "decode", hashlib.sha256(data).hexdigest(), "1", "1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unsupported transformer variant", result.stderr)
+
+    def test_generation_cancellation(self):
+        data = Fixture("mamba2").bytes()
+        self.file.write_bytes(data)
+        child = subprocess.Popen([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ",".join(["1"] * 1024), "4096"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        child.stdout.readline()
+        child.terminate()
+        child.communicate(timeout=5)
+        self.assertNotEqual(child.returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

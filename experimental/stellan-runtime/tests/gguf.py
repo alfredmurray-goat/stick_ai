@@ -1,4 +1,5 @@
 import json
+import hashlib
 import pathlib
 import random
 import struct
@@ -194,7 +195,7 @@ class GGUFTests(unittest.TestCase):
             self.assertNotEqual(self.invoke(changed, "inspect").returncode, 0)
 
     def test_unsupported_compute_is_explicit(self):
-        data = model([("w", [256, 1], 14, b"\0" * 210)])
+        data = model([("w", [256, 1], 13, b"\0" * 176)])
         self.assertEqual(self.invoke(data, "inspect").returncode, 0)
         result = self.invoke(data, "tensorbench", "w")
         self.assertNotEqual(result.returncode, 0)
@@ -205,6 +206,22 @@ class GGUFTests(unittest.TestCase):
             self.assertNotEqual(self.invoke(model(), *args).returncode, 0)
         result = subprocess.run([EXECUTABLE, "inspect", str(self.root / "missing.gguf")], capture_output=True, timeout=15)
         self.assertNotEqual(result.returncode, 0)
+
+    def test_hash_large_blocks_and_final_padding(self):
+        rng = random.Random(42)
+        for size in (255, 256, 257, 4095, 4096, 4097, 65535, 1048576 + 55, 1048576 + 56, 1048576 + 63, 1048576 + 64):
+            with self.subTest(size=size):
+                payload = rng.randbytes(size)
+                result = self.invoke(payload, "hash")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["sha256"], hashlib.sha256(payload).hexdigest())
+
+    def test_hash_matches_standard_library_at_padding_boundaries(self):
+        for size in range(1, 130):
+            payload = bytes(i % 256 for i in range(size))
+            result = self.invoke(payload, "hash")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["sha256"], hashlib.sha256(payload).hexdigest())
 
 
 if __name__ == "__main__":
