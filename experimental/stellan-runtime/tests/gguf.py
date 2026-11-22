@@ -49,7 +49,7 @@ class GGUFTests(unittest.TestCase):
 
     def invoke(self, data, *args):
         self.file.write_bytes(data)
-        return subprocess.run([EXECUTABLE, *args[:1], str(self.file), *args[1:]], capture_output=True, text=True, timeout=15)
+        return subprocess.run([EXECUTABLE, *args[:1], str(self.file), *args[1:]], capture_output=True, text=True, encoding="utf-8", timeout=15)
 
     def test_inspect_versions_and_alignment(self):
         for version in (2, 3):
