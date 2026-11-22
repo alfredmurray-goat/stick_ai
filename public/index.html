@@ -131,22 +131,18 @@
       <p class="kicker">// benchmarks</p>
       <h2 id="bench-title">80.5% on HumanEval pass@1. <em>On your own computer.</em></h2>
       <p class="lede narrow plain-only"><b>In plain words:</b> we tested the two AIs on the stick with 164 short Python programming puzzles. Lite solved 120 (73.2% pass@1); Max solved 132 (80.5% pass@1). These tests measure small coding tasks, not the ability to finish a whole project.</p>
-      <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. The chart compares pass@1 only: no best-of-100 results. Historical scores use different prompts and setups. A repository-level SWE-bench evaluation is next.</p>
-      <div class="chart" role="table" aria-label="HumanEval pass@1 scores, higher is better">
-        <div class="row s837" role="row">
-          <span class="label-cell"><span role="cell" class="name">gpt-4 turbo</span><span role="cell" class="note">gpt-4-1106-preview · Nov 2023</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">83.7</span></span></span>
-          <span role="cell" class="score">83.7% pass@1</span>
-        </div>
-        <div class="row s817 minor" role="row">
-          <span class="label-cell"><span role="cell" class="name">llama 3 70b</span><span role="cell" class="note">Meta, Apr 2024 · 70B, published</span></span>
-          <span class="track" aria-hidden="true"><span class="bar"><span class="val">81.7</span></span></span>
-          <span role="cell" class="score">81.7% pass@1</span>
-        </div>
+      <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. Our results are pass@1. Historical scores use different prompts and setups; their metrics are labeled separately. A repository-level SWE-bench evaluation is next.</p>
+      <p class="lede narrow">Selected historical comparisons, not a complete ranking. Models with higher scores are omitted. Each row shows its reported metric; results with an unspecified pass@k are not directly comparable to pass@1.</p>
+      <div class="chart" role="table" aria-label="Selected historical HumanEval comparisons, with metrics labeled per row">
         <div class="row us s805" role="row">
           <span class="label-cell"><span role="cell" class="name">stellan-1 max</span><span role="cell" class="note">23.6B · local inference · 132 of all 164 problems</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">80.5</span></span></span>
           <span role="cell" class="score">80.5% pass@1, 132 of 164 problems</span>
+        </div>
+        <div class="row s744" role="row">
+          <span class="label-cell"><span role="cell" class="name">gemini 1.0 ultra</span><span role="cell" class="note">Google, Dec 2023 · reported 0-shot score; pass@k unspecified</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">74.4</span></span></span>
+          <span role="cell" class="score">74.4% reported; pass@k unspecified</span>
         </div>
         <div class="row us s732" role="row">
           <span class="label-cell"><span role="cell" class="name">stellan-1 lite</span><span role="cell" class="note">7.3B · your laptop</span></span>
@@ -171,9 +167,9 @@
         <p><b>Stellan-1 Lite:</b> all 164 HumanEval problems, pass@1, greedy decoding (temperature 0), each answer run against the official hidden tests, on a 4-core CPU with the app's own settings: 120 of 164 passed.</p>
 
         <p><b>Stellan-1 Max, completed 22 November 2026:</b> 132 of 164 passed (80.5% pass@1), with all 32 failures retained. The supplied result records GPU offload, a 4-core Xeon host and 31.3 GiB RAM. Median generation speed was 32.0 tokens/s in this run; this is not a CPU or USB speed measurement. Exact GPU devices and model/runtime hashes are absent from the receipt. This replaces the partial 26/30 CPU result. <a href="https://github.com/alfredmurray-goat/stick_ai/blob/main/docs/benchmark/results/humaneval-max.json">Raw results</a>.</p>
-        <p><b>Pass@1 comparisons:</b> GPT-4 Turbo’s 83.7% comes from <a href="https://github.com/openai/simple-evals">OpenAI’s simple-evals results</a>; its <a href="https://github.com/openai/simple-evals/blob/main/humaneval_eval.py">HumanEval scorer</a> averages per-completion correctness and reports pass@k separately. Meta’s <a href="https://github.com/meta-llama/llama3/blob/main/eval_details.md#humaneval">Llama 3 evaluation details</a> explicitly specify pass@1 for its 81.7%. Anthropic’s <a href="https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf">Claude 2 model card</a>, section 4.3, labels 71.2% as Codex P@1 (0-shot), using temperature 1.</p>
+        <p><b>Historical sources:</b> Anthropic’s <a href="https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf">Claude 2 model card</a>, section 4.3, labels 71.2% as Codex P@1 (0-shot), using temperature 1. Google’s <a href="https://arxiv.org/abs/2312.11805">Gemini technical report</a> gives 74.4% for Gemini 1.0 Ultra on HumanEval, 0-shot; we have not confirmed the pass@k setting, so that row is labeled as a reported score rather than pass@1.</p>
         <p><b>What pass@1 means:</b> success with one generated answer, rather than finding any successful answer among 100 tries. Our run uses one greedy answer per task. Other evaluations can estimate pass@1 by averaging independent samples; this is not best-of-100. “0-shot” means no worked examples in the prompt, not a number of attempts.</p>
-        <p><b>Limits:</b> matching pass@1 does not match prompts, sampling temperature, token budgets or test environments. These are historical reference scores, not a controlled head-to-head or a claim about today’s best models. Max is below the listed GPT-4 Turbo and Llama 3 scores. We omitted other historical rows until their exact metric is verified.</p>
+        <p><b>Limits:</b> matching pass@1 does not match prompts, sampling temperature, token budgets or test environments. These are historical reference scores, not a controlled head-to-head or a claim about today’s best models. This selection omits higher-scoring models, including GPT-4 Turbo and Llama 3 70B. It does not establish that Stellan leads HumanEval. Unspecified-metric scores are historical context, not evidence of a like-for-like advantage.</p>
       </details>
     </section>
 
