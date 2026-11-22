@@ -85,3 +85,18 @@ The owner asked whether our own Ollama or llama.cpp could make Stellan faster. T
 - Max's measured disk thrashing on a 16 GB machine is a model-fit limit: changing wrappers or rebranding llama.cpp will not make the weights fit. Smaller quantisation/model variants require quality and compatibility evaluation.
 - Prefer a small reproducible patch set on a pinned upstream commit, with benchmark evidence and retained licence notices. Only maintain a long-lived fork or write new kernels if profiling identifies a worthwhile bottleneck.
 - No promised speed multiplier until measured on representative hardware.
+
+## Owner direction and unnamed open-source demonstrations (22 November 2026)
+
+Continue the independent Stellan runtime on `experimental/stellan-runtime`. The owner has conditionally authorised replacing llama.cpp on main **only after** the new engine runs the real models correctly, is faster and puts less load on the host. This is not permission to merge an incomplete prototype or to claim unmeasured speed/security improvements. Retain the production engine until the parity, performance, resource and security acceptance checks pass, including the desktop packaging and all supported platforms. Website copy must distinguish research from shipped features.
+
+Save for later: an **unnamed** initiative that demonstrates Stellan by fixing issues in open-source GitHub projects which explicitly welcome AI-assisted contributions.
+
+- Find projects with clear contribution rules permitting AI-assisted fixes; check each repository's current policy and issue ownership before choosing work. Do not assume a public repository permits automated submissions.
+- Start with small, reproducible bugs and maintainer-labelled help-wanted issues. Read CONTRIBUTING, AGENTS, licence, CLA/DCO requirements and the relevant tests.
+- Run Stellan Lite as the orchestrator and Max as the coding specialist where hardware permits; record exact model/runtime versions, hardware, task, intervention, elapsed time and tool trace.
+- Reproduce the bug first, produce a scoped fix, run the project's checks and have a human review correctness and security. Disclose AI assistance according to the maintainer's policy; claim only the model's actual work.
+- Publish reproducible before/after demonstrations, including failures and human edits. Keep evaluation tasks separate from later RL training and review licences before retaining examples.
+- Keep maintainer contact and pull requests deliberate and individually approved; this saved plan does not authorise unsolicited bulk submissions or contacting other projects now.
+- Measure fixes proposed, tests passed, maintainer acceptance, human intervention and time/resource cost. A passing local test is not proof a maintainer accepted the change.
+- No project name has been chosen. Do not create branding or present this initiative as launched yet.
