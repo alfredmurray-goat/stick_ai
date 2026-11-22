@@ -335,7 +335,7 @@ h2 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); }
 .chart .us .bar { background: linear-gradient(90deg, var(--violet-deep), var(--violet-hi)); box-shadow: 0 0 30px -4px color-mix(in srgb, var(--violet) 70%, transparent); }
 .chart .us .val { color: var(--amber); font-size: 16px; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .chart .axis { margin-left: calc(var(--label) + 20px); display: flex; justify-content: space-between; font: 400 11px var(--mono); color: var(--faint); }
-.s712 { --score: 71.2; } .s732 { --score: 73.2; } .s744 { --score: 74.4; } .s805 { --score: 80.5; } .s817 { --score: 81.7; } .s837 { --score: 83.7; }
+.s481 { --score: 48.1; } .s670 { --score: 67; } .s712 { --score: 71.2; } .s730 { --score: 73; } .s732 { --score: 73.2; } .s744 { --score: 74.4; } .s750 { --score: 75; } .s759 { --score: 75.9; } .s805 { --score: 80.5; }
 @media (max-width: 620px) {
   .chart { --label: 0px; padding: 20px 14px 16px; gap: 12px; }
   .chart .row { grid-template-columns: 1fr; gap: 6px; }

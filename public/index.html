@@ -132,12 +132,22 @@
       <h2 id="bench-title">80.5% on HumanEval pass@1. <em>On your own computer.</em></h2>
       <p class="lede narrow plain-only"><b>In plain words:</b> we tested the two AIs on the stick with 164 short Python programming puzzles. Lite solved 120 (73.2% pass@1); Max solved 132 (80.5% pass@1). These tests measure small coding tasks, not the ability to finish a whole project.</p>
       <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. Our results are pass@1. Historical scores use different prompts and setups; their metrics are labeled separately. A repository-level SWE-bench evaluation is next.</p>
-      <p class="lede narrow">Selected historical comparisons, not a complete ranking. Models with higher scores are omitted. Each row shows its reported metric; results with an unspecified pass@k are not directly comparable to pass@1.</p>
+      <p class="lede narrow">Selected historical comparisons below Max’s 80.5%, not a complete ranking. Models with higher scores are omitted. Each row shows its reported metric; results with an unspecified pass@k are not directly comparable to pass@1.</p>
       <div class="chart" role="table" aria-label="Selected historical HumanEval comparisons, with metrics labeled per row">
         <div class="row us s805" role="row">
           <span class="label-cell"><span role="cell" class="name">stellan-1 max</span><span role="cell" class="note">23.6B · local inference · 132 of all 164 problems</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">80.5</span></span></span>
           <span role="cell" class="score">80.5% pass@1, 132 of 164 problems</span>
+        </div>
+        <div class="row s759" role="row">
+          <span class="label-cell"><span role="cell" class="name">claude 3 haiku</span><span role="cell" class="note">Anthropic · Mar 2024 · reported 0-shot score</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">75.9</span></span></span>
+          <span role="cell" class="score">75.9% reported; pass@k unspecified</span>
+        </div>
+        <div class="row s750" role="row">
+          <span class="label-cell"><span role="cell" class="name">codestral mamba 7b</span><span role="cell" class="note">Mistral · Jul 2024 · published HumanEval score</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">75.0</span></span></span>
+          <span role="cell" class="score">75.0% reported; pass@k unspecified</span>
         </div>
         <div class="row s744" role="row">
           <span class="label-cell"><span role="cell" class="name">gemini 1.0 ultra</span><span role="cell" class="note">Google, Dec 2023 · reported 0-shot score; pass@k unspecified</span></span>
@@ -149,10 +159,25 @@
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">73.2</span></span></span>
           <span role="cell" class="score">73.2% pass@1</span>
         </div>
+        <div class="row s730" role="row">
+          <span class="label-cell"><span role="cell" class="name">claude 3 sonnet</span><span role="cell" class="note">Anthropic · Mar 2024 · reported 0-shot score</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">73.0</span></span></span>
+          <span role="cell" class="score">73.0% reported; pass@k unspecified</span>
+        </div>
         <div class="row s712" role="row">
           <span class="label-cell"><span role="cell" class="name">claude 2</span><span role="cell" class="note">Anthropic's best, Jul–Nov 2023 · size unpublished</span></span>
           <span class="track" aria-hidden="true"><span class="bar"><span class="val">71.2</span></span></span>
           <span role="cell" class="score">71.2% pass@1</span>
+        </div>
+        <div class="row s670" role="row">
+          <span class="label-cell"><span role="cell" class="name">gpt-4</span><span role="cell" class="note">OpenAI · original Mar 2023 result · 0-shot</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">67.0</span></span></span>
+          <span role="cell" class="score">67.0% reported; pass@k unspecified</span>
+        </div>
+        <div class="row s481" role="row">
+          <span class="label-cell"><span role="cell" class="name">gpt-3.5</span><span role="cell" class="note">OpenAI · Mar 2023 report · 0-shot</span></span>
+          <span class="track" aria-hidden="true"><span class="bar"><span class="val">48.1</span></span></span>
+          <span role="cell" class="score">48.1% reported; pass@k unspecified</span>
         </div>
         <div class="axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
       </div>
@@ -168,6 +193,7 @@
 
         <p><b>Stellan-1 Max, completed 22 November 2026:</b> 132 of 164 passed (80.5% pass@1), with all 32 failures retained. The supplied result records GPU offload, a 4-core Xeon host and 31.3 GiB RAM. Median generation speed was 32.0 tokens/s in this run; this is not a CPU or USB speed measurement. Exact GPU devices and model/runtime hashes are absent from the receipt. This replaces the partial 26/30 CPU result. <a href="https://github.com/alfredmurray-goat/stick_ai/blob/main/docs/benchmark/results/humaneval-max.json">Raw results</a>.</p>
         <p><b>Historical sources:</b> Anthropic’s <a href="https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf">Claude 2 model card</a>, section 4.3, labels 71.2% as Codex P@1 (0-shot), using temperature 1. Google’s <a href="https://arxiv.org/abs/2312.11805">Gemini technical report</a> gives 74.4% for Gemini 1.0 Ultra on HumanEval, 0-shot; we have not confirmed the pass@k setting, so that row is labeled as a reported score rather than pass@1.</p>
+        <p><b>Additional historical sources:</b> the <a href="https://arxiv.org/abs/2303.08774">GPT-4 technical report</a> reports GPT-4 at 67.0% and GPT-3.5 at 48.1%, 0-shot. Anthropic’s <a href="https://www.anthropic.com/news/claude-3-family">Claude 3 announcement</a> reports Haiku at 75.9% and Sonnet at 73.0%, 0-shot. Mistral’s <a href="https://huggingface.co/mistralai/Mamba-Codestral-7B-v0.1">Codestral Mamba model card</a> reports 75.0%. These entries retain the published scores and are not labeled pass@1 where the exact pass@k has not been confirmed. Older model names refer to those historical releases, not current products.</p>
         <p><b>What pass@1 means:</b> success with one generated answer, rather than finding any successful answer among 100 tries. Our run uses one greedy answer per task. Other evaluations can estimate pass@1 by averaging independent samples; this is not best-of-100. “0-shot” means no worked examples in the prompt, not a number of attempts.</p>
         <p><b>Limits:</b> matching pass@1 does not match prompts, sampling temperature, token budgets or test environments. These are historical reference scores, not a controlled head-to-head or a claim about today’s best models. This selection omits higher-scoring models, including GPT-4 Turbo and Llama 3 70B. It does not establish that Stellan leads HumanEval. Unspecified-metric scores are historical context, not evidence of a like-for-like advantage.</p>
       </details>

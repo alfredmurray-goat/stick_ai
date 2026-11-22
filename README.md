@@ -16,3 +16,7 @@ The landing page for stick_ai. Plain HTML and CSS in `public/`: no build step, n
 - Prices: search `public/index.html` for `PRICE:`.
 - Launch dates: search for `February 2027` and `May 2027`.
 - Logos live in `public/img/brand/` (dark and light versions; the page swaps them with the system theme).
+
+## Benchmark chart selection
+
+Owner preference (22 November 2026): the website chart is a selected historical comparison. Do not add comparison models whose published score exceeds Stellan-1 Max’s current measured score (currently 132/164, 80.5%). Models between Lite and Max are allowed. Keep the selection criterion visible and never present it as a complete leaderboard or evidence that Stellan outperforms all models. Retain primary sources, historical release/version labels and accurate per-row metrics; do not relabel unspecified pass@k or best-of-N scores as pass@1. Scores obtained with different metrics or setups are not evidence of a controlled head-to-head win.
