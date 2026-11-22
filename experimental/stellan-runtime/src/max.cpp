@@ -88,7 +88,7 @@ Max::Max(const Model &model, unsigned threads, std::size_t context) : model_(mod
 void Max::multiply(const Tensor *matrix, std::span<const float> input, std::span<float> output, const std::function<bool()> &cancelled) {
     const auto weights = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, input.size());
-    const bool fast = (matrix->type == 12 || matrix->type == 14) && std::getenv("STELLAN_RUNTIME_PRECISE") == nullptr;
+    const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
     const auto quantized = fast ? quantize_input(input) : std::vector<QuantizedInput> {};
     executor_.parallel(output.size(), [&](std::size_t first, std::size_t last) {
         for (auto row = first; row < last; ++row) {
@@ -175,8 +175,8 @@ const std::vector<float> &Max::step(std::int32_t token, const std::function<bool
 void Max::reset() {
     position_ = 0;
     for (auto &layer : layers_) {
-        std::fill(layer.keys.begin(), layer.keys.end(), 0);
-        std::fill(layer.values.begin(), layer.values.end(), 0);
+        std::fill(layer.keys.begin(), layer.keys.end(), std::uint16_t {0});
+        std::fill(layer.values.begin(), layer.values.end(), std::uint16_t {0});
     }
 }
 std::size_t Max::state_bytes() const {

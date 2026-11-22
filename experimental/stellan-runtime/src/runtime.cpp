@@ -5,6 +5,7 @@
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <set>
 #include <stdexcept>
@@ -26,6 +27,15 @@
 #endif
 
 namespace stellan {
+bool environment_set(const char *name) {
+#ifdef _WIN32
+    SetLastError(ERROR_SUCCESS);
+    return GetEnvironmentVariableA(name, nullptr, 0) != 0 || GetLastError() != ERROR_ENVVAR_NOT_FOUND;
+#else
+    return std::getenv(name) != nullptr;
+#endif
+}
+
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &);
 bool accelerated_ssm(std::size_t, std::size_t, std::span<const float>, float, float, float, std::span<const float>, std::span<const float>, std::span<float>, std::span<float>);
 namespace {

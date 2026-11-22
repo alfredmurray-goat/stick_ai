@@ -18,7 +18,7 @@ std::uint16_t read_half(const std::byte *p) {
     return static_cast<std::uint16_t>(std::to_integer<unsigned>(p[0]) | (std::to_integer<unsigned>(p[1]) << 8));
 }
 bool available() {
-    if (std::getenv("STELLAN_RUNTIME_SCALAR") != nullptr) { return false; }
+    if (environment_set("STELLAN_RUNTIME_SCALAR")) { return false; }
 #ifdef _MSC_VER
     int registers[4];
     __cpuid(registers, 1);
@@ -170,7 +170,7 @@ namespace stellan {
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &) { return false; }
 bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
         std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output) {
-    if (states % 4 != 0 || std::getenv("STELLAN_RUNTIME_SCALAR") != nullptr) { return false; }
+    if (states % 4 != 0 || environment_set("STELLAN_RUNTIME_SCALAR")) { return false; }
     for (std::size_t channel = 0; channel < width; ++channel) {
         const auto x = vdupq_n_f32(dt * input[channel]);
         auto sum = vdupq_n_f32(0);
@@ -185,11 +185,11 @@ bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const floa
     return true;
 }
 bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input, float &result) {
-    if (std::getenv("STELLAN_RUNTIME_SCALAR") != nullptr) { return false; }
+    if (environment_set("STELLAN_RUNTIME_SCALAR")) { return false; }
     float total = 0;
     const auto read = [](const std::byte *p) {
         const auto bits = static_cast<std::uint16_t>(std::to_integer<unsigned>(p[0]) | (std::to_integer<unsigned>(p[1]) << 8));
-        return vget_lane_f32(vcvt_f32_f16(vreinterpret_f16_u16(vdup_n_u16(bits))), 0);
+        return vgetq_lane_f32(vcvt_f32_f16(vreinterpret_f16_u16(vdup_n_u16(bits))), 0);
     };
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);

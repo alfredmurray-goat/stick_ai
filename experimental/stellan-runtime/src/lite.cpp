@@ -91,7 +91,7 @@ Lite::Lite(const Model &model, unsigned threads) : model_(model), executor_(thre
 void Lite::multiply(const Tensor *matrix, std::span<const float> input, std::span<float> output, const std::function<bool()> &cancelled) {
     const auto data = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, input.size());
-    const bool fast = (matrix->type == 12 || matrix->type == 14) && std::getenv("STELLAN_RUNTIME_PRECISE") == nullptr;
+    const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
     const auto quantized = fast ? quantize_input(input) : std::vector<QuantizedInput> {};
     executor_.parallel(output.size(), [&](std::size_t first, std::size_t last) {
         for (auto row = first; row < last; ++row) {
@@ -155,8 +155,8 @@ const std::vector<float> &Lite::step(std::int32_t token, const std::function<boo
 
 void Lite::reset() {
     for (auto &layer : layers_) {
-        std::fill(layer.history.begin(), layer.history.end(), 0);
-        std::fill(layer.state.begin(), layer.state.end(), 0);
+        std::fill(layer.history.begin(), layer.history.end(), 0.0f);
+        std::fill(layer.state.begin(), layer.state.end(), 0.0f);
     }
 }
 std::size_t Lite::state_bytes() const {
