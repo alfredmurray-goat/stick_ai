@@ -93,4 +93,6 @@ static_assert(sizeof(QuantizedInput) == 320);
 std::vector<QuantizedInput> quantize_input(std::span<const float> input);
 float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input);
 
+void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output);
+
 }

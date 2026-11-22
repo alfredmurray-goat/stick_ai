@@ -11,6 +11,7 @@ class Decoder {
 public:
     virtual ~Decoder() = default;
     virtual const std::vector<float> &step(std::int32_t token, const std::function<bool()> &cancelled) = 0;
+    virtual const std::vector<float> &prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress = {});
     virtual void reset() = 0;
     virtual std::size_t state_bytes() const = 0;
 };
@@ -35,6 +36,7 @@ class Lite : public Decoder {
 public:
     Lite(const Model &model, unsigned threads);
     const std::vector<float> &step(std::int32_t token, const std::function<bool()> &cancelled) override;
+    const std::vector<float> &prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress = {}) override;
     void reset() override;
     std::size_t state_bytes() const override;
 private:
@@ -74,9 +76,15 @@ private:
     std::vector<float> update_;
     std::vector<float> logits_;
     std::vector<float> final_norm_;
+    std::vector<float> batch_hidden_, batch_normalized_, batch_projected_, batch_mixed_, batch_update_;
     const Tensor *tensor(const std::string &name, const std::vector<std::uint64_t> &shape) const;
     std::vector<float> floats(const Tensor *tensor) const;
     void multiply(const Tensor *tensor, std::span<const float> input, std::span<float> output, const std::function<bool()> &cancelled);
+    void prepare_mix(Layer &layer, const std::function<bool()> &cancelled);
+    void mix_batch(Layer &layer, std::size_t batch, const std::function<bool()> &cancelled);
+    std::vector<float> batch_convolution_, batch_delta_, batch_attenuation_;
+    void mix(Layer &layer, const std::function<bool()> &cancelled);
+    void multiply_batch(const Tensor *tensor, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled);
     void normalize(std::span<const float> input, std::span<const float> weights, std::span<float> output) const;
 };
 }

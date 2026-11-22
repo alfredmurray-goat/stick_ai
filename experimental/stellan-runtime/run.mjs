@@ -10,9 +10,9 @@ export function launchPlan({ mode, ramBytes = totalmem(), forceMax = false, toke
   if (!["llama", "gpt2"].includes(mode) || !Number.isFinite(ramBytes) || ramBytes < 0) { throw new Error("Unsupported model or memory information"); }
   if (ramBytes < 8 * 1024 ** 3) { throw new Error("Your computer needs at least 8 GB of memory"); }
   if (mode === "gpt2" && ramBytes < 16 * 1024 ** 3 && !forceMax) { throw new Error("Stellan-1 Max needs 16 GB RAM or more"); }
-  if (!Array.isArray(tokens) || tokens.length === 0 || tokens.length > 32768 || !tokens.every(id => Number.isInteger(id) && id >= 0)) { throw new Error("Invalid prompt tokens"); }
+  if (!Array.isArray(tokens) || tokens.length === 0 || tokens.length > 262144 || !tokens.every(id => Number.isInteger(id) && id >= 0)) { throw new Error("Invalid prompt tokens"); }
   if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 4096 || !Number.isInteger(threads) || threads < 1 || threads > 64) { throw new Error("Invalid generation limits"); }
-  if (!Number.isInteger(context) || context < 1 || context > 8192 || mode === "gpt2" && tokens.length + maxTokens > context) { throw new Error("The request exceeds the experimental context limit; shorten it"); }
+  if (!Number.isInteger(context) || context < 1 || context > (mode === "llama" ? 262144 : 8192) || tokens.length + maxTokens > context) { throw new Error("The request exceeds the experimental context limit; shorten it"); }
   return { mode, maxTokens, threads, context, warning: mode === "gpt2" && ramBytes < 16 * 1024 ** 3 ? "Max may be very slow or crash on this computer" : null };
 }
 

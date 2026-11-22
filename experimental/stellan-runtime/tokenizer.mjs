@@ -203,7 +203,7 @@ export function createTokenizer(metadata) {
         prefix = false;
       }
       result.push(...ordinary(text.slice(cursor), prefix));
-      if (result.length === 0 || result.length > 32768 || !result.every(Number.isInteger)) { throw new Error("Prompt token count exceeds limits"); }
+      if (result.length === 0 || result.length > 262144 || !result.every(Number.isInteger)) { throw new Error("Prompt token count exceeds limits"); }
       return result;
     },
     decodeBytes(id) {

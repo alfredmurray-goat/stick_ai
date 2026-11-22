@@ -118,6 +118,19 @@ void Max::rotate(std::span<float> values, std::size_t heads) const {
     }
 }
 const std::vector<float> &Max::step(std::int32_t token, const std::function<bool()> &cancelled) {
+    return evaluate(token, cancelled, true);
+}
+const std::vector<float> &Max::prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress) {
+    if (tokens.empty() || tokens.size() > context_ - position_ || !std::all_of(tokens.begin(), tokens.end(), [&](auto token) { return token >= 0 && static_cast<std::size_t>(token) < logits_.size(); })) {
+        throw std::runtime_error("Invalid transformer prompt or context is full");
+    }
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        evaluate(tokens[i], cancelled, i + 1 == tokens.size());
+        if (progress) { progress(i + 1); }
+    }
+    return logits_;
+}
+const std::vector<float> &Max::evaluate(std::int32_t token, const std::function<bool()> &cancelled, bool output_logits) {
     if (token < 0 || static_cast<std::size_t>(token) >= logits_.size() || position_ >= context_) {
         throw std::runtime_error("Invalid token or transformer context is full");
     }
@@ -148,9 +161,10 @@ const std::vector<float> &Max::step(std::int32_t token, const std::function<bool
                 }
                 float denominator = 0;
                 for (auto &score : scores) { score = std::exp(score - maximum); denominator += score; }
+                for (auto &score : scores) { score /= denominator; }
                 for (std::size_t i = 0; i < head_width_; ++i) {
                     float sum = 0;
-                    for (std::size_t t = 0; t <= position_; ++t) { sum += (scores[t] / denominator) * half(layer.values[t * value_.size() + kv_head * head_width_ + i]); }
+                    for (std::size_t t = 0; t <= position_; ++t) { sum += scores[t] * half(layer.values[t * value_.size() + kv_head * head_width_ + i]); }
                     attended_[h * head_width_ + i] = sum;
                 }
             }
@@ -164,10 +178,12 @@ const std::vector<float> &Max::step(std::int32_t token, const std::function<bool
         multiply(layer.down, gate_, update_, cancelled);
         for (std::size_t i = 0; i < width_; ++i) { hidden_[i] += update_[i]; }
     }
-    normalize(hidden_, final_norm_, normalized_);
-    multiply(output_, normalized_, logits_, cancelled);
-    if (!std::all_of(logits_.begin(), logits_.end(), [](float value) { return std::isfinite(value); })) {
-        throw std::runtime_error("Transformer produced non-finite logits");
+    if (output_logits) {
+        normalize(hidden_, final_norm_, normalized_);
+        multiply(output_, normalized_, logits_, cancelled);
+        if (!std::all_of(logits_.begin(), logits_.end(), [](float value) { return std::isfinite(value); })) {
+            throw std::runtime_error("Transformer produced non-finite logits");
+        }
     }
     ++position_;
     return logits_;

@@ -8,6 +8,8 @@
 namespace stellan {
 bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::span<const QuantizedInput>, float &);
 
+bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>);
+
 std::vector<QuantizedInput> quantize_input(std::span<const float> input) {
     if (input.empty() || input.size() % 256 != 0) { throw std::runtime_error("Quantized activations need complete 256-value blocks"); }
     std::vector<QuantizedInput> result(input.size() / 256);
@@ -46,4 +48,13 @@ float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::spa
     }
     return sum;
 }
+void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    if ((type != 12 && type != 14) || input.empty() || input.size() > 16 || input.size() != output.size() || input.front().empty() ||
+        !std::all_of(input.begin(), input.end(), [&](const auto values) { return values.size() == input.front().size(); }) || row.size() != row_bytes(type, input.front().size() * 256)) {
+        throw std::runtime_error("Invalid batched quantized matrix row");
+    }
+    if (accelerated_quantized_batch_dot(type, row, input, output)) { return; }
+    for (std::size_t t = 0; t < input.size(); ++t) { output[t] = quantized_dot(type, row, input[t]); }
+}
+
 }

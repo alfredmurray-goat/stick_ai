@@ -80,6 +80,21 @@ void quantized() {
             }
         }
         close(stellan::dot(12, weights, input), expected, 2e-5);
+        std::array<std::vector<stellan::QuantizedInput>, 16> packed;
+        std::array<std::span<const stellan::QuantizedInput>, 16> views;
+        for (std::size_t t = 0; t < packed.size(); ++t) {
+            std::array<float, 512> values;
+            for (std::size_t i = 0; i < values.size(); ++i) { values[i] = input[i] * static_cast<float>(t + 1) / 16 + static_cast<float>(t) / 31; }
+            packed[t] = stellan::quantize_input(values); views[t] = packed[t];
+        }
+        for (const std::size_t count : {1U, 2U, 7U, 16U}) {
+            std::array<float, 16> output;
+            stellan::quantized_batch_dot(12, weights, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(12, weights, views[t]), 2e-5); }
+        }
+        rejects([&] { stellan::quantized_batch_dot(12, weights, {}, {}); });
+        rejects([&] { std::array<float, 1> output; stellan::quantized_batch_dot(12, weights, std::span(views).first(2), output); });
+
     }
     std::array<std::byte, 34> q8 {};
     set_half(q8, 0, 0x3800);
@@ -175,6 +190,17 @@ void additional_kernels() {
             expected += (static_cast<int>(value) - 32) * (raw < 128 ? raw : raw - 256) * 0.0078125 * input[i];
         }
         close(stellan::dot(14, packed, input), expected, 3e-5);
+        std::array<std::vector<stellan::QuantizedInput>, 16> inputs;
+        std::array<std::span<const stellan::QuantizedInput>, 16> views;
+        for (std::size_t t = 0; t < inputs.size(); ++t) {
+            for (auto &value : input) { value = static_cast<float>(static_cast<int>(random() % 201) - 100) / 100; }
+            inputs[t] = stellan::quantize_input(input); views[t] = inputs[t];
+        }
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 16U}) {
+            std::array<float, 16> output;
+            stellan::quantized_batch_dot(14, packed, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(14, packed, views[t]), 3e-5); }
+        }
     }
     require(stellan::sha256({}) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     const std::string abc = "abc";

@@ -1,0 +1,103 @@
+{
+  "purpose": "real Lite prefix reuse correctness and warm-session timing diagnostic only; no llama.cpp comparison",
+  "executableSha256": "8eb8bc945d1863e1c5add6350cc80b530e882bbfa87487d9fe0dccf348d6a1d1",
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "threads": 2,
+  "context": 8192,
+  "prompt": "<s>[INST] Write a Python function add(a, b) that returns their sum. Return only code. [/INST]",
+  "followup": "<s>[INST] Write a Python function add(a, b) that returns their sum. Return only code. [/INST] ```python\ndef add(a, b):\n   </s>[INST] Add a docstring. [/INST]",
+  "startup": {
+    "event": "ready",
+    "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+    "verify_ms": 2704.51,
+    "state_bytes": 276299776
+  },
+  "first": {
+    "text": " ```python\ndef add(a, b):\n   ",
+    "tokens": [
+      9557,
+      18435,
+      781,
+      2038,
+      1735,
+      29500,
+      29476,
+      29493,
+      1055,
+      2097,
+      781,
+      3055
+    ],
+    "metrics": {
+      "event": "finished",
+      "request_id": 1,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 0,
+      "evaluated_prompt_tokens": 23,
+      "prompt_ms": 2517.85,
+      "decode_ms": 1378.27,
+      "generated": 12,
+      "cpu_ms": 7327.73,
+      "peak_rss_bytes": 4449910784
+    }
+  },
+  "cached": {
+    "text": " ```python\ndef add(a, b):\n   ",
+    "tokens": [
+      9557,
+      18435,
+      781,
+      2038,
+      1735,
+      29500,
+      29476,
+      29493,
+      1055,
+      2097,
+      781,
+      3055
+    ],
+    "metrics": {
+      "event": "finished",
+      "request_id": 2,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 34,
+      "evaluated_prompt_tokens": 10,
+      "prompt_ms": 1076.91,
+      "decode_ms": 1390.76,
+      "generated": 12,
+      "cpu_ms": 4633.66,
+      "peak_rss_bytes": 4449910784
+    }
+  },
+  "fresh": {
+    "text": " ```python\ndef add(a, b):\n   ",
+    "tokens": [
+      9557,
+      18435,
+      781,
+      2038,
+      1735,
+      29500,
+      29476,
+      29493,
+      1055,
+      2097,
+      781,
+      3055
+    ],
+    "metrics": {
+      "event": "finished",
+      "request_id": 4,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 0,
+      "evaluated_prompt_tokens": 44,
+      "prompt_ms": 4851.47,
+      "decode_ms": 1800.45,
+      "generated": 12,
+      "cpu_ms": 12448.8,
+      "peak_rss_bytes": 4449910784
+    }
+  },
+  "identicalTokens": true
+}

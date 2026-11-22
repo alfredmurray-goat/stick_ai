@@ -1,0 +1,61 @@
+{
+  "purpose": "full-file SHA256 verification only; warm filesystem cache; no generation speed claim",
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "modelBytes": 4147481440,
+  "runs": [
+    {
+      "implementation": "portable",
+      "repeat": 0,
+      "wallMs": 13284.079031999681,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "3061c9878233d6fa6973490bb0eb5eafa643212085a7669f1b852362a30d10a6"
+    },
+    {
+      "implementation": "sha-instructions",
+      "repeat": 0,
+      "wallMs": 2245.605326000259,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "79d01b0288f39c9dcae252e768505974a5556804ddce087d8876b87b9aa2a408"
+    },
+    {
+      "implementation": "sha-instructions",
+      "repeat": 1,
+      "wallMs": 2204.719013000613,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "79d01b0288f39c9dcae252e768505974a5556804ddce087d8876b87b9aa2a408"
+    },
+    {
+      "implementation": "portable",
+      "repeat": 1,
+      "wallMs": 13031.551828000374,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "3061c9878233d6fa6973490bb0eb5eafa643212085a7669f1b852362a30d10a6"
+    },
+    {
+      "implementation": "portable",
+      "repeat": 2,
+      "wallMs": 12945.443925999825,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "3061c9878233d6fa6973490bb0eb5eafa643212085a7669f1b852362a30d10a6"
+    },
+    {
+      "implementation": "sha-instructions",
+      "repeat": 2,
+      "wallMs": 2239.6350460003305,
+      "result": {
+        "sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e"
+      },
+      "binarySha256": "79d01b0288f39c9dcae252e768505974a5556804ddce087d8876b87b9aa2a408"
+    }
+  ]
+}

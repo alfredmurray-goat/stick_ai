@@ -7,6 +7,8 @@
 #include <stdexcept>
 
 namespace stellan {
+bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
+    std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output);
 namespace {
 std::size_t dimension(const Model &model, const std::string &key, std::size_t maximum) {
     const auto value = model.number("mamba2." + key);
@@ -16,6 +18,16 @@ std::size_t dimension(const Model &model, const std::string &key, std::size_t ma
     return static_cast<std::size_t>(value);
 }
 float silu(float value) { return value / (1 + std::exp(-value)); }
+}
+
+const std::vector<float> &Decoder::prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress) {
+    if (tokens.empty()) { throw std::runtime_error("A prompt token is required"); }
+    const std::vector<float> *result = nullptr;
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        result = &step(tokens[i], cancelled);
+        if (progress) { progress(i + 1); }
+    }
+    return *result;
 }
 
 const Tensor *Lite::tensor(const std::string &name, const std::vector<std::uint64_t> &shape) const {
@@ -112,36 +124,11 @@ const std::vector<float> &Lite::step(std::int32_t token, const std::function<boo
     if (token < 0 || static_cast<std::size_t>(token) >= logits_.size()) { throw std::runtime_error("Invalid input token"); }
     const auto stride = row_bytes(embedding_->type, width_);
     decode_row(embedding_->type, model_.data(*embedding_).subspan(static_cast<std::size_t>(token) * stride, stride), hidden_);
-    const auto conv = convolution_.size();
     for (auto &layer : layers_) {
         if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
         normalize(hidden_, layer.norm_weight, normalized_);
         multiply(layer.projection, normalized_, projection_, cancelled);
-        for (std::size_t channel = 0; channel < conv; ++channel) {
-            auto value = layer.conv_bias[channel];
-            const auto history = channel * (kernel_ - 1);
-            const auto weights = channel * kernel_;
-            for (std::size_t j = 0; j < kernel_ - 1; ++j) { value += layer.history[history + j] * layer.conv_weight[weights + j]; }
-            const auto current = projection_[inner_ + channel];
-            value += current * layer.conv_weight[weights + kernel_ - 1];
-            for (std::size_t j = 0; j < kernel_ - 2; ++j) { layer.history[history + j] = layer.history[history + j + 1]; }
-            layer.history[history + kernel_ - 2] = current;
-            convolution_[channel] = silu(value);
-        }
-        for (std::size_t h = 0; h < heads_; ++h) {
-            const auto value = projection_[inner_ + conv + h] + layer.dt_bias[h];
-            delta_[h] = value > 20 ? value : std::log1p(std::exp(value));
-        }
-        mamba2_step(heads_, inner_ / heads_, states_, groups_, std::span(convolution_).first(inner_), delta_,
-            layer.decay, std::span(convolution_).subspan(inner_, groups_ * states_),
-            std::span(convolution_).subspan(inner_ + groups_ * states_), layer.skip, layer.state, mixed_);
-        for (std::size_t i = 0; i < inner_; ++i) { mixed_[i] *= silu(projection_[i]); }
-        const auto group_width = inner_ / groups_;
-        for (std::size_t g = 0; g < groups_; ++g) {
-            const auto offset = g * group_width;
-            auto values = std::span(mixed_).subspan(offset, group_width);
-            normalize(values, std::span(layer.gated_norm).subspan(offset, group_width), values);
-        }
+        mix(layer, cancelled);
         multiply(layer.output, mixed_, update_, cancelled);
         for (std::size_t i = 0; i < width_; ++i) { hidden_[i] += update_[i]; }
     }
@@ -150,6 +137,164 @@ const std::vector<float> &Lite::step(std::int32_t token, const std::function<boo
     if (!std::all_of(logits_.begin(), logits_.end(), [](float value) { return std::isfinite(value); })) {
         throw std::runtime_error("Model produced non-finite logits");
     }
+    return logits_;
+}
+
+void Lite::prepare_mix(Layer &layer, const std::function<bool()> &cancelled) {
+    if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+    const auto conv = convolution_.size();
+    for (std::size_t channel = 0; channel < conv; ++channel) {
+        auto value = layer.conv_bias[channel];
+        const auto history = channel * (kernel_ - 1);
+        const auto weights = channel * kernel_;
+        for (std::size_t j = 0; j < kernel_ - 1; ++j) { value += layer.history[history + j] * layer.conv_weight[weights + j]; }
+        const auto current = projection_[inner_ + channel];
+        value += current * layer.conv_weight[weights + kernel_ - 1];
+        for (std::size_t j = 0; j < kernel_ - 2; ++j) { layer.history[history + j] = layer.history[history + j + 1]; }
+        layer.history[history + kernel_ - 2] = current;
+        convolution_[channel] = silu(value);
+    }
+    for (std::size_t h = 0; h < heads_; ++h) {
+        const auto value = projection_[inner_ + conv + h] + layer.dt_bias[h];
+        delta_[h] = value > 20 ? value : std::log1p(std::exp(value));
+    }
+    for (std::size_t h = 0; h < heads_; ++h) {
+        if (!std::isfinite(delta_[h]) || delta_[h] < 0 || !std::isfinite(layer.decay[h]) || layer.decay[h] > 0) { throw std::runtime_error("Invalid Mamba2 time step or decay"); }
+    }
+}
+
+void Lite::mix(Layer &layer, const std::function<bool()> &cancelled) {
+    prepare_mix(layer, cancelled);
+    executor_.parallel(groups_, [&](std::size_t first, std::size_t last) {
+        if (first == last) { return; }
+        if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+        const auto first_head = first * (heads_ / groups_);
+        const auto local_heads = (last - first) * (heads_ / groups_);
+        const auto head_width = inner_ / heads_;
+        const auto channel_start = first_head * head_width;
+        const auto channels = local_heads * head_width;
+        mamba2_step(local_heads, head_width, states_, last - first,
+            std::span(convolution_).subspan(channel_start, channels), std::span(delta_).subspan(first_head, local_heads),
+            std::span(layer.decay).subspan(first_head, local_heads), std::span(convolution_).subspan(inner_ + first * states_, (last - first) * states_),
+            std::span(convolution_).subspan(inner_ + groups_ * states_ + first * states_, (last - first) * states_),
+            std::span(layer.skip).subspan(first_head, local_heads), std::span(layer.state).subspan(channel_start * states_, channels * states_), std::span(mixed_).subspan(channel_start, channels));
+    });
+    for (std::size_t i = 0; i < inner_; ++i) { mixed_[i] *= silu(projection_[i]); }
+    const auto group_width = inner_ / groups_;
+    for (std::size_t g = 0; g < groups_; ++g) {
+        const auto offset = g * group_width;
+        auto values = std::span(mixed_).subspan(offset, group_width);
+        normalize(values, std::span(layer.gated_norm).subspan(offset, group_width), values);
+    }
+}
+
+void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()> &cancelled) {
+    const auto conv = convolution_.size();
+    batch_convolution_.resize(batch * conv);
+    batch_delta_.resize(batch * heads_);
+    batch_attenuation_.resize(batch * heads_);
+    // The convolution remains causal. The large recurrent state is traversed channel first,
+    // keeping each channel's state hot while processing all tokens in this microbatch.
+    for (std::size_t t = 0; t < batch; ++t) {
+        const auto values = std::span(batch_projected_).subspan(t * projection_.size(), projection_.size());
+        std::copy(values.begin(), values.end(), projection_.begin());
+        prepare_mix(layer, cancelled);
+        std::copy(convolution_.begin(), convolution_.end(), batch_convolution_.begin() + t * conv);
+        std::copy(delta_.begin(), delta_.end(), batch_delta_.begin() + t * heads_);
+        for (std::size_t h = 0; h < heads_; ++h) { batch_attenuation_[t * heads_ + h] = std::exp(delta_[h] * layer.decay[h]); }
+    }
+    executor_.parallel(inner_, [&](std::size_t first, std::size_t last) {
+        for (auto channel = first; channel < last; ++channel) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            const auto head = channel / (inner_ / heads_);
+            const auto group = head / (heads_ / groups_);
+            auto state = std::span(layer.state).subspan(channel * states_, states_);
+            for (std::size_t t = 0; t < batch; ++t) {
+                const auto values = std::span(batch_convolution_).subspan(t * conv, conv);
+                const auto b = values.subspan(inner_ + group * states_, states_);
+                const auto c = values.subspan(inner_ + groups_ * states_ + group * states_, states_);
+                const auto dt = batch_delta_[t * heads_ + head];
+                const auto attenuation = batch_attenuation_[t * heads_ + head];
+                auto output = std::span(batch_mixed_).subspan(t * inner_ + channel, 1);
+                if (!accelerated_ssm(1, states_, values.subspan(channel, 1), dt, attenuation, layer.skip[head], b, c, state, output)) {
+                    float y = layer.skip[head] * values[channel];
+                    for (std::size_t n = 0; n < states_; ++n) {
+                        state[n] = attenuation * state[n] + dt * b[n] * values[channel];
+                        y += c[n] * state[n];
+                    }
+                    output[0] = y;
+                }
+            }
+        }
+    });
+    for (std::size_t t = 0; t < batch; ++t) {
+        auto mixed = std::span(batch_mixed_).subspan(t * inner_, inner_);
+        const auto projected = std::span(batch_projected_).subspan(t * projection_.size(), inner_);
+        for (std::size_t i = 0; i < inner_; ++i) { mixed[i] *= silu(projected[i]); }
+        const auto group_width = inner_ / groups_;
+        for (std::size_t g = 0; g < groups_; ++g) {
+            auto group = mixed.subspan(g * group_width, group_width);
+            normalize(group, std::span(layer.gated_norm).subspan(g * group_width, group_width), group);
+        }
+    }
+}
+
+void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled) {
+    const auto columns = static_cast<std::size_t>(matrix->dimensions[0]);
+    const auto rows = static_cast<std::size_t>(matrix->dimensions[1]);
+    if (batch == 0 || batch > 16 || input.size() != batch * columns || output.size() != batch * rows) { throw std::runtime_error("Invalid prefill matrix dimensions"); }
+    const auto data = model_.data(*matrix);
+    const auto stride = row_bytes(matrix->type, columns);
+    const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
+    std::vector<std::vector<QuantizedInput>> quantized(batch);
+    if (fast) {
+        for (std::size_t t = 0; t < batch; ++t) { quantized[t] = quantize_input(input.subspan(t * columns, columns)); }
+    }
+    executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
+        for (auto row = first; row < last; ++row) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            const auto weights = data.subspan(row * stride, stride);
+            if (fast) {
+                std::array<std::span<const QuantizedInput>, 16> views;
+                std::array<float, 16> values;
+                for (std::size_t t = 0; t < batch; ++t) { views[t] = quantized[t]; }
+                quantized_batch_dot(matrix->type, weights, std::span(views).first(batch), std::span(values).first(batch));
+                for (std::size_t t = 0; t < batch; ++t) { output[t * rows + row] = values[t]; }
+            } else {
+                for (std::size_t t = 0; t < batch; ++t) { output[t * rows + row] = dot(matrix->type, weights, input.subspan(t * columns, columns)); }
+            }
+        }
+    });
+}
+
+const std::vector<float> &Lite::prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress) {
+    if (tokens.empty()) { throw std::runtime_error("A prompt token is required"); }
+    for (const auto token : tokens) {
+        if (token < 0 || static_cast<std::size_t>(token) >= logits_.size()) { throw std::runtime_error("Invalid input token"); }
+    }
+    const auto stride = row_bytes(embedding_->type, width_);
+    for (std::size_t offset = 0; offset < tokens.size(); offset += 16) {
+        const auto batch = std::min<std::size_t>(16, tokens.size() - offset);
+        batch_hidden_.resize(batch * width_); batch_normalized_.resize(batch * width_);
+        batch_projected_.resize(batch * projection_.size()); batch_mixed_.resize(batch * inner_); batch_update_.resize(batch * width_);
+        for (std::size_t t = 0; t < batch; ++t) {
+            decode_row(embedding_->type, model_.data(*embedding_).subspan(static_cast<std::size_t>(tokens[offset + t]) * stride, stride), std::span(batch_hidden_).subspan(t * width_, width_));
+        }
+        for (auto &layer : layers_) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            for (std::size_t t = 0; t < batch; ++t) { normalize(std::span(batch_hidden_).subspan(t * width_, width_), layer.norm_weight, std::span(batch_normalized_).subspan(t * width_, width_)); }
+            multiply_batch(layer.projection, batch_normalized_, batch_projected_, batch, cancelled);
+            mix_batch(layer, batch, cancelled);
+            multiply_batch(layer.output, batch_mixed_, batch_update_, batch, cancelled);
+            for (std::size_t i = 0; i < batch_hidden_.size(); ++i) { batch_hidden_[i] += batch_update_[i]; }
+        }
+        const auto last = std::span(batch_hidden_).subspan((batch - 1) * width_, width_);
+        std::copy(last.begin(), last.end(), hidden_.begin());
+        if (progress) { progress(offset + batch); }
+    }
+    normalize(hidden_, final_norm_, normalized_);
+    multiply(output_, normalized_, logits_, cancelled);
+    if (!std::all_of(logits_.begin(), logits_.end(), [](float value) { return std::isfinite(value); })) { throw std::runtime_error("Model produced non-finite logits"); }
     return logits_;
 }
 

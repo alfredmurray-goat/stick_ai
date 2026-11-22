@@ -1,5 +1,6 @@
 #include "runtime.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cstdlib>
 
@@ -126,6 +127,95 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
     }
     return total;
 }
+template<std::size_t Count>
+STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::fill(output.begin(), output.end(), 0.0f);
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 144;
+        __m256i accumulator[Count];
+        int minima[Count] {};
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto *scales = p + 4;
+            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
+            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
+            if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
+            q = _mm256_and_si256(q, _mm256_set1_epi8(15));
+            const auto multiplier = _mm256_set1_epi32(static_cast<int>(scale));
+            for (std::size_t t = 0; t < Count; ++t) {
+                const auto &x = input[t][block];
+                const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
+                const auto sums = _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), _mm256_set1_epi16(1));
+                accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(sums, multiplier));
+                minima[t] += static_cast<int>(minimum) * (x.sums[g * 2] + x.sums[g * 2 + 1]);
+            }
+        }
+        const auto scale = half_float(read_half(p));
+        const auto minimum = half_float(read_half(p + 2));
+        for (std::size_t t = 0; t < Count; ++t) {
+            alignas(32) std::int32_t lanes[8];
+            _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator[t]);
+            int sum = 0;
+            for (const auto value : lanes) { sum += value; }
+            output[t] += input[t][block].scale * (scale * static_cast<float>(sum) - minimum * static_cast<float>(minima[t]));
+        }
+    }
+}
+template<std::size_t Count>
+STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::fill(output.begin(), output.end(), 0.0f);
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 210;
+        __m256i accumulator[Count];
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto quarter = g % 4;
+            for (std::size_t j = 0; j < 32; j += 16) {
+                auto low = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j)));
+                if (quarter >= 2) { low = _mm256_srli_epi16(low, 4); }
+                const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
+                const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
+                const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                const auto multiplier = _mm256_set1_epi32(raw < 128 ? raw : raw - 256);
+                for (std::size_t t = 0; t < Count; ++t) {
+                    const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[t][block].values.data() + g * 32 + j)));
+                    accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(_mm256_madd_epi16(q, x), multiplier));
+                }
+            }
+        }
+        const auto scale = half_float(read_half(p + 208));
+        for (std::size_t t = 0; t < Count; ++t) {
+            alignas(32) std::int32_t lanes[8];
+            _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator[t]);
+            int sum = 0;
+            for (const auto value : lanes) { sum += value; }
+            output[t] += input[t][block].scale * scale * static_cast<float>(sum);
+        }
+    }
+}
+STELLAN_AVX2 void q4_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 4 <= input.size(); first += 4) { q4_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); }
+    switch (input.size() - first) {
+        case 3: q4_tile<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q4_tile<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q4_tile<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_AVX2 void q6_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 4 <= input.size(); first += 4) { q6_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); }
+    switch (input.size() - first) {
+        case 3: q6_tile<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q6_tile<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q6_tile<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
 STELLAN_AVX2 void recurrent(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
         std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output) {
     const auto attenuation = _mm256_set1_ps(decay);
@@ -157,6 +247,13 @@ bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> ro
     static const bool enabled = available();
     if (!enabled) { return false; }
     result = q8_dot(type, row, input);
+    return true;
+}
+bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    static const bool enabled = available();
+    if (!enabled || (type != 12 && type != 14)) { return false; }
+    if (type == 12) { q4_batch(row, input, output); }
+    else { q6_batch(row, input, output); }
     return true;
 }
 bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
@@ -240,5 +337,11 @@ namespace stellan {
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &) { return false; }
 bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::span<const QuantizedInput>, float &) { return false; }
 bool accelerated_ssm(std::size_t, std::size_t, std::span<const float>, float, float, float, std::span<const float>, std::span<const float>, std::span<float>, std::span<float>) { return false; }
+}
+#endif
+
+#if !defined(__x86_64__) && !defined(__i386__) && !defined(_M_X64)
+namespace stellan {
+bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>) { return false; }
 }
 #endif

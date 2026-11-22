@@ -1,6 +1,7 @@
 #include "runtime.hpp"
 #include "lite.hpp"
 #include "max.hpp"
+#include "session.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -65,7 +66,7 @@ int generate(int argc, char **argv) {
         if (std::string_view(argv[4]) == "-") {
             char value;
             while (std::cin.get(value) && value != '\n') {
-                if (standard_input.size() >= 1048576) { throw std::runtime_error("Token input exceeds limit"); }
+                if (standard_input.size() >= 4194304) { throw std::runtime_error("Token input exceeds limit"); }
                 standard_input += value;
             }
         }
@@ -79,7 +80,7 @@ int generate(int argc, char **argv) {
                 throw std::runtime_error("Invalid prompt token ID");
             }
             tokens.push_back(token);
-            if (tokens.size() > 32768) { throw std::runtime_error("Prompt exceeds token limit"); }
+            if (tokens.size() > 262144) { throw std::runtime_error("Prompt exceeds token limit"); }
             if (comma == std::string_view::npos) { break; }
             ids.remove_prefix(comma + 1);
             if (ids.empty()) { throw std::runtime_error("Empty token ID"); }
@@ -101,10 +102,9 @@ int generate(int argc, char **argv) {
     const auto start = Clock::now();
     const auto cpu_start = stellan::usage().cpu_ms;
     const std::vector<float> *logits = nullptr;
-    for (std::size_t i = 0; i < tokens.size(); ++i) {
-        logits = &engine->step(tokens[i], [] { return cancelled != 0; });
-        std::cout << "{\"event\":\"prompt_progress\",\"completed\":" << i + 1 << ",\"total\":" << tokens.size() << "}\n" << std::flush;
-    }
+    logits = &engine->prefill(tokens, [] { return cancelled != 0; }, [&](std::size_t completed) {
+        std::cout << "{\"event\":\"prompt_progress\",\"completed\":" << completed << ",\"total\":" << tokens.size() << "}\n" << std::flush;
+    });
     const auto prompt_ms = milliseconds(start);
     double first_ms = 0;
     std::vector<std::int32_t> generated;
@@ -133,6 +133,7 @@ int generate(int argc, char **argv) {
 }
 
 int run(int argc, char **argv) {
+    if (argc >= 2 && std::string_view(argv[1]) == "serve") { return stellan::session(argc, argv, [] { return cancelled.load(std::memory_order_relaxed); }); }
     if (argc == 3 && std::string_view(argv[1]) == "hash") {
         const stellan::Mapping mapping(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[2]))));
         std::cout << "{\"sha256\":" << stellan::json_string(stellan::sha256(mapping.bytes())) << "}\n";
@@ -155,7 +156,7 @@ int run(int argc, char **argv) {
     const auto load_ms = milliseconds(start);
     std::cout << std::setprecision(12);
     if (!bench) {
-        std::cout << "{\"runtime\":\"stellan-native-prototype\",\"generation_supported\":false,\"architecture\":"
+        std::cout << "{\"runtime\":\"Stellan-Run\",\"generation_supported\":false,\"architecture\":"
                   << stellan::json_string(model.architecture()) << ",\"mapped_bytes\":" << mapping.bytes().size()
                   << ",\"load_ms\":" << load_ms << ",\"tensors\":[";
         bool first = true;
@@ -209,7 +210,7 @@ int run(int argc, char **argv) {
     double checksum = 0;
     for (const auto value : output) { checksum += value; }
     if (!std::isfinite(checksum)) { throw std::runtime_error("Non-finite benchmark output; check model weights"); }
-    std::cout << "{\"runtime\":\"stellan-native-prototype\",\"scope\":\"single-thread-matvec-only\",\"tensor\":"
+    std::cout << "{\"runtime\":\"Stellan-Run\",\"scope\":\"single-thread-matvec-only\",\"tensor\":"
               << stellan::json_string(tensor->name) << ",\"type\":" << tensor->type << ",\"load_ms\":" << load_ms
               << ",\"first_matvec_ms\":" << first_ms << ",\"median_matvec_ms\":" << samples[samples.size() / 2]
               << ",\"matrix_bytes\":" << weights.size() << ",\"repetitions\":" << repetitions

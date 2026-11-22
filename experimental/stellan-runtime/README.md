@@ -1,4 +1,4 @@
-# Stellan Runtime
+# Stellan-Run
 
 An independent C++20 inference-engine experiment by localilabs, under the repository's MIT licence. The engine does not link or launch llama.cpp, ggml or Ollama. Its optional Node.js bridge uses only built-in modules from the app's existing Node runtime. No new npm dependencies or third-party implementation code are included.
 
@@ -65,9 +65,9 @@ For Max, change the model file and trusted model hash to the Max values above. T
 
 The native diagnostic commands are `generate MODEL SHA256 PROMPT [TOKENS] [THREADS] [CONTEXT]` for Lite, or `decode MODEL SHA256 COMMA_SEPARATED_IDS [TOKENS] [THREADS] [CONTEXT]` for either architecture. `-` reads IDs from stdin, avoiding Windows command-line length limits. Native Max raw-text tokenization is deliberately refused; use the bridge's Tekken tokenizer. The CLI writes newline-delimited JSON progress, tokens and timings. `hash` supports nonempty files; empty-input hashing is covered in core tests.
 
-Max's default KV context is 8192, configurable downwards in the bridge. Its FP16 cache uses about 1.25 GiB at that setting, in addition to weights and working memory. Lite's recurrent state/history is 276,299,776 bytes, independent of prompt length. Context and allocation budgets fail explicitly. Models must not be modified or truncated while mapped.
+Max's default KV context is 8192, configurable downwards in the bridge. The persistent Lite bridge accepts the app's 65536/262144 context budgets without a token-sized state allocation; this capacity check is not long-context quality validation. Its FP16 cache uses about 1.25 GiB at that setting, in addition to weights and working memory. Lite's recurrent state/history is 276,299,776 bytes, independent of prompt length. Context and allocation budgets fail explicitly. Models must not be modified or truncated while mapped.
 
-Each bridge request currently starts a new native process and re-verifies the model. The native state and workers remain alive within that request, not between tool calls. This startup cost is a known blocker for app integration. SIGINT/SIGTERM cancel generation; the bridge terminates an unresponsive child after two seconds. A child is never started with a shell. This developer interface can show diagnostics; it is not the consumer UI.
+`run.mjs` is a one-shot diagnostic and starts a fresh, fully verified process for each request. `session.mjs` retains a verified model, decoder and worker pool across requests; use that interface for persistent-session development. SIGINT/SIGTERM cancel generation; the bridge terminates an unresponsive child after two seconds. A child is never started with a shell. This developer interface can show diagnostics; it is not the consumer UI.
 
 ## Evidence and replacement gate
 
@@ -77,7 +77,7 @@ See [EVIDENCE.md](EVIDENCE.md) for the actual Linux probes, their limitations an
 
 This is a structural eligibility check, not independent proof of the assertions in a report, a security audit or an automatic merger. Inspect the raw results and exact candidate commit. A short CPU probe, a CI virtual machine, disabling the baseline's normal GPU acceleration, or a smaller context cannot establish that the app is better. Main must keep its existing engine until all conditions are met for both models.
 
-The next priorities are persistent model processes and stable prompt caching, batched prompt processing, faster integrity verification using the existing trusted app pipeline, complete checkpoint/agent validation for Max on sufficient RAM, physical-device profiling, GPU execution, encrypted/split model support, secure streaming serving and desktop integration. Keep approvals and all privacy/integrity/activation checks when integrating. The deferred reinforcement learning and unnamed open-source demonstration plan are in [HANDOVER.md](../../HANDOVER.md).
+The next priorities are production integration of persistent sessions and prompt caching, further matrix-kernel improvements, integrity verification using the existing trusted app pipeline, complete checkpoint/agent validation for Max on sufficient RAM, physical-device profiling, GPU execution, encrypted/split model support, secure streaming serving and desktop integration. Keep approvals and all privacy/integrity/activation checks when integrating. The deferred reinforcement learning and unnamed open-source demonstration plan are in [HANDOVER.md](../../HANDOVER.md).
 
 ## References
 
@@ -86,3 +86,33 @@ The implementation uses the published [GGUF format](https://github.com/ggml-org/
 ## Verification startup improvement
 
 The portable SHA-256 path checks every byte as before, with less per-block overhead and no new dependencies. On this development host, alternating full-Lite verification runs measured median **19.05 s → 12.12 s**. This improves model verification only; it does not establish faster generation or superiority to llama.cpp. See [the measurement and limitations](EVIDENCE.md#verification-optimization-22-november-2026) and [raw timings](evidence/verification-probe.json).
+
+## Persistent local sessions
+
+Stellan-Run now has a pipe-only persistent worker (`serve MODEL SHA256 THREADS CONTEXT`) and the `openNativeSession` bridge in `session.mjs`. It verifies the executable and full model before readiness, retains the model/decoder within that process, and supports one request at a time. Requests provide the complete tokenized prompt. Only an exact extension of the already evaluated prefix reuses state; divergent or shorter prompts reset the decoder. The last generated token is not counted as cached until it has actually been evaluated. No other process or conversation receives this state.
+
+Cancellation, unexpected protocol events and model-file changes retire the bridge session; callers must reopen it. An idle session closes after ten minutes by default. Nothing is exposed on a network port. Full model checks are performed again when a new session opens. Size/mtime checks detect ordinary model-file changes during a session; models must remain immutable while mapped, and this is not a defence against a malicious process rewriting files and restoring metadata. No disk trust cache was added.
+
+Lite prefill processes up to sixteen tokens at a time, reusing each weight row across the batch and projecting vocabulary logits only after the final prompt token. The convolution and recurrent state still advance in causal order. Decode math is unchanged. Max retains sequential layer evaluation but skips vocabulary projection for every intermediate prompt token; the output head runs only for the final prompt token. Prompt progress is emitted during prefill for both architectures.
+
+Native tests compare cached/uncached results for both architectures, divergent and shortened prompts, errors and batch boundaries; Node integration tests cover prefix reuse, concurrency rejection, cancellation, inactivity and file tampering. This developer worker has not replaced the app server or its activation/encrypted-model/desktop integrations.
+
+The acceptance target for the next replacement PR is the app using Stellan-Run, with matched quality, latency, memory and CPU results against the shipped llama.cpp setup for **both** release models. Partial or synthetic results must not be described as that qualification.
+
+## Current performance work
+
+On a SHA-capable Linux x64 development CPU, hardware SHA-256 reduced full pinned Lite verification from median **13.03 s to 2.24 s** across three alternating trials per implementation. All six digests match the pinned hash. The implementation checks CPU capabilities before using SHA instructions and retains the portable fallback. This is model-verification timing, not a generation speedup over llama.cpp.
+
+The persistent worker reused 34 evaluated tokens in a real Lite follow-up, processed 10 new tokens, and returned the same 12 generated IDs as a reset/fresh evaluation of that full follow-up. Warm prompt computation was 1.08 s versus 4.85 s for that fresh request. This is one cache diagnostic against our own fresh state, not a win over the baseline's existing prompt cache.
+
+Packed Q4_K/Q6_K prefill now shares weight unpacking across four activation vectors. Lite traverses recurrent state channel-first across each microbatch to keep it hot, while preserving causal convolution and per-token state updates. Independent numerical fixtures cover both architectures, scalar/vector paths and chunk boundaries. Exploratory real-model timings still favour llama.cpp; see [the receipts and limits](EVIDENCE.md#sessions-and-hardware-verification).
+
+To compare persistent Stellan-Run with your locally built pinned llama-server:
+
+```sh
+node experimental/stellan-runtime/bench-sessions.mjs \
+  /path/to/stellan-runtime /path/to/llama-server \
+  /path/to/model.gguf TRUSTED_MODEL_SHA256 /path/to/new-report.json 5
+```
+
+The output must be a new report file. Both use the same tokenized prompts, 8192 context, greedy output, 12-token limit and two CPU threads. The script runs engines sequentially to avoid simultaneous model residency, checks the model hash, retains executable hashes/raw output/timings, and does not download models, rent machines or start a hosted evaluation. Max is refused below 24 GiB reported RAM for this development diagnostic. Reference commit provenance must be checked separately; the executable hash alone does not establish its source commit. Grouped run order, two short prompts and CPU-only settings make this a diagnostic, not qualification for replacement.

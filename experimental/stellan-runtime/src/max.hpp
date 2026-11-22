@@ -7,6 +7,7 @@ class Max : public Decoder {
 public:
     Max(const Model &model, unsigned threads, std::size_t context);
     const std::vector<float> &step(std::int32_t token, const std::function<bool()> &cancelled) override;
+    const std::vector<float> &prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress = {}) override;
     void reset() override;
     std::size_t state_bytes() const override;
 private:
@@ -23,6 +24,7 @@ private:
         std::vector<std::uint16_t> keys;
         std::vector<std::uint16_t> values;
     };
+    const std::vector<float> &evaluate(std::int32_t token, const std::function<bool()> &cancelled, bool output_logits);
     const Model &model_;
     Executor executor_;
     std::size_t width_;

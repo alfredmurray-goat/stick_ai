@@ -112,3 +112,12 @@ test("actual Max tokenizer metadata matches independent Unicode/code golden case
   const tokenizer = await readTokenizer(process.env.STELLAN_TOKENIZER_GGUF);
   for (const item of reference.cases) { assert.deepEqual(tokenizer.encode(item.prompt), item.ids); }
 });
+
+
+test("Lite accepts the app's long context budget and refuses over-budget requests", () => {
+  const options = { mode: "llama", ramBytes: 8 * 1024 ** 3, tokens: Array(65537).fill(1), context: 262144, maxTokens: 128 };
+  assert.equal(launchPlan(options).context, 262144);
+  assert.throws(() => launchPlan({ ...options, context: 65536 }), /context/);
+  assert.throws(() => launchPlan({ ...options, context: 262145 }), /context/);
+  assert.throws(() => launchPlan({ ...options, mode: "gpt2", ramBytes: 32 * 1024 ** 3 }), /context/);
+});

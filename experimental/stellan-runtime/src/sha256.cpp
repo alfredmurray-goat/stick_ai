@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 namespace stellan {
+bool accelerated_sha256(std::span<const std::byte> bytes, std::span<std::uint32_t, 8> state, std::span<const std::uint32_t, 64> constants);
 std::string sha256(std::span<const std::byte> bytes) {
     if (bytes.size() > (UINT64_MAX >> 3)) { throw std::runtime_error("File exceeds hash size limit"); }
     constexpr std::array<std::uint32_t, 64> constants {
@@ -53,7 +54,10 @@ std::string sha256(std::span<const std::byte> bytes) {
         hash[4] += e; hash[5] += f; hash[6] += g; hash[7] += h;
     };
     const auto complete = bytes.size() - bytes.size() % 64;
-    for (std::size_t offset = 0; offset < complete; offset += 64) { compress(bytes.data() + offset); }
+    const bool accelerated = accelerated_sha256(bytes.first(complete), hash, constants);
+    if (!accelerated) {
+        for (std::size_t offset = 0; offset < complete; offset += 64) { compress(bytes.data() + offset); }
+    }
     std::array<std::byte, 128> tail {};
     const auto remainder = bytes.size() - complete;
     if (remainder != 0) { std::copy_n(bytes.data() + complete, remainder, tail.data()); }
@@ -61,8 +65,10 @@ std::string sha256(std::span<const std::byte> bytes) {
     const auto padded = remainder < 56 ? 64U : 128U;
     const auto length = static_cast<std::uint64_t>(bytes.size()) * 8;
     for (unsigned i = 0; i < 8; ++i) { tail[padded - 1 - i] = static_cast<std::byte>((length >> (i * 8)) & 255); }
-    compress(tail.data());
-    if (padded == 128) { compress(tail.data() + 64); }
+    if (!accelerated || !accelerated_sha256(std::span(tail).first(padded), hash, constants)) {
+        compress(tail.data());
+        if (padded == 128) { compress(tail.data() + 64); }
+    }
     constexpr char digits[] = "0123456789abcdef";
     std::string result;
     for (const auto word : hash) {
