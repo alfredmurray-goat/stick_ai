@@ -85,3 +85,13 @@ The owner asked whether our own Ollama or llama.cpp could make Stellan faster. T
 - Max's measured disk thrashing on a 16 GB machine is a model-fit limit: changing wrappers or rebranding llama.cpp will not make the weights fit. Smaller quantisation/model variants require quality and compatibility evaluation.
 - Prefer a small reproducible patch set on a pinned upstream commit, with benchmark evidence and retained licence notices. Only maintain a long-lived fork or write new kernels if profiling identifies a worthwhile bottleneck.
 - No promised speed multiplier until measured on representative hardware.
+
+## Independent runtime experiment started (22 November 2026)
+
+The owner explicitly approved saving the deferred training plan on GitHub and starting an independent runtime on a separate branch. `experimental/stellan-runtime` now contains `experimental/stellan-runtime/`: original C++20 code with no llama.cpp, ggml or Ollama linkage and no new package dependencies, under the repository's MIT licence. The production app and release path are unchanged.
+
+First milestone: read-only POSIX/Windows file mapping, validated GGUF v2/v3 metadata and tensor layouts, F32/F16/Q8_0/Q4_K single-thread matrix-vector kernels, grouped Mamba2 recurrent-state math, an inspection CLI, a per-tensor timing CLI, native correctness tests and a separate cross-platform CI workflow. See that directory's README for build commands, scope and the implementation roadmap.
+
+This does **not** generate text, expose a server or run either complete Stellan model yet. Q4_K_M mixes storage formats; Q6_K computation, tokenizer integration, complete Lite layers and then Max's transformer execution remain. Encrypted/split model handling and production integrity/activation integration are also pending. No speed improvement is claimed. Keep this branch separate until real checkpoint/logit parity, end-to-end correctness, security and hardware benchmarks pass.
+
+Local verification on Linux with GCC 14.2: 129,327 native numeric/validation checks and 15 Python GGUF/CLI test cases passed, including every truncated fixture prefix and seeded mutations. AddressSanitizer and UndefinedBehaviorSanitizer passed with local leak detection disabled because the execution host uses ptrace; the CI sanitizer job keeps default leak detection. The unchanged Node.js 24.22.1 app passed strict type checking, build and all 312 available unit tests (one optional Ollama integration test skipped). The three extra Kaggle tests from the separate benchmark-fix branch are not on this branch. Native Windows/macOS execution, CMake builds, real model generation and performance remain unverified locally; the new CI matrix is intended to check native compilation and fixtures on all four targets.

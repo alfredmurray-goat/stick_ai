@@ -1,0 +1,51 @@
+name: Experimental Stellan runtime
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [experimental/stellan-runtime]
+    paths:
+      - experimental/stellan-runtime/**
+      - .github/workflows/stellan-runtime.yml
+  pull_request:
+    paths:
+      - experimental/stellan-runtime/**
+      - .github/workflows/stellan-runtime.yml
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Configure
+        run: cmake -S experimental/stellan-runtime -B experimental/stellan-runtime/build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build experimental/stellan-runtime/build --config Release --parallel 2
+      - name: Test native core and GGUF validation
+        run: ctest --test-dir experimental/stellan-runtime/build -C Release --output-on-failure --timeout 60
+
+  sanitize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Configure sanitizers
+        run: cmake -S experimental/stellan-runtime -B experimental/stellan-runtime/build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer'
+      - name: Build
+        run: cmake --build experimental/stellan-runtime/build --parallel 2
+      - name: Test memory and arithmetic safety
+        run: ctest --test-dir experimental/stellan-runtime/build --output-on-failure --timeout 60
