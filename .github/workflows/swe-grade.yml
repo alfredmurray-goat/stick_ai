@@ -1,0 +1,103 @@
+name: Grade SWE-bench pilot
+on:
+  workflow_dispatch:
+    inputs:
+      submission_ref:
+        description: Git ref containing the sanitized Kaggle Output in benchmark-submission/
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.submission_ref }}
+          path: submission
+          persist-credentials: false
+      - id: plan
+        run: |
+          python3 - <<'PY'
+          import importlib.util, json, os
+          spec = importlib.util.spec_from_file_location('grade', 'scripts/grade-swe.py')
+          grade = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(grade)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as file:
+              file.write('matrix=' + json.dumps(grade.plan('submission/benchmark-submission')) + '\n')
+          PY
+  grade:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.submission_ref }}
+          path: submission
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: SWE-bench/SWE-bench
+          ref: 02e7a74ffd0b707aab73d203fe87bdc7c76afc8e
+          path: official-harness
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned official harness
+        run: python -m pip install -e official-harness
+      - name: Grade one prediction with one worker
+        env:
+          SWE_MODEL: ${{ matrix.model }}
+          SWE_INSTANCE: ${{ matrix.instance }}
+          SWE_RUN: stellan-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.model }}-${{ matrix.instance }}
+        run: |
+          python scripts/grade-swe.py task --submission submission/benchmark-submission \
+            --model "$SWE_MODEL" --instance "$SWE_INSTANCE" --harness official-harness \
+            --run-id "$SWE_RUN" --out grade-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swe-report-${{ matrix.model }}-${{ matrix.instance }}
+          path: grade-output/
+          if-no-files-found: warn
+          retention-days: 30
+  summarize:
+    needs: [plan, grade]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.submission_ref }}
+          path: submission
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: swe-report-*
+          path: reports
+      - name: Summarize against the original ten tasks
+        run: python3 scripts/grade-swe.py aggregate --submission submission/benchmark-submission --reports reports --out swe-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swe-pilot-summary
+          path: swe-summary.json
+          retention-days: 30
