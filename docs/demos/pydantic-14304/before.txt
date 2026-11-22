@@ -1,0 +1,17 @@
+Pydantic: 2.14.3
+Traceback (most recent call last):
+  File "<venv>/site-packages/pydantic/_internal/_serializers.py", line 47, in serialize_sequence_via_list
+    item_v = handler(item, index)
+             ^^^^^^^^^^^^^^^^^^^^
+ValueError: Negative indices cannot be used to exclude items on unsized iterables
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<case>/reproduce.py", line 12, in <module>
+    assert Model().model_dump(exclude={'items': {-1}}) == {'items': [{'a': 1}, {'a': 1}]}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<venv>/site-packages/pydantic/main.py", line 520, in model_dump
+    return self.__pydantic_serializer__.to_python(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.PydanticSerializationError: Error calling function `serialize_sequence_via_list`: ValueError: Negative indices cannot be used to exclude items on unsized iterables

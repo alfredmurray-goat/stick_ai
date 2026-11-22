@@ -1,0 +1,21 @@
+{
+  "model": "stellan-1-lite",
+  "runtime": "experimental independent CPU engine; not the production agent loop",
+  "maxRan": false,
+  "wallSeconds": 148.599,
+  "engineSha256": "220fb88fb356c12a2fe96a6f70f3748efcf419533c084575746ec5170a28cb12",
+  "text": " The bug is that the `exclude` parameter is being passed to the `handler` function with an index of `-1`. This is causing a `ValueError: Negative indices cannot be used to exclude items on unsized iterables`. The `exclude` parameter is a set of field names or indices to exclude from serialization. In this case, the `exclude` set contains the integer `-1`, which is causing the error.\n\nTo fix this bug, the `handler` function should be modified to handle negative indices gracefully. One possible solution is to ignore any negative indices and continue processing the remaining items. Another solution is to raise a custom error message indicating that negative indices are not allowed.\n\nHere is an example of how the `handler` function could be modified:\n\n```python\ndef serialize_sequence_via_list(\n    v: Any, handler: core_schema.SerializerFunctionWrapHandler, info: core_schema.SerializationInfo\n) -> Any:\n    items: list[Any] = []\n\n    value_type = type(v)\n    mapped_origin = SEQUENCE_ORIGIN_MAP.get(value_type)\n",
+  "metrics": {
+    "event": "finished",
+    "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+    "verify_ms": 21201.6,
+    "prompt_ms": 91810.8,
+    "first_token_ms": 91810.9,
+    "decode_ms": 35127.7,
+    "generated": 256,
+    "state_bytes": 276299776,
+    "threads": 2,
+    "cpu_ms": 228179,
+    "peak_rss_bytes": 4446875648
+  }
+}
