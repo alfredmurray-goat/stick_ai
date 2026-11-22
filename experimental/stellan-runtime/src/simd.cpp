@@ -29,14 +29,17 @@ bool available() {
     return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") && __builtin_cpu_supports("f16c");
 #endif
 }
+STELLAN_AVX2 float half_float(std::uint16_t bits) {
+    return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(static_cast<int>(bits))));
+}
 STELLAN_AVX2 float packed_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const float> input) {
     auto sum = _mm256_setzero_ps();
     const auto mask = _mm256_set1_epi32(15);
     for (std::size_t block = 0; block < input.size() / 256; ++block) {
         const auto *p = row.data() + block * (type == 12 ? 144 : 210);
         if (type == 12) {
-            const auto d = _cvtsh_ss(read_half(p));
-            const auto minimum = _cvtsh_ss(read_half(p + 2));
+            const auto d = half_float(read_half(p));
+            const auto minimum = half_float(read_half(p + 2));
             for (std::size_t g = 0; g < 8; ++g) {
                 const auto *s = p + 4;
                 const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
@@ -55,7 +58,7 @@ STELLAN_AVX2 float packed_dot(std::uint32_t type, std::span<const std::byte> row
                 }
             }
         } else {
-            const auto d = _cvtsh_ss(read_half(p + 208));
+            const auto d = half_float(read_half(p + 208));
             for (std::size_t g = 0; g < 8; ++g) {
                 const auto half_block = g / 4;
                 const auto quarter = g % 4;
@@ -118,8 +121,8 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
         _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator);
         int sum = 0;
         for (const auto value : lanes) { sum += value; }
-        if (type == 12) { total += input[b].scale * (_cvtsh_ss(read_half(p)) * static_cast<float>(sum) - _cvtsh_ss(read_half(p + 2)) * static_cast<float>(minima)); }
-        else { total += input[b].scale * _cvtsh_ss(read_half(p + 208)) * static_cast<float>(sum); }
+        if (type == 12) { total += input[b].scale * (half_float(read_half(p)) * static_cast<float>(sum) - half_float(read_half(p + 2)) * static_cast<float>(minima)); }
+        else { total += input[b].scale * half_float(read_half(p + 208)) * static_cast<float>(sum); }
     }
     return total;
 }
