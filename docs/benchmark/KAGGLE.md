@@ -30,3 +30,11 @@ Follow along in Google Drive: the folder **Stick AI benchmark** gets `run.log` (
 Just **Save & Run All** again. It reads the last save from your Drive and carries on with the problems it hasn't done. It always stops itself at 11 hours, before Kaggle's 12-hour limit, so the run's own Output is kept as well.
 
 Free GPU time on Kaggle is about 30 hours a week.
+
+## If CUDA configuration failed
+
+`Target "ggml-cuda" links to CUDA::cuda_driver but the target was not found` is a build failure, before HumanEval or Max starts. Kaggle can expose working T4s without the driver development library that CMake needs for CUDA virtual-memory allocation. The notebook disables that optional allocator with `GGML_CUDA_NO_VMM=ON`; inference still uses CUDA on both T4s. It does not install a different NVIDIA driver or fall back to CPU scores.
+
+Import the updated `kaggle-max-humaneval.ipynb` into Kaggle, keep **Internet: On** and **GPU T4 x2**, then **Save Version → Save & Run All**. An existing Kaggle copy does not update its cells when the GitHub repository changes. Keep your Drive saver secret selected, or attach your previous run's Output as input: completed problems are still resumed.
+
+CPU and CUDA builds now have separate folders keyed by the pinned llama.cpp revision and the app's split-model patch. An old CPU executable or failed CMake cache will not be reused for the CUDA run. Before downloading Max, the notebook checks that the server lists CUDA devices; if it cannot, it stops rather than reporting a CPU run as a GPU benchmark. Configuration and build failures show their actual log.

@@ -8,6 +8,8 @@ Stick AI is a private, offline coding assistant: a Tauri desktop app around a lo
 
 ### Recently merged
 
+- **Kaggle CUDA build fix (2026-11-22).** The notebook disables CUDA VMM (`GGML_CUDA_NO_VMM=ON`) because Kaggle can expose both T4s without CMake finding the driver development library behind `CUDA::cuda_driver`. CUDA inference stays enabled. Builds are keyed by CPU/CUDA mode, the pinned llama.cpp revision and the split-model patch; the patch is applied, and a GPU run must list CUDA devices before Max is downloaded. Import the updated notebook: existing Kaggle copies keep their embedded old build cell. Drive/Output resume remains unchanged. Regression tests exercise the actual Bash build cell with mocked build tools; a real Kaggle T4 run still needs verification.
+
 | PR | What changed |
 | --- | --- |
 | [#25](https://github.com/alfredmurray-goat/stick_ai/pull/25) | Workspace UI redesign: formatted Markdown answers, before/after diffs in approvals, tool timeline, SVG icons, light and dark themes. |
