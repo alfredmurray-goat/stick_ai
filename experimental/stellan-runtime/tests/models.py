@@ -1,6 +1,7 @@
 import hashlib
 import json
 import math
+import os
 import random
 import struct
 import subprocess
@@ -20,6 +21,18 @@ def vector(values):
 def dense(weights, values):
     return [sum(a * b for a, b in zip(row, values)) for row in weights]
 
+
+def cache_values(values, quantized):
+    if not quantized:
+        return list(struct.unpack('<' + 'e' * len(values), struct.pack('<' + 'e' * len(values), *values)))
+    result = []
+    for start in range(0, len(values), 32):
+        block = values[start:start+32]
+        maximum = max(abs(v) for v in block)
+        scale = struct.unpack('<e', struct.pack('<e', maximum / 127))[0]
+        if maximum and not scale: scale = 2 ** -24
+        result += [scale * min(127, max(-127, round(value / scale))) if scale else 0 for value in block]
+    return result
 
 def norm(values, weights):
     scale = 1 / math.sqrt(sum(x * x for x in values) / len(values) + 1e-5)
@@ -75,6 +88,7 @@ class Fixture:
                 self.add(prefix + "ffn_norm.weight", [4], ones=True)
         self.state = [[[0.0] * 2 for _ in range(8)] for _ in range(2)]
         self.history = [[[0.0] * 3 for _ in range(8 + 4 * groups)] for _ in range(2)]
+        self.quantized_cache = False
         self.keys = [[], []]
         self.values = [[], []]
 
@@ -121,8 +135,8 @@ class Fixture:
                     for i in range(0, len(values), 2):
                         a, b = values[i:i + 2]
                         values[i:i + 2] = [a * math.cos(position) - b * math.sin(position), a * math.sin(position) + b * math.cos(position)]
-                self.keys[layer].append(list(struct.unpack("<" + "e" * len(k), struct.pack("<" + "e" * len(k), *k))))
-                self.values[layer].append(list(struct.unpack("<" + "e" * len(v), struct.pack("<" + "e" * len(v), *v))))
+                self.keys[layer].append(cache_values(k, self.quantized_cache))
+                self.values[layer].append(cache_values(v, self.quantized_cache))
                 attention = []
                 for head in range(2):
                     scores = [sum(a * b for a, b in zip(q[head * 2:head * 2 + 2], key)) / math.sqrt(2) for key in self.keys[layer]]
@@ -230,6 +244,20 @@ class ExecutionTests(unittest.TestCase):
                 event = next(json.loads(line) for line in result.stdout.splitlines() if json.loads(line)['event'] == 'token')
                 self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
                 for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+
+    def test_quantized_transformer_cache_matches_independent_reference(self):
+        fixture = Fixture("llama"); fixture.quantized_cache = True
+        data = fixture.bytes(); self.file.write_bytes(data)
+        tokens = [1, 68, 69, 70, 71]
+        for token in tokens: logits = fixture.step(token)
+        result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "4", "2", "8192"], env={**os.environ, 'STELLAN_RUNTIME_KV_Q8': '1'}, capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(events[-1]['cache_type'], 'q8_0')
+        self.assertLess(events[-1]['state_bytes'], events[-1]['state_capacity_bytes'])
+        for event in [e for e in events if e['event'] == 'token']:
+            self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
+            for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+            logits = fixture.step(event['id'])
 
     def test_hash_mismatch_blocks_execution(self):
         result = self.invoke(Fixture("mamba2").bytes(), "decode", "0" * 64, "1", "1")

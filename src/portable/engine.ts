@@ -72,10 +72,11 @@ export interface ContextPlan { lite: number; max: number; historyBytes: number; 
 // window costs no RAM (measured 8.0 GB resident at both 8,192 and 131,072 tokens). What a long
 // conversation does cost is time if it ever has to be read again from the start, so the app keeps
 // about 12k tokens word for word and summarises older tasks (compactHistory); Long context mode keeps
-// about 100k. Max stores every token (about 80 KB each with the 8-bit cache), so its window follows RAM.
+// about 100k. Max stores every token (about 80 KB each with the 8-bit cache). Normal stays at 8k;
+// the optional Long window follows RAM instead of consuming the savings by default.
 export function contextPlan(totalBytes: number, long = false): ContextPlan {
   const GiB = 1024 ** 3;
-  const max = totalBytes >= 30 * GiB ? (long ? 65536 : 32768) : totalBytes >= 22 * GiB ? (long ? 32768 : 16384) : (long ? 16384 : 8192);
+  const max = long ? (totalBytes >= 30 * GiB ? 65536 : totalBytes >= 22 * GiB ? 32768 : 16384) : 8192;
   return long ? { lite: 262144, max, historyBytes: 393216, projectBytes: 32768 } : { lite: 65536, max, historyBytes: 49152, projectBytes: 8192 };
 }
 // Apple Silicon builds include the Metal GPU backend. Weights are memory-mapped and
@@ -133,6 +134,7 @@ export class ManagedEngine implements Switchable {
   activeContextSize = 0;
   onOutput?: (text: string, thinking: boolean) => void;
   onModelStart?: () => void;
+  onUsage?: (model: ModelName, tokens: number) => void;
   onProcess?: (pid: number | null) => void;
   readonly key = randomBytes(32).toString("hex");
   /** A second engine that keeps Max loaded beside Lite (see keepsBothLoaded); stopped with this one. */
@@ -291,7 +293,7 @@ export class ManagedEngine implements Switchable {
   }
   async code(task: string, context: string, signal: AbortSignal, report: (text: string) => void): Promise<string> {
     const write = async (server: ManagedEngine): Promise<string> => {
-      const client = new Ollama("stellan-1-max", server.baseUrl, false, ramStatus(), { apiKey: server.key, specialist: true });
+      const client = new Ollama("stellan-1-max", server.baseUrl, false, ramStatus(), { apiKey: server.key, specialist: true, onUsage: (tokens) => this.onUsage?.("stellan-1-max", tokens) });
       this.onModelStart?.();
       const result = await client.complete([{ role: "system", content: coderSystem }, { role: "user", content: `Task:\n${task}\n\nRelevant source context:\n${context}` }], signal, (text, thinking) => this.onOutput?.(text, thinking));
       return result.content;

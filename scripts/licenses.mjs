@@ -25,6 +25,10 @@ async function visit(name, parent) {
   for (const dependency of Object.keys(pkg.dependencies ?? {}).sort()) { await visit(dependency, directory); }
 }
 for (const name of Object.keys(manifest.dependencies ?? {}).sort()) { await visit(name, root); }
+const pdfNotices = join(root, "node_modules/unpdf/dist/licenses");
+for (const name of (await readdir(pdfNotices)).sort()) {
+  sections.push(`## unpdf bundled component: ${name}\n\n${(await readFile(join(pdfNotices, name), "utf8")).replace(/[ \t]+$/gm, "")}`);
+}
 const esbuild = JSON.parse(await readFile(join(root, "node_modules/esbuild/package.json"), "utf8"));
 if (esbuild.version !== manifest.devDependencies.esbuild || esbuild.license !== "MIT") { throw new Error("Unexpected esbuild build-tool licence or version"); }
 sections.push(`## Build tool: esbuild ${esbuild.version} (MIT)\n\nNot shipped as a runtime dependency.\n\n${(await readFile(join(root, "node_modules/esbuild/LICENSE.md"), "utf8")).replaceAll("\r\n", "\n")}`);

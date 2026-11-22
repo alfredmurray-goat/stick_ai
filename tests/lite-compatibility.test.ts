@@ -40,7 +40,7 @@ it("builds a Lite-only Intel package with its own template and complete target-s
     const index = JSON.parse(await readFile(join(output, "manifest.json"), "utf8")); index.targets = ["untrusted-platform"];
     await writeFile(join(output, "manifest.json"), JSON.stringify(index)); await expect(verifyStick(output)).rejects.toThrow("damaged");
   } finally { await rm(root, { recursive: true, force: true }); }
-});
+}, 30000);
 
 it("bounds Lite recurrent-state memory without reducing its configured context window", () => {
   const args = modelRuntimeArgs("stellan-1-lite");

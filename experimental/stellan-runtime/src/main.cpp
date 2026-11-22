@@ -97,7 +97,7 @@ int generate(int argc, char **argv) {
     const auto threads = argc >= 7 ? bounded(argv[6], 64) : 2;
     std::unique_ptr<stellan::Decoder> engine;
     if (model.architecture() == "mamba2") { engine = std::make_unique<stellan::Lite>(model, threads); }
-    else if (model.architecture() == "llama") { engine = std::make_unique<stellan::Max>(model, threads, argc >= 8 ? bounded(argv[7], 32768) : 8192); }
+    else if (model.architecture() == "llama") { engine = std::make_unique<stellan::Max>(model, threads, argc >= 8 ? bounded(argv[7], 65536) : 8192); }
     else { throw std::runtime_error("Unsupported model execution architecture"); }
     const auto start = Clock::now();
     const auto cpu_start = stellan::usage().cpu_ms;
@@ -127,7 +127,7 @@ int generate(int argc, char **argv) {
     }
     std::cout << "{\"event\":\"finished\",\"model_sha256\":" << stellan::json_string(argv[3]) << ",\"verify_ms\":" << verify_ms
               << ",\"prompt_ms\":" << prompt_ms << ",\"first_token_ms\":" << first_ms << ",\"decode_ms\":" << milliseconds(decode_start)
-              << ",\"generated\":" << generated.size() << ",\"state_bytes\":" << engine->state_bytes() << ",\"threads\":" << threads
+              << ",\"generated\":" << generated.size() << ",\"state_bytes\":" << engine->state_bytes() << ",\"state_capacity_bytes\":" << engine->state_capacity_bytes() << ",\"cache_type\":" << stellan::json_string(std::string(engine->cache_type())) << ",\"threads\":" << threads
               << ",\"cpu_ms\":" << stellan::usage().cpu_ms - cpu_start << ",\"peak_rss_bytes\":" << stellan::usage().peak_rss_bytes << "}\n";
     return cancelled ? 130 : 0;
 }
@@ -156,7 +156,7 @@ int run(int argc, char **argv) {
     const auto load_ms = milliseconds(start);
     std::cout << std::setprecision(12);
     if (!bench) {
-        std::cout << "{\"runtime\":\"Stellan-Run\",\"generation_supported\":false,\"architecture\":"
+        std::cout << "{\"runtime\":\"Stellan-Run\",\"native_input_modalities\":[\"text\"],\"generation_supported\":false,\"architecture\":"
                   << stellan::json_string(model.architecture()) << ",\"mapped_bytes\":" << mapping.bytes().size()
                   << ",\"load_ms\":" << load_ms << ",\"tensors\":[";
         bool first = true;

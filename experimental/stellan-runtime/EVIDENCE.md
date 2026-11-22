@@ -76,3 +76,15 @@ Stellan-Run now retains a verified mapped model and decoder across requests over
 The reference executable was built from the project's pinned llama.cpp commit with its split-directory patch. Its Lite CPU flags include the app's no-repack, one-slot, 512/256 batching and one checkpoint. However, the diagnostic uses 8192 context, disables normal GPU acceleration, excludes the app verification pipeline from reference startup and uses only two synthetic coding prompts. It is not the complete shipped configuration. CPU/RSS and raw timing fields are retained; no unmeasured Max, physical-device or general superiority claim is made.
 
 Max prefill now avoids intermediate output-head projections and normalizes attention scores once per head. Independent transformer fixtures check the resulting logits after multi-token prefill and subsequent decoding. Full Max-weight correctness, quality and speed remain unverified here. Local Release and AddressSanitizer/UndefinedBehaviorSanitizer suites pass; local leak detection remains disabled for the ptrace limitation described above, while CI retains normal leak checking. The optional actual-Max tokenizer golden test remains skipped without its model metadata fixture.
+
+## Lazy and optional Q8 Max cache
+
+Max no longer preallocates the entire attention window. Cache data grows in 256-token chunks, is released on reset, and reports allocated vector capacity separately from the configured maximum. Independent fixtures check FP16 behavior and the optional Q8 mode through prompt prefill and subsequent decoding. Randomized cache tests cover quantization error, full and partial rows, chunk growth, reset, invalid access and nonfinite input.
+
+[KV-capacity arithmetic](evidence/kv-capacity.json) describes the audited 40-layer Max dimensions. Q8 stores 32 values in 34 bytes versus 64 FP16 bytes, a 46.875% cache-data reduction. This is not a full-Max RSS measurement or proof that long-context quality is unchanged. FP16 remains the reference default, and Q8 is opt-in. More context still increases attention work. Full Max weights and representative long tasks must be validated on sufficient RAM before promotion.
+
+## Shared upload processor smoke test
+
+The [real Lite upload smoke receipt](evidence/lite-upload-smoke.json) records a synthetic Python file passed through the shared document/text pipeline into Stellan-Run. The generated `add(a, b)` function returns `a + b`, checked by Python AST. The response also included explanatory prose despite the code-only instruction, so format adherence was not perfect. This is one functionality check, not a benchmark or pass@1 score. Verification checked the full pinned Lite file; no weights or private user files are in the receipt.
+
+The persistent-session portability follow-up at `1d804a505dc71c857118540273924b95d5315d4d` passed Apple Silicon, Intel Mac, Linux, Windows and sanitizer CI. Fixture RAM mocking is restricted to tiny test models; the production RAM policies remain tested and enforced. Windows' read mapping denies writes to a running model, so that test checks the file lock and post-close hash refusal. Later changes require their own CI result.

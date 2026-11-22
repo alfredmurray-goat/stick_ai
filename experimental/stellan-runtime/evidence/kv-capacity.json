@@ -1,0 +1,32 @@
+{
+  "purpose": "KV data-capacity arithmetic for the audited Max layout, not measured full-model RSS",
+  "layers": 40,
+  "kvHeads": 8,
+  "headWidth": 128,
+  "blocksPerTokenPerKVLayer": 32,
+  "f16BytesPer32Values": 64,
+  "q8BytesPer32Values": 34,
+  "cacheDataReductionPercent": 46.875,
+  "contexts": [
+    {
+      "tokens": 8192,
+      "f16Bytes": 1342177280,
+      "q8Bytes": 713031680
+    },
+    {
+      "tokens": 16384,
+      "f16Bytes": 2684354560,
+      "q8Bytes": 1426063360
+    },
+    {
+      "tokens": 32768,
+      "f16Bytes": 5368709120,
+      "q8Bytes": 2852126720
+    },
+    {
+      "tokens": 65536,
+      "f16Bytes": 10737418240,
+      "q8Bytes": 5704253440
+    }
+  ]
+}

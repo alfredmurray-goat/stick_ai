@@ -116,3 +116,15 @@ node experimental/stellan-runtime/bench-sessions.mjs \
 ```
 
 The output must be a new report file. Both use the same tokenized prompts, 8192 context, greedy output, 12-token limit and two CPU threads. The script runs engines sequentially to avoid simultaneous model residency, checks the model hash, retains executable hashes/raw output/timings, and does not download models, rent machines or start a hosted evaluation. Max is refused below 24 GiB reported RAM for this development diagnostic. Reference commit provenance must be checked separately; the executable hash alone does not establish its source commit. Grouped run order, two short prompts and CPU-only settings make this a diagnostic, not qualification for replacement.
+
+## File inputs
+
+After `npm ci` and `npm run build`, `run.mjs --capabilities` lists supported types. Add up to four `--file PATH` flags to the launcher. The shared app/runner processor reads text/code and extracts PDF/DOCX text locally, with byte/page limits, worker timeouts and explicit errors. For a formatted instruction prompt, end it at `[/INST]`; attachment text is inserted before that marker. Native inference still receives only text/token IDs. Images, scans without a text layer, audio and video are unsupported; see [the full input guide](../../docs/INPUTS.md).
+
+## Lower-RAM Max cache
+
+Max's attention cache is allocated in 256-token increments as it is used, and released on reset. It no longer allocates the full configured window during model construction. `state_bytes` reports allocated cache storage; `state_capacity_bytes` reports the configured data capacity. These are cache measurements, not total process RAM. Lite's recurrent state remains fixed-size.
+
+FP16 is still the default reference path. `--kv-cache q8_0` opts into the experimental 8-bit Max cache through `run.mjs`; `openNativeSession` accepts `kvCache: 'q8_0'`. Native CLI experiments can set `STELLAN_RUNTIME_KV_Q8=1`. The 34-byte block stores 32 values plus an FP16 scale, versus 64 bytes for the same FP16 values: **46.875% less cache data** at the real Max head dimensions. At 8,192 tokens, the audited Max layout's data capacity is 1.25 GiB FP16 or 0.664 GiB Q8; this is arithmetic, not a measured full-Max RSS improvement.
+
+The optional Q8 bridge supports an explicitly requested context up to 65,536 within the native 8 GiB cache-capacity budget. It does not enlarge the default 8,192 window or make Max's 14.3 GB weights fit in a small machine. Quantizing cached keys/values changes precision and may affect output. Numerical fixtures cover both modes; full-checkpoint quality and performance have not been validated here. Longer context also increases attention work. Keep the app's normal mode low-RAM and use its sidebar Long switch deliberately.

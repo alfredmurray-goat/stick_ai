@@ -1,5 +1,6 @@
 #include "runtime.hpp"
 #include "executor.hpp"
+#include "kv_cache.hpp"
 
 #include <array>
 #include <algorithm>
@@ -171,6 +172,34 @@ void recurrence() {
     rejects([&] { stellan::mamba2_step(heads, width, states, groups, x, dt, invalid_decay, b, c, skip, state, output); });
 }
 
+void cache_storage() {
+    stellan::KVCache half_cache(8192, 128, false), quantized_cache(8192, 128, true);
+    require(half_cache.bytes() == 0 && quantized_cache.bytes() == 0);
+    require(quantized_cache.capacity_bytes() * 64 == half_cache.capacity_bytes() * 34);
+    std::mt19937 random(8761);
+    std::array<float, 128> values, decoded;
+    for (std::size_t position = 0; position < 270; ++position) {
+        for (auto &value : values) value = static_cast<float>(static_cast<int>(random() % 20001) - 10000) / 1000;
+        half_cache.write(position, values); quantized_cache.write(position, values);
+        quantized_cache.decode(position, 0, decoded);
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            close(half_cache.read(position, i), stellan::half(stellan::to_half(values[i])), 0);
+            require(std::abs(decoded[i] - values[i]) < 0.09F);
+            close(decoded[i], quantized_cache.read(position, i), 0);
+        }
+    }
+    require(half_cache.bytes() < half_cache.capacity_bytes());
+    require(quantized_cache.bytes() * 64 == half_cache.bytes() * 34);
+    rejects([&] { quantized_cache.read(8192, 0); });
+    rejects([&] { quantized_cache.decode(0, 127, decoded); });
+    quantized_cache.clear(); require(quantized_cache.bytes() == 0); rejects([&] { quantized_cache.read(0, 0); });
+    values.fill(0); quantized_cache.write(0, values); quantized_cache.decode(0, 0, decoded);
+    require(std::all_of(decoded.begin(), decoded.end(), [](float value) { return value == 0; }));
+    values[7] = std::numeric_limits<float>::quiet_NaN();
+    rejects([&] { quantized_cache.write(0, values); });
+    rejects([] { stellan::KVCache invalid(65537, 128, true); });
+}
+
 void additional_kernels() {
     std::mt19937 random(42);
     for (unsigned trial = 0; trial < 100; ++trial) {
@@ -293,6 +322,7 @@ int main() {
         quantized();
         recurrence();
         additional_kernels();
+        cache_storage();
         require(stellan::json_string("a\n\"\\") == "\"a\\u000a\\\"\\\\\"");
         std::cout << checks << " checks passed\n";
         return 0;

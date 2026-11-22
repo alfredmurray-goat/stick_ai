@@ -58,6 +58,27 @@
   <div id="file-tree" class="file-tree"><p class="empty-files">Open the workspace to see your files.</p></div>
 
   <div class="sidebar-bottom">
+    <section id="long-context-panel" class="sidebar-context" aria-label="Context and chat memory" hidden>
+      <div class="context-summary">
+        <svg id="context-wheel" class="context-wheel" viewBox="0 0 44 44" role="img" aria-label="Context usage unavailable">
+          <circle class="context-track" cx="22" cy="22" r="18"/>
+          <circle id="context-fill" class="context-fill" cx="22" cy="22" r="18" pathLength="100" stroke-dasharray="0 100"/>
+          <text id="context-percent" x="22" y="25" text-anchor="middle">—</text>
+        </svg>
+        <div><strong>Context</strong><span id="context-used">Usage not yet reported</span><span id="context-capacity">Normal · saves RAM</span></div>
+      </div>
+      <label class="check-label"><input id="long-context" type="checkbox"> Long context · slower, more RAM for Max</label>
+      <p id="long-context-size" class="muted"></p>
+      <p class="context-help">Normal saves RAM. Long keeps more text, with slower replies. Lite’s recurrent state stays the same size.</p>
+      <details class="sidebar-memory"><summary>Chat memory <span id="sidebar-memory-state">local</span></summary>
+      <label class="check-label"><input id="chat-memory-enabled" type="checkbox" checked> Save a memory file for each chat on this stick</label>
+      <p id="chat-memory-status" class="memory-status">Chat notes are saved locally and recalled in small portions. They do not change model weights.</p>
+      <div class="button-row"><button id="view-chat-memory" type="button" class="secondary">View saved notes</button><button id="forget-chat-memory" type="button" class="secondary">Forget this chat’s saved notes</button></div>
+      <pre id="chat-memory-preview" class="memory-preview" hidden></pre>
+      <p class="status-box warning-box">Stellan keeps much more of your conversation and files in view. It can be noticeably slower: reading a long conversation again can take minutes on an ordinary laptop, and Max uses more memory. Turning this on or off restarts the model (about 10–60 seconds).</p>
+      </details>
+    </section>
+
     <div class="local-note"><span class="status-dot"></span> Models run on this computer</div>
     <button id="open-mcp" class="nav-button"><svg class="i"><use href="#i-plug"/></svg> MCP servers</button>
     <button id="open-skills" class="nav-button"><svg class="i"><use href="#i-sparkle"/></svg> Skills</button>
@@ -138,13 +159,17 @@
     <div id="skill-menu" class="skill-menu" role="listbox" hidden></div>
     <form id="question" class="composer">
       <label for="prompt" class="sr-only">What would you like to make?</label>
+      <div id="attachments" class="attachments" aria-live="polite" hidden></div>
+      <input id="attachment-files" type="file" multiple hidden aria-label="Attach text or documents" accept=".txt,.md,.csv,.tsv,.json,.jsonl,.yaml,.yml,.toml,.xml,.html,.svg,.js,.jsx,.ts,.tsx,.py,.rs,.go,.java,.c,.h,.cpp,.cs,.rb,.php,.swift,.sh,.sql,.log,.pdf,.docx">
       <textarea id="prompt" rows="2" placeholder="Ask Stellan to build, explain, or fix something…" spellcheck="false"></textarea>
       <div class="composer-toolbar">
+        <button id="attach-files" class="chip-button" type="button" title="Text, code, PDF text and DOCX · up to 4 files"><svg class="i"><use href="#i-file"/></svg> Attach</button>
         <button id="skill-picker" class="chip-button" type="button"><svg class="i"><use href="#i-sparkle"/></svg> Skills</button>
         <span id="session-model" class="model-chip" role="status">Stellan-1 Lite</span>
         <span class="composer-hint"><kbd>↵</kbd> send · <kbd>Shift ↵</kbd> new line</span>
         <button id="send" class="send-button" title="Send message" aria-label="Send message"><svg class="i"><use href="#i-arrow-up"/></svg></button>
       </div>
+      <p id="input-note" class="input-note">Text, code, PDF text and DOCX · processed locally. Images and scanned PDFs need OCR first.</p>
     </form>
     <div class="composer-caption"><span><svg class="i"><use href="#i-shield"/></svg> Changes, web searches and MCP calls need your approval. GitHub publishing needs your review.</span><span id="footer" hidden><button id="stop" class="text-button">Close assistant</button></span></div>
   </div>
@@ -224,11 +249,7 @@
       <label class="check-label"><input id="allow-internet" type="checkbox" checked> Allow internet</label>
       <p class="muted">Stellan itself always runs on this computer and never needs the internet. This switch covers the extras that do: web search, GitHub, MCP servers on other computers, hooks that notify other computers, and automatic app update checks. Turn it off and nothing leaves this computer.</p>
     </fieldset>
-    <fieldset id="long-context-panel" class="form-group" hidden><legend>Memory</legend>
-      <label class="check-label"><input id="long-context" type="checkbox"> Long context mode</label>
-      <p id="long-context-size" class="muted"></p>
-      <p class="status-box warning-box">Stellan keeps much more of your conversation and files in view. It can be noticeably slower: reading a long conversation again can take minutes on an ordinary laptop, and Max uses more memory. Turning this on or off restarts the model (about 10–60 seconds).</p>
-    </fieldset>
+
     <p id="running-model-note" class="status-box" hidden>Model files and the GGUF picker are managed from the launch screen. Close and reopen the app to change them. Your project files are kept.</p>
   </div>
 

@@ -121,3 +121,12 @@ test("Lite accepts the app's long context budget and refuses over-budget request
   assert.throws(() => launchPlan({ ...options, context: 262145 }), /context/);
   assert.throws(() => launchPlan({ ...options, mode: "gpt2", ramBytes: 32 * 1024 ** 3 }), /context/);
 });
+
+
+test("Max's optional q8 cache supports a larger explicit context while defaults stay bounded", () => {
+  const options = { mode:"gpt2", ramBytes:32*1024**3, tokens:[1], maxTokens:128 };
+  assert.equal(launchPlan(options).context,8192);
+  assert.equal(launchPlan({...options,context:65536,kvCache:"q8_0"}).context,65536);
+  assert.throws(()=>launchPlan({...options,context:65536}),/context/);
+  assert.throws(()=>launchPlan({...options,mode:"llama",kvCache:"q8_0"}),/recurrent/);
+});

@@ -5,18 +5,20 @@ import { totalmem } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readTokenizer } from "./tokenizer.mjs";
+import { filePrompt, inputTypes } from "./inputs.mjs";
 
-export function launchPlan({ mode, ramBytes = totalmem(), forceMax = false, tokens, maxTokens = 128, threads = 2, context = 8192 }) {
+export function launchPlan({ mode, ramBytes = totalmem(), forceMax = false, tokens, maxTokens = 128, threads = 2, context = 8192, kvCache = "f16" }) {
+  if (!["f16", "q8_0"].includes(kvCache) || mode === "llama" && kvCache !== "f16") { throw new Error("KV cache must be f16 or q8_0 for Max; Lite uses fixed recurrent state"); }
   if (!["llama", "gpt2"].includes(mode) || !Number.isFinite(ramBytes) || ramBytes < 0) { throw new Error("Unsupported model or memory information"); }
   if (ramBytes < 8 * 1024 ** 3) { throw new Error("Your computer needs at least 8 GB of memory"); }
   if (mode === "gpt2" && ramBytes < 16 * 1024 ** 3 && !forceMax) { throw new Error("Stellan-1 Max needs 16 GB RAM or more"); }
   if (!Array.isArray(tokens) || tokens.length === 0 || tokens.length > 262144 || !tokens.every(id => Number.isInteger(id) && id >= 0)) { throw new Error("Invalid prompt tokens"); }
   if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 4096 || !Number.isInteger(threads) || threads < 1 || threads > 64) { throw new Error("Invalid generation limits"); }
-  if (!Number.isInteger(context) || context < 1 || context > (mode === "llama" ? 262144 : 8192) || tokens.length + maxTokens > context) { throw new Error("The request exceeds the experimental context limit; shorten it"); }
-  return { mode, maxTokens, threads, context, warning: mode === "gpt2" && ramBytes < 16 * 1024 ** 3 ? "Max may be very slow or crash on this computer" : null };
+  if (!Number.isInteger(context) || context < 1 || context > (mode === "llama" ? 262144 : kvCache === "q8_0" ? 65536 : 32768) || tokens.length + maxTokens > context) { throw new Error("The request exceeds the experimental context limit; shorten it"); }
+  return { mode, maxTokens, threads, context, kvCache, warning: mode === "gpt2" && ramBytes < 16 * 1024 ** 3 ? "Max may be very slow or crash on this computer" : null };
 }
 
-export async function runNative({ executable, executableSha256, model, sha256, prompt, maxTokens = 128, threads = 2, context = 8192, forceMax = false, signal, onEvent = () => {} }) {
+export async function runNative({ executable, executableSha256, model, sha256, prompt, maxTokens = 128, threads = 2, context = 8192, forceMax = false, kvCache = "f16", signal, onEvent = () => {} }) {
   if (!/^[a-f0-9]{64}$/.test(sha256 ?? "")) { throw new Error("A trusted model SHA256 is required"); }
   if (!/^[a-f0-9]{64}$/.test(executableSha256 ?? "")) { throw new Error("A trusted executable SHA256 is required"); }
   if (signal?.aborted) { throw new Error("Generation cancelled"); }
@@ -28,11 +30,13 @@ export async function runNative({ executable, executableSha256, model, sha256, p
   if (executableHash.digest("hex") !== executableSha256) { throw new Error("The executable hash does not match; refusing to start"); }
   const tokenizer = await readTokenizer(model);
   const tokens = tokenizer.encode(prompt);
-  const plan = launchPlan({ mode: tokenizer.mode, tokens, maxTokens, threads, context, forceMax });
+  const plan = launchPlan({ mode: tokenizer.mode, tokens, maxTokens, threads, context, forceMax, kvCache });
   if (plan.warning) { onEvent({ event: "warning", text: plan.warning }); }
   onEvent({ event: "status", text: "Checking and starting the local model..." });
+  const nativeEnv = { ...process.env };
+  if (kvCache === "q8_0") nativeEnv.STELLAN_RUNTIME_KV_Q8 = "1"; else delete nativeEnv.STELLAN_RUNTIME_KV_Q8;
   const child = spawn(resolve(executable), ["decode", resolve(model), sha256, "-", String(maxTokens), String(threads), String(context), ...(forceMax ? ["--force-max"] : [])], {
-    stdio: ["pipe", "pipe", "pipe"],
+    env: nativeEnv, stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
     shell: false
   });
@@ -109,10 +113,13 @@ export async function runNative({ executable, executableSha256, model, sha256, p
 }
 
 async function main() {
+  if (process.argv.length === 3 && process.argv[2] === "--capabilities") { process.stdout.write(JSON.stringify(await inputTypes(), null, 2) + "\n"); return; }
   const options = {};
-  const flags = new Map([["--engine", "executable"], ["--engine-sha256", "executableSha256"], ["--model", "model"], ["--sha256", "sha256"], ["--prompt", "prompt"], ["--tokens", "maxTokens"], ["--threads", "threads"], ["--context", "context"]]);
+  const files = [];
+  const flags = new Map([["--engine", "executable"], ["--engine-sha256", "executableSha256"], ["--model", "model"], ["--sha256", "sha256"], ["--prompt", "prompt"], ["--tokens", "maxTokens"], ["--threads", "threads"], ["--context", "context"], ["--kv-cache", "kvCache"]]);
   for (let i = 2; i < process.argv.length; i++) {
     const flag = process.argv[i];
+    if (flag === "--file") { if (i + 1 >= process.argv.length || files.length >= 4) { throw new Error("Supply up to four --file paths"); } files.push(process.argv[++i]); continue; }
     if (flag === "--force-max") { options.forceMax = true; continue; }
     const key = flags.get(flag);
     if (!key || i + 1 >= process.argv.length || key in options) { throw new Error("Check the experimental launcher arguments"); }
@@ -123,7 +130,7 @@ async function main() {
   const cancel = () => controller.abort();
   process.on("SIGINT", cancel);
   process.on("SIGTERM", cancel);
-  try { await runNative({ ...options, signal: controller.signal, onEvent: event => process.stdout.write(JSON.stringify(event) + "\n") }); }
+  try { options.prompt = await filePrompt(options.prompt, files, controller.signal); await runNative({ ...options, signal: controller.signal, onEvent: event => process.stdout.write(JSON.stringify(event) + "\n") }); }
   finally { process.off("SIGINT", cancel); process.off("SIGTERM", cancel); }
 }
 

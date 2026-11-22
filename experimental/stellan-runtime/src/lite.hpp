@@ -14,6 +14,8 @@ public:
     virtual const std::vector<float> &prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress = {});
     virtual void reset() = 0;
     virtual std::size_t state_bytes() const = 0;
+    virtual std::size_t state_capacity_bytes() const { return state_bytes(); }
+    virtual std::string_view cache_type() const { return "recurrent-f32"; }
 };
 class Tokenizer {
 public:

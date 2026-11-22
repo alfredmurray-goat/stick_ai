@@ -1,0 +1,1355 @@
+{
+  "model": "stellan-1-max",
+  "results": [
+    {
+      "task": "HumanEval/0",
+      "passed": true,
+      "seconds": 5.29,
+      "promptTokens": 167,
+      "genTokens": 170,
+      "genTokPerSec": 36.636413082711364
+    },
+    {
+      "task": "HumanEval/1",
+      "passed": true,
+      "seconds": 7.705,
+      "promptTokens": 114,
+      "genTokens": 214,
+      "genTokPerSec": 28.71982008718151
+    },
+    {
+      "task": "HumanEval/2",
+      "passed": true,
+      "seconds": 3.888,
+      "promptTokens": 84,
+      "genTokens": 124,
+      "genTokPerSec": 33.72488010530936
+    },
+    {
+      "task": "HumanEval/3",
+      "passed": true,
+      "seconds": 5.616,
+      "promptTokens": 116,
+      "genTokens": 150,
+      "genTokPerSec": 27.97931333507218
+    },
+    {
+      "task": "HumanEval/4",
+      "passed": true,
+      "seconds": 5.057,
+      "promptTokens": 112,
+      "genTokens": 169,
+      "genTokPerSec": 35.12188024149638
+    },
+    {
+      "task": "HumanEval/5",
+      "passed": true,
+      "seconds": 6.618,
+      "promptTokens": 90,
+      "genTokens": 148,
+      "genTokPerSec": 23.09958750736594
+    },
+    {
+      "task": "HumanEval/6",
+      "passed": true,
+      "seconds": 8.461,
+      "promptTokens": 107,
+      "genTokens": 207,
+      "genTokPerSec": 25.170041346069375
+    },
+    {
+      "task": "HumanEval/7",
+      "passed": true,
+      "seconds": 2.673,
+      "promptTokens": 87,
+      "genTokens": 109,
+      "genTokPerSec": 44.60946274097888
+    },
+    {
+      "task": "HumanEval/8",
+      "passed": true,
+      "seconds": 4.523,
+      "promptTokens": 105,
+      "genTokens": 152,
+      "genTokPerSec": 35.570539678112524
+    },
+    {
+      "task": "HumanEval/9",
+      "passed": true,
+      "seconds": 6.038,
+      "promptTokens": 89,
+      "genTokens": 165,
+      "genTokPerSec": 28.38694311395073
+    },
+    {
+      "task": "HumanEval/10",
+      "passed": true,
+      "seconds": 4.414,
+      "promptTokens": 148,
+      "genTokens": 189,
+      "genTokPerSec": 47.24712609302959
+    },
+    {
+      "task": "HumanEval/11",
+      "passed": true,
+      "seconds": 4.918,
+      "promptTokens": 82,
+      "genTokens": 133,
+      "genTokPerSec": 28.287658051931857
+    },
+    {
+      "task": "HumanEval/12",
+      "passed": true,
+      "seconds": 3.963,
+      "promptTokens": 95,
+      "genTokens": 120,
+      "genTokPerSec": 32.18328135327723
+    },
+    {
+      "task": "HumanEval/13",
+      "passed": true,
+      "seconds": 2.517,
+      "promptTokens": 72,
+      "genTokens": 88,
+      "genTokPerSec": 39.35732652466664
+    },
+    {
+      "task": "HumanEval/14",
+      "passed": true,
+      "seconds": 2.934,
+      "promptTokens": 56,
+      "genTokens": 79,
+      "genTokPerSec": 28.455988982424778
+    },
+    {
+      "task": "HumanEval/15",
+      "passed": true,
+      "seconds": 2.455,
+      "promptTokens": 67,
+      "genTokens": 83,
+      "genTokPerSec": 37.08903539560431
+    },
+    {
+      "task": "HumanEval/16",
+      "passed": true,
+      "seconds": 2.045,
+      "promptTokens": 69,
+      "genTokens": 80,
+      "genTokPerSec": 44.33183783525952
+    },
+    {
+      "task": "HumanEval/17",
+      "passed": true,
+      "seconds": 6.726,
+      "promptTokens": 171,
+      "genTokens": 228,
+      "genTokPerSec": 36.33884387087768
+    },
+    {
+      "task": "HumanEval/18",
+      "passed": false,
+      "seconds": 4.769,
+      "promptTokens": 86,
+      "genTokens": 126,
+      "genTokPerSec": 27.729909791275862,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/19",
+      "passed": true,
+      "seconds": 9.308,
+      "promptTokens": 108,
+      "genTokens": 212,
+      "genTokPerSec": 23.395612601919215
+    },
+    {
+      "task": "HumanEval/20",
+      "passed": true,
+      "seconds": 11.134,
+      "promptTokens": 161,
+      "genTokens": 288,
+      "genTokPerSec": 26.940666701711436
+    },
+    {
+      "task": "HumanEval/21",
+      "passed": true,
+      "seconds": 7.225,
+      "promptTokens": 120,
+      "genTokens": 207,
+      "genTokPerSec": 29.842785021413643
+    },
+    {
+      "task": "HumanEval/22",
+      "passed": true,
+      "seconds": 2.959,
+      "promptTokens": 88,
+      "genTokens": 109,
+      "genTokPerSec": 40.15953748111944
+    },
+    {
+      "task": "HumanEval/23",
+      "passed": true,
+      "seconds": 1.604,
+      "promptTokens": 40,
+      "genTokens": 47,
+      "genTokPerSec": 31.959469834081712
+    },
+    {
+      "task": "HumanEval/24",
+      "passed": true,
+      "seconds": 3.48,
+      "promptTokens": 50,
+      "genTokens": 88,
+      "genTokPerSec": 26.555706546622663
+    },
+    {
+      "task": "HumanEval/25",
+      "passed": true,
+      "seconds": 12.347,
+      "promptTokens": 125,
+      "genTokens": 288,
+      "genTokPerSec": 23.878914103469086
+    },
+    {
+      "task": "HumanEval/26",
+      "passed": true,
+      "seconds": 3.72,
+      "promptTokens": 79,
+      "genTokens": 116,
+      "genTokPerSec": 33.309360248841195
+    },
+    {
+      "task": "HumanEval/27",
+      "passed": true,
+      "seconds": 1.752,
+      "promptTokens": 45,
+      "genTokens": 54,
+      "genTokPerSec": 33.74010316832301
+    },
+    {
+      "task": "HumanEval/28",
+      "passed": true,
+      "seconds": 2.181,
+      "promptTokens": 58,
+      "genTokens": 68,
+      "genTokPerSec": 33.96573820222896
+    },
+    {
+      "task": "HumanEval/29",
+      "passed": true,
+      "seconds": 2.767,
+      "promptTokens": 80,
+      "genTokens": 102,
+      "genTokPerSec": 40.35683433000063
+    },
+    {
+      "task": "HumanEval/30",
+      "passed": true,
+      "seconds": 2.807,
+      "promptTokens": 119,
+      "genTokens": 135,
+      "genTokPerSec": 54.03920907568352
+    },
+    {
+      "task": "HumanEval/31",
+      "passed": true,
+      "seconds": 7.675,
+      "promptTokens": 109,
+      "genTokens": 209,
+      "genTokPerSec": 28.22065513165478
+    },
+    {
+      "task": "HumanEval/32",
+      "passed": false,
+      "seconds": 19.051,
+      "promptTokens": 264,
+      "genTokens": 446,
+      "genTokPerSec": 24.419732285103063,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/33",
+      "passed": true,
+      "seconds": 9.281,
+      "promptTokens": 150,
+      "genTokens": 268,
+      "genTokPerSec": 30.26317057150354
+    },
+    {
+      "task": "HumanEval/34",
+      "passed": true,
+      "seconds": 2.063,
+      "promptTokens": 72,
+      "genTokens": 82,
+      "genTokPerSec": 46.43414434483716
+    },
+    {
+      "task": "HumanEval/35",
+      "passed": true,
+      "seconds": 2.881,
+      "promptTokens": 82,
+      "genTokens": 106,
+      "genTokPerSec": 40.16830904043265
+    },
+    {
+      "task": "HumanEval/36",
+      "passed": true,
+      "seconds": 4.569,
+      "promptTokens": 87,
+      "genTokens": 138,
+      "genTokPerSec": 31.85870918277295
+    },
+    {
+      "task": "HumanEval/37",
+      "passed": true,
+      "seconds": 6.419,
+      "promptTokens": 121,
+      "genTokens": 197,
+      "genTokPerSec": 32.156102785341936
+    },
+    {
+      "task": "HumanEval/38",
+      "passed": false,
+      "seconds": 5.131,
+      "promptTokens": 156,
+      "genTokens": 140,
+      "genTokPerSec": 29.860820648392274,
+      "error": "NameError: name 'encode_cyclic' is not defined. Did you mean: 'decode_cyclic'?"
+    },
+    {
+      "task": "HumanEval/39",
+      "passed": false,
+      "seconds": 6.419,
+      "promptTokens": 95,
+      "genTokens": 175,
+      "genTokPerSec": 28.362805929130474,
+      "error": "ImportError: cannot import name 'fibonacci' from 'sympy.ntheory.factor_' (/usr/local/lib/python3.13/dist-packages/sympy/ntheory/factor_.py)"
+    },
+    {
+      "task": "HumanEval/40",
+      "passed": true,
+      "seconds": 9.03,
+      "promptTokens": 161,
+      "genTokens": 270,
+      "genTokPerSec": 32.13321547172516
+    },
+    {
+      "task": "HumanEval/41",
+      "passed": true,
+      "seconds": 3.255,
+      "promptTokens": 151,
+      "genTokens": 164,
+      "genTokPerSec": 58.36722869891569
+    },
+    {
+      "task": "HumanEval/42",
+      "passed": true,
+      "seconds": 2.648,
+      "promptTokens": 112,
+      "genTokens": 128,
+      "genTokPerSec": 54.123485075129366
+    },
+    {
+      "task": "HumanEval/43",
+      "passed": true,
+      "seconds": 4.005,
+      "promptTokens": 152,
+      "genTokens": 187,
+      "genTokPerSec": 52.51012513783908
+    },
+    {
+      "task": "HumanEval/44",
+      "passed": true,
+      "seconds": 6.96,
+      "promptTokens": 92,
+      "genTokens": 170,
+      "genTokPerSec": 25.30862293236787
+    },
+    {
+      "task": "HumanEval/45",
+      "passed": true,
+      "seconds": 1.98,
+      "promptTokens": 41,
+      "genTokens": 56,
+      "genTokPerSec": 30.435773876587916
+    },
+    {
+      "task": "HumanEval/46",
+      "passed": true,
+      "seconds": 10.034,
+      "promptTokens": 167,
+      "genTokens": 288,
+      "genTokPerSec": 30.06170820262513
+    },
+    {
+      "task": "HumanEval/47",
+      "passed": true,
+      "seconds": 5.417,
+      "promptTokens": 77,
+      "genTokens": 142,
+      "genTokPerSec": 27.3374382144814
+    },
+    {
+      "task": "HumanEval/48",
+      "passed": true,
+      "seconds": 4.419,
+      "promptTokens": 72,
+      "genTokens": 111,
+      "genTokPerSec": 26.85956719470134
+    },
+    {
+      "task": "HumanEval/49",
+      "passed": true,
+      "seconds": 6.946,
+      "promptTokens": 111,
+      "genTokens": 196,
+      "genTokPerSec": 29.336322127861234
+    },
+    {
+      "task": "HumanEval/50",
+      "passed": false,
+      "seconds": 3.076,
+      "promptTokens": 87,
+      "genTokens": 65,
+      "genTokPerSec": 22.794060295275685,
+      "error": "NameError: name 'encode_shift' is not defined. Did you mean: 'decode_shift'?"
+    },
+    {
+      "task": "HumanEval/51",
+      "passed": true,
+      "seconds": 3.108,
+      "promptTokens": 124,
+      "genTokens": 147,
+      "genTokPerSec": 52.405144893046845
+    },
+    {
+      "task": "HumanEval/52",
+      "passed": true,
+      "seconds": 2.314,
+      "promptTokens": 79,
+      "genTokens": 94,
+      "genTokPerSec": 45.24752586042063
+    },
+    {
+      "task": "HumanEval/53",
+      "passed": true,
+      "seconds": 2.536,
+      "promptTokens": 49,
+      "genTokens": 62,
+      "genTokPerSec": 26.13201982092284
+    },
+    {
+      "task": "HumanEval/54",
+      "passed": false,
+      "seconds": 3.081,
+      "promptTokens": 153,
+      "genTokens": 173,
+      "genTokPerSec": 65.97368723869434,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/55",
+      "passed": false,
+      "seconds": 6.446,
+      "promptTokens": 51,
+      "genTokens": 137,
+      "genTokPerSec": 21.779399346585993,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/56",
+      "passed": true,
+      "seconds": 5.085,
+      "promptTokens": 89,
+      "genTokens": 148,
+      "genTokPerSec": 30.59539258363521
+    },
+    {
+      "task": "HumanEval/57",
+      "passed": true,
+      "seconds": 5.661,
+      "promptTokens": 85,
+      "genTokens": 158,
+      "genTokPerSec": 29.136134039578376
+    },
+    {
+      "task": "HumanEval/58",
+      "passed": true,
+      "seconds": 2.688,
+      "promptTokens": 118,
+      "genTokens": 134,
+      "genTokPerSec": 56.292055032467395
+    },
+    {
+      "task": "HumanEval/59",
+      "passed": true,
+      "seconds": 9.591,
+      "promptTokens": 67,
+      "genTokens": 199,
+      "genTokPerSec": 21.214606964048315
+    },
+    {
+      "task": "HumanEval/60",
+      "passed": true,
+      "seconds": 2.557,
+      "promptTokens": 99,
+      "genTokens": 117,
+      "genTokPerSec": 51.296814423602896
+    },
+    {
+      "task": "HumanEval/61",
+      "passed": true,
+      "seconds": 5.083,
+      "promptTokens": 90,
+      "genTokens": 149,
+      "genTokPerSec": 30.803524505972863
+    },
+    {
+      "task": "HumanEval/62",
+      "passed": true,
+      "seconds": 3.057,
+      "promptTokens": 106,
+      "genTokens": 132,
+      "genTokPerSec": 47.55855783574436
+    },
+    {
+      "task": "HumanEval/63",
+      "passed": true,
+      "seconds": 7.625,
+      "promptTokens": 145,
+      "genTokens": 231,
+      "genTokPerSec": 32.120159561780476
+    },
+    {
+      "task": "HumanEval/64",
+      "passed": true,
+      "seconds": 5.355,
+      "promptTokens": 124,
+      "genTokens": 171,
+      "genTokPerSec": 33.79769376466348
+    },
+    {
+      "task": "HumanEval/65",
+      "passed": false,
+      "seconds": 4.258,
+      "promptTokens": 83,
+      "genTokens": 128,
+      "genTokPerSec": 31.838207754584076,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/66",
+      "passed": true,
+      "seconds": 2.924,
+      "promptTokens": 116,
+      "genTokens": 136,
+      "genTokPerSec": 51.883804873849336
+    },
+    {
+      "task": "HumanEval/67",
+      "passed": true,
+      "seconds": 9.599,
+      "promptTokens": 239,
+      "genTokens": 292,
+      "genTokPerSec": 32.66638161226217
+    },
+    {
+      "task": "HumanEval/68",
+      "passed": true,
+      "seconds": 9.911,
+      "promptTokens": 314,
+      "genTokens": 387,
+      "genTokPerSec": 42.47700354451887
+    },
+    {
+      "task": "HumanEval/69",
+      "passed": true,
+      "seconds": 6.685,
+      "promptTokens": 163,
+      "genTokens": 209,
+      "genTokPerSec": 33.54344214417423
+    },
+    {
+      "task": "HumanEval/70",
+      "passed": true,
+      "seconds": 7.849,
+      "promptTokens": 120,
+      "genTokens": 219,
+      "genTokPerSec": 28.96121694502204
+    },
+    {
+      "task": "HumanEval/71",
+      "passed": true,
+      "seconds": 10.584,
+      "promptTokens": 120,
+      "genTokens": 238,
+      "genTokPerSec": 23.097738029743454
+    },
+    {
+      "task": "HumanEval/72",
+      "passed": true,
+      "seconds": 7.71,
+      "promptTokens": 230,
+      "genTokens": 294,
+      "genTokPerSec": 41.74664545044203
+    },
+    {
+      "task": "HumanEval/73",
+      "passed": true,
+      "seconds": 5.149,
+      "promptTokens": 152,
+      "genTokens": 202,
+      "genTokPerSec": 42.88583704832786
+    },
+    {
+      "task": "HumanEval/74",
+      "passed": true,
+      "seconds": 8.014,
+      "promptTokens": 197,
+      "genTokens": 274,
+      "genTokPerSec": 37.1301520636136
+    },
+    {
+      "task": "HumanEval/75",
+      "passed": true,
+      "seconds": 13.347,
+      "promptTokens": 85,
+      "genTokens": 263,
+      "genTokPerSec": 20.035343263165533
+    },
+    {
+      "task": "HumanEval/76",
+      "passed": false,
+      "seconds": 4.62,
+      "promptTokens": 136,
+      "genTokens": 182,
+      "genTokPerSec": 44.136254714471356,
+      "error": "ZeroDivisionError: float division by zero"
+    },
+    {
+      "task": "HumanEval/77",
+      "passed": false,
+      "seconds": 4.784,
+      "promptTokens": 121,
+      "genTokens": 161,
+      "genTokPerSec": 35.851650352298485,
+      "error": "TypeError: type complex doesn't define __round__ method"
+    },
+    {
+      "task": "HumanEval/78",
+      "passed": true,
+      "seconds": 16.93,
+      "promptTokens": 321,
+      "genTokens": 463,
+      "genTokPerSec": 28.88980602558812
+    },
+    {
+      "task": "HumanEval/79",
+      "passed": true,
+      "seconds": 4.248,
+      "promptTokens": 143,
+      "genTokens": 182,
+      "genTokPerSec": 47.73438373591968
+    },
+    {
+      "task": "HumanEval/80",
+      "passed": true,
+      "seconds": 4.852,
+      "promptTokens": 118,
+      "genTokens": 169,
+      "genTokPerSec": 37.08884367582232
+    },
+    {
+      "task": "HumanEval/81",
+      "passed": false,
+      "seconds": 20.462,
+      "promptTokens": 279,
+      "genTokens": 461,
+      "genTokPerSec": 23.36924458053247,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/82",
+      "passed": true,
+      "seconds": 9.147,
+      "promptTokens": 78,
+      "genTokens": 204,
+      "genTokPerSec": 22.842744694181782
+    },
+    {
+      "task": "HumanEval/83",
+      "passed": false,
+      "seconds": 11.226,
+      "promptTokens": 40,
+      "genTokens": 204,
+      "genTokPerSec": 18.348292162658062,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/84",
+      "passed": true,
+      "seconds": 7.584,
+      "promptTokens": 145,
+      "genTokens": 206,
+      "genTokPerSec": 28.80820187776075
+    },
+    {
+      "task": "HumanEval/85",
+      "passed": true,
+      "seconds": 4.971,
+      "promptTokens": 53,
+      "genTokens": 85,
+      "genTokPerSec": 17.61787459219339
+    },
+    {
+      "task": "HumanEval/86",
+      "passed": true,
+      "seconds": 5.094,
+      "promptTokens": 130,
+      "genTokens": 183,
+      "genTokPerSec": 39.08799545376545
+    },
+    {
+      "task": "HumanEval/87",
+      "passed": true,
+      "seconds": 7.661,
+      "promptTokens": 257,
+      "genTokens": 321,
+      "genTokPerSec": 46.26989460874755
+    },
+    {
+      "task": "HumanEval/88",
+      "passed": false,
+      "seconds": 5.884,
+      "promptTokens": 198,
+      "genTokens": 253,
+      "genTokPerSec": 48.37976735091401,
+      "error": "SyntaxError: invalid syntax"
+    },
+    {
+      "task": "HumanEval/89",
+      "passed": true,
+      "seconds": 9.202,
+      "promptTokens": 109,
+      "genTokens": 201,
+      "genTokPerSec": 22.46751253855706
+    },
+    {
+      "task": "HumanEval/90",
+      "passed": true,
+      "seconds": 5.661,
+      "promptTokens": 121,
+      "genTokens": 171,
+      "genTokPerSec": 31.856957015970075
+    },
+    {
+      "task": "HumanEval/91",
+      "passed": false,
+      "seconds": 8.124,
+      "promptTokens": 108,
+      "genTokens": 199,
+      "genTokPerSec": 25.30153552207802,
+      "error": "AssertionError: Test 2"
+    },
+    {
+      "task": "HumanEval/92",
+      "passed": true,
+      "seconds": 7.439,
+      "promptTokens": 141,
+      "genTokens": 179,
+      "genTokPerSec": 25.497377924141002
+    },
+    {
+      "task": "HumanEval/93",
+      "passed": false,
+      "seconds": 10.314,
+      "promptTokens": 111,
+      "genTokens": 192,
+      "genTokPerSec": 19.07595094863905,
+      "error": "AssertionError: This prints if this assert fails 1 (good for debugging!)"
+    },
+    {
+      "task": "HumanEval/94",
+      "passed": true,
+      "seconds": 15.318,
+      "promptTokens": 325,
+      "genTokens": 516,
+      "genTokPerSec": 35.89889616122299
+    },
+    {
+      "task": "HumanEval/95",
+      "passed": false,
+      "seconds": 7.513,
+      "promptTokens": 182,
+      "genTokens": 250,
+      "genTokPerSec": 35.617787666203824,
+      "error": "AssertionError: Third test error: True"
+    },
+    {
+      "task": "HumanEval/96",
+      "passed": true,
+      "seconds": 6.949,
+      "promptTokens": 151,
+      "genTokens": 233,
+      "genTokPerSec": 35.764403226997445
+    },
+    {
+      "task": "HumanEval/97",
+      "passed": true,
+      "seconds": 4.571,
+      "promptTokens": 109,
+      "genTokens": 144,
+      "genTokPerSec": 33.48928881396864
+    },
+    {
+      "task": "HumanEval/98",
+      "passed": true,
+      "seconds": 5.859,
+      "promptTokens": 74,
+      "genTokens": 132,
+      "genTokPerSec": 23.402590112923747
+    },
+    {
+      "task": "HumanEval/99",
+      "passed": false,
+      "seconds": 4.191,
+      "promptTokens": 164,
+      "genTokens": 199,
+      "genTokPerSec": 53.45796057880392,
+      "error": "AssertionError: Test 3"
+    },
+    {
+      "task": "HumanEval/100",
+      "passed": true,
+      "seconds": 5.779,
+      "promptTokens": 127,
+      "genTokens": 194,
+      "genTokPerSec": 35.40310655839798
+    },
+    {
+      "task": "HumanEval/101",
+      "passed": false,
+      "seconds": 3.602,
+      "promptTokens": 113,
+      "genTokens": 131,
+      "genTokPerSec": 39.67441345194559,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/102",
+      "passed": true,
+      "seconds": 6.082,
+      "promptTokens": 95,
+      "genTokens": 154,
+      "genTokPerSec": 26.377232000857862
+    },
+    {
+      "task": "HumanEval/103",
+      "passed": true,
+      "seconds": 6.127,
+      "promptTokens": 146,
+      "genTokens": 201,
+      "genTokPerSec": 35.328105362541436
+    },
+    {
+      "task": "HumanEval/104",
+      "passed": true,
+      "seconds": 13.869,
+      "promptTokens": 116,
+      "genTokens": 283,
+      "genTokPerSec": 20.818216441385758
+    },
+    {
+      "task": "HumanEval/105",
+      "passed": true,
+      "seconds": 17.384,
+      "promptTokens": 279,
+      "genTokens": 438,
+      "genTokPerSec": 26.31487987829398
+    },
+    {
+      "task": "HumanEval/106",
+      "passed": true,
+      "seconds": 5.535,
+      "promptTokens": 121,
+      "genTokens": 184,
+      "genTokPerSec": 35.09615771868071
+    },
+    {
+      "task": "HumanEval/107",
+      "passed": true,
+      "seconds": 8.354,
+      "promptTokens": 213,
+      "genTokens": 307,
+      "genTokPerSec": 39.78183434038143
+    },
+    {
+      "task": "HumanEval/108",
+      "passed": false,
+      "seconds": 8.335,
+      "promptTokens": 129,
+      "genTokens": 234,
+      "genTokPerSec": 29.492203742269528,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/109",
+      "passed": true,
+      "seconds": 11.108,
+      "promptTokens": 306,
+      "genTokens": 352,
+      "genTokPerSec": 34.1612389064783
+    },
+    {
+      "task": "HumanEval/110",
+      "passed": true,
+      "seconds": 10.502,
+      "promptTokens": 193,
+      "genTokens": 323,
+      "genTokPerSec": 32.607017090836365
+    },
+    {
+      "task": "HumanEval/111",
+      "passed": true,
+      "seconds": 6.885,
+      "promptTokens": 147,
+      "genTokens": 215,
+      "genTokPerSec": 33.33166674999583
+    },
+    {
+      "task": "HumanEval/112",
+      "passed": true,
+      "seconds": 6.457,
+      "promptTokens": 163,
+      "genTokens": 227,
+      "genTokPerSec": 37.84955571990525
+    },
+    {
+      "task": "HumanEval/113",
+      "passed": true,
+      "seconds": 7.393,
+      "promptTokens": 181,
+      "genTokens": 266,
+      "genTokPerSec": 38.541171570170235
+    },
+    {
+      "task": "HumanEval/114",
+      "passed": true,
+      "seconds": 7.305,
+      "promptTokens": 84,
+      "genTokens": 179,
+      "genTokPerSec": 25.29555655127203
+    },
+    {
+      "task": "HumanEval/115",
+      "passed": false,
+      "seconds": 9.117,
+      "promptTokens": 331,
+      "genTokens": 349,
+      "genTokPerSec": 42.68780579894215,
+      "error": "AssertionError: Error"
+    },
+    {
+      "task": "HumanEval/116",
+      "passed": true,
+      "seconds": 3.492,
+      "promptTokens": 167,
+      "genTokens": 190,
+      "genTokPerSec": 62.81052159319386
+    },
+    {
+      "task": "HumanEval/117",
+      "passed": true,
+      "seconds": 8.595,
+      "promptTokens": 182,
+      "genTokens": 260,
+      "genTokPerSec": 32.053911957185875
+    },
+    {
+      "task": "HumanEval/118",
+      "passed": true,
+      "seconds": 8.903,
+      "promptTokens": 151,
+      "genTokens": 218,
+      "genTokPerSec": 25.71989634289149
+    },
+    {
+      "task": "HumanEval/119",
+      "passed": true,
+      "seconds": 8.164,
+      "promptTokens": 168,
+      "genTokens": 266,
+      "genTokPerSec": 34.5182830319453
+    },
+    {
+      "task": "HumanEval/120",
+      "passed": false,
+      "seconds": 5.103,
+      "promptTokens": 219,
+      "genTokens": 249,
+      "genTokPerSec": 56.00591133360914,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/121",
+      "passed": true,
+      "seconds": 4.623,
+      "promptTokens": 103,
+      "genTokens": 137,
+      "genTokPerSec": 31.395166575597596
+    },
+    {
+      "task": "HumanEval/122",
+      "passed": true,
+      "seconds": 3.449,
+      "promptTokens": 133,
+      "genTokens": 159,
+      "genTokPerSec": 53.02479613979484
+    },
+    {
+      "task": "HumanEval/123",
+      "passed": true,
+      "seconds": 12.742,
+      "promptTokens": 231,
+      "genTokens": 353,
+      "genTokPerSec": 29.192138258610996
+    },
+    {
+      "task": "HumanEval/124",
+      "passed": true,
+      "seconds": 22.761,
+      "promptTokens": 286,
+      "genTokens": 485,
+      "genTokPerSec": 22.030459112492032
+    },
+    {
+      "task": "HumanEval/125",
+      "passed": false,
+      "seconds": 6.325,
+      "promptTokens": 144,
+      "genTokens": 209,
+      "genTokPerSec": 35.432209070475174,
+      "error": "SyntaxError: invalid syntax"
+    },
+    {
+      "task": "HumanEval/126",
+      "passed": true,
+      "seconds": 8.923,
+      "promptTokens": 262,
+      "genTokens": 350,
+      "genTokPerSec": 42.97429927572914
+    },
+    {
+      "task": "HumanEval/127",
+      "passed": false,
+      "seconds": 19.098,
+      "promptTokens": 256,
+      "genTokens": 494,
+      "genTokPerSec": 26.81598765920633,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/128",
+      "passed": true,
+      "seconds": 6.971,
+      "promptTokens": 116,
+      "genTokens": 201,
+      "genTokPerSec": 30.085358178223252
+    },
+    {
+      "task": "HumanEval/129",
+      "passed": false,
+      "seconds": 19.824,
+      "promptTokens": 392,
+      "genTokens": 631,
+      "genTokPerSec": 33.87459378044177,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/130",
+      "passed": false,
+      "seconds": 16.402,
+      "promptTokens": 237,
+      "genTokens": 419,
+      "genTokPerSec": 26.619919201539982,
+      "error": "IndexError: list index out of range"
+    },
+    {
+      "task": "HumanEval/131",
+      "passed": true,
+      "seconds": 5.996,
+      "promptTokens": 69,
+      "genTokens": 143,
+      "genTokPerSec": 24.83328905896
+    },
+    {
+      "task": "HumanEval/132",
+      "passed": false,
+      "seconds": 6.668,
+      "promptTokens": 142,
+      "genTokens": 208,
+      "genTokPerSec": 33.30056364823601,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/133",
+      "passed": true,
+      "seconds": 3.405,
+      "promptTokens": 161,
+      "genTokens": 179,
+      "genTokPerSec": 61.05908701571655
+    },
+    {
+      "task": "HumanEval/134",
+      "passed": true,
+      "seconds": 5.998,
+      "promptTokens": 146,
+      "genTokens": 207,
+      "genTokPerSec": 37.24850029581819
+    },
+    {
+      "task": "HumanEval/135",
+      "passed": false,
+      "seconds": 4.288,
+      "promptTokens": 98,
+      "genTokens": 135,
+      "genTokPerSec": 33.53670592463451,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/136",
+      "passed": true,
+      "seconds": 7.602,
+      "promptTokens": 138,
+      "genTokens": 230,
+      "genTokPerSec": 32.02395895563297
+    },
+    {
+      "task": "HumanEval/137",
+      "passed": true,
+      "seconds": 9.611,
+      "promptTokens": 141,
+      "genTokens": 266,
+      "genTokPerSec": 28.940029379044166
+    },
+    {
+      "task": "HumanEval/138",
+      "passed": false,
+      "seconds": 8.112,
+      "promptTokens": 77,
+      "genTokens": 185,
+      "genTokPerSec": 23.434666188463623,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/139",
+      "passed": true,
+      "seconds": 5.026,
+      "promptTokens": 95,
+      "genTokens": 154,
+      "genTokPerSec": 32.24187899770324
+    },
+    {
+      "task": "HumanEval/140",
+      "passed": true,
+      "seconds": 7.45,
+      "promptTokens": 112,
+      "genTokens": 165,
+      "genTokPerSec": 22.93662024425263
+    },
+    {
+      "task": "HumanEval/141",
+      "passed": true,
+      "seconds": 14.152,
+      "promptTokens": 213,
+      "genTokens": 369,
+      "genTokPerSec": 27.274692694629206
+    },
+    {
+      "task": "HumanEval/142",
+      "passed": true,
+      "seconds": 9.192,
+      "promptTokens": 174,
+      "genTokens": 233,
+      "genTokPerSec": 26.672037863257064
+    },
+    {
+      "task": "HumanEval/143",
+      "passed": true,
+      "seconds": 10.865,
+      "promptTokens": 152,
+      "genTokens": 296,
+      "genTokPerSec": 28.356144329506474
+    },
+    {
+      "task": "HumanEval/144",
+      "passed": true,
+      "seconds": 5.139,
+      "promptTokens": 155,
+      "genTokens": 199,
+      "genTokPerSec": 42.49878245281079
+    },
+    {
+      "task": "HumanEval/145",
+      "passed": false,
+      "seconds": 4.284,
+      "promptTokens": 116,
+      "genTokens": 158,
+      "genTokPerSec": 39.59031837676669,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/146",
+      "passed": true,
+      "seconds": 11.669,
+      "promptTokens": 127,
+      "genTokens": 239,
+      "genTokPerSec": 20.974438944774214
+    },
+    {
+      "task": "HumanEval/147",
+      "passed": true,
+      "seconds": 9.53,
+      "promptTokens": 168,
+      "genTokens": 260,
+      "genTokPerSec": 28.63161022628258
+    },
+    {
+      "task": "HumanEval/148",
+      "passed": true,
+      "seconds": 14.932,
+      "promptTokens": 221,
+      "genTokens": 325,
+      "genTokPerSec": 22.71554369268225
+    },
+    {
+      "task": "HumanEval/149",
+      "passed": true,
+      "seconds": 7.445,
+      "promptTokens": 184,
+      "genTokens": 260,
+      "genTokPerSec": 37.377766405700584
+    },
+    {
+      "task": "HumanEval/150",
+      "passed": true,
+      "seconds": 10.097,
+      "promptTokens": 88,
+      "genTokens": 212,
+      "genTokPerSec": 21.470973330100136
+    },
+    {
+      "task": "HumanEval/151",
+      "passed": true,
+      "seconds": 5.64,
+      "promptTokens": 145,
+      "genTokens": 174,
+      "genTokPerSec": 33.417120807913946
+    },
+    {
+      "task": "HumanEval/152",
+      "passed": true,
+      "seconds": 17.152,
+      "promptTokens": 232,
+      "genTokens": 264,
+      "genTokPerSec": 15.966146427289411
+    },
+    {
+      "task": "HumanEval/153",
+      "passed": true,
+      "seconds": 12.672,
+      "promptTokens": 274,
+      "genTokens": 361,
+      "genTokPerSec": 30.26409203310387
+    },
+    {
+      "task": "HumanEval/154",
+      "passed": false,
+      "seconds": 5.441,
+      "promptTokens": 133,
+      "genTokens": 176,
+      "genTokPerSec": 35.215929996365716,
+      "error": "AssertionError: test #3"
+    },
+    {
+      "task": "HumanEval/155",
+      "passed": true,
+      "seconds": 6.17,
+      "promptTokens": 68,
+      "genTokens": 133,
+      "genTokPerSec": 22.36139745181712
+    },
+    {
+      "task": "HumanEval/156",
+      "passed": true,
+      "seconds": 14.222,
+      "promptTokens": 108,
+      "genTokens": 313,
+      "genTokPerSec": 22.41085650845751
+    },
+    {
+      "task": "HumanEval/157",
+      "passed": true,
+      "seconds": 4.303,
+      "promptTokens": 108,
+      "genTokens": 142,
+      "genTokPerSec": 35.24075811118534
+    },
+    {
+      "task": "HumanEval/158",
+      "passed": true,
+      "seconds": 8.19,
+      "promptTokens": 118,
+      "genTokens": 211,
+      "genTokPerSec": 26.69996448904723
+    },
+    {
+      "task": "HumanEval/159",
+      "passed": true,
+      "seconds": 7.244,
+      "promptTokens": 299,
+      "genTokens": 327,
+      "genTokPerSec": 50.66852140395323
+    },
+    {
+      "task": "HumanEval/160",
+      "passed": false,
+      "seconds": 15.017,
+      "promptTokens": 214,
+      "genTokens": 337,
+      "genTokPerSec": 23.40555898744208,
+      "error": "AssertionError"
+    },
+    {
+      "task": "HumanEval/161",
+      "passed": true,
+      "seconds": 6.003,
+      "promptTokens": 107,
+      "genTokens": 163,
+      "genTokPerSec": 28.410715118744516
+    },
+    {
+      "task": "HumanEval/162",
+      "passed": true,
+      "seconds": 4.381,
+      "promptTokens": 83,
+      "genTokens": 132,
+      "genTokPerSec": 31.856210307405135
+    },
+    {
+      "task": "HumanEval/163",
+      "passed": false,
+      "seconds": 9.074,
+      "promptTokens": 105,
+      "genTokens": 224,
+      "genTokPerSec": 25.418557005616474,
+      "error": "AssertionError: Test 1"
+    }
+  ],
+  "loadSeconds": 8.075,
+  "totalMemGB": 31.3,
+  "cpus": 4,
+  "cpu": "Intel(R) Xeon(R) CPU @ 2.00GHz",
+  "gpuLayers": 999,
+  "passRate": 0.8048780487804879
+}

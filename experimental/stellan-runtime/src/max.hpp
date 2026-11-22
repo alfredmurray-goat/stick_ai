@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lite.hpp"
+#include "kv_cache.hpp"
 
 namespace stellan {
 class Max : public Decoder {
@@ -10,6 +11,8 @@ public:
     const std::vector<float> &prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress = {}) override;
     void reset() override;
     std::size_t state_bytes() const override;
+    std::size_t state_capacity_bytes() const override;
+    std::string_view cache_type() const override { return quantized_cache_ ? "q8_0" : "f16"; }
 private:
     struct Layer {
         const Tensor *q;
@@ -21,8 +24,8 @@ private:
         const Tensor *down;
         std::vector<float> attention_norm;
         std::vector<float> ffn_norm;
-        std::vector<std::uint16_t> keys;
-        std::vector<std::uint16_t> values;
+        KVCache keys;
+        KVCache values;
     };
     const std::vector<float> &evaluate(std::int32_t token, const std::function<bool()> &cancelled, bool output_logits);
     const Model &model_;
@@ -34,6 +37,7 @@ private:
     std::size_t feed_forward_;
     std::size_t context_;
     std::size_t position_ = 0;
+    bool quantized_cache_ = false;
     float epsilon_;
     double rope_base_;
     const Tensor *embedding_;

@@ -86,7 +86,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     std::vector<std::int32_t> processed;
     const std::vector<float> *logits = nullptr;
     std::cout << "{\"event\":\"ready\",\"model_sha256\":" << json_string(expected) << ",\"verify_ms\":" << verify_ms
-              << ",\"state_bytes\":" << engine->state_bytes() << "}\n" << std::flush;
+              << ",\"state_bytes\":" << engine->state_bytes() << ",\"state_capacity_bytes\":" << engine->state_capacity_bytes() << ",\"cache_type\":" << stellan::json_string(std::string(engine->cache_type())) << "}\n" << std::flush;
     std::string line;
     while (!cancelled() && read_line(line)) {
         unsigned request = 0;

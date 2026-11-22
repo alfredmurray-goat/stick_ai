@@ -48,7 +48,7 @@ Max::Max(const Model &model, unsigned threads, std::size_t context) : model_(mod
     rope_base_ = model.number("llama.rope.freq_base");
     epsilon_ = static_cast<float>(model.number("llama.attention.layer_norm_rms_epsilon"));
     if (heads_ % kv_heads_ != 0 || rope != head_width_ || head_width_ % 2 != 0 || value_width != head_width_ ||
-        context_ == 0 || context_ > 32768 || layers * context_ * kv_heads_ * head_width_ > 536870912 ||
+        context_ == 0 || context_ > 65536 ||
         rope_base_ <= 1 || epsilon_ <= 0 || epsilon_ > 0.1F || model.vocabulary().empty()) {
         throw std::runtime_error("Unsupported transformer configuration or KV memory budget");
     }
@@ -57,6 +57,9 @@ Max::Max(const Model &model, unsigned threads, std::size_t context) : model_(mod
     output_ = tensor("output.weight", {width_, vocabulary});
     final_norm_ = floats(tensor("output_norm.weight", {width_}));
     const auto query_width = heads_ * head_width_;
+    quantized_cache_ = environment_set("STELLAN_RUNTIME_KV_Q8");
+    const auto cache_budget = layers * 2 * KVCache(context_, kv_heads_ * head_width_, quantized_cache_).capacity_bytes();
+    if (cache_budget > 8ULL * 1024 * 1024 * 1024) { throw std::runtime_error("Transformer KV capacity exceeds the 8 GiB experimental budget"); }
     const auto kv_width = kv_heads_ * head_width_;
     for (std::size_t i = 0; i < layers; ++i) {
         const auto prefix = "blk." + std::to_string(i) + ".";
@@ -70,8 +73,8 @@ Max::Max(const Model &model, unsigned threads, std::size_t context) : model_(mod
         layer.down = tensor(prefix + "ffn_down.weight", {feed_forward_, width_});
         layer.attention_norm = floats(tensor(prefix + "attn_norm.weight", {width_}));
         layer.ffn_norm = floats(tensor(prefix + "ffn_norm.weight", {width_}));
-        layer.keys.resize(context_ * kv_width);
-        layer.values.resize(context_ * kv_width);
+        layer.keys = KVCache(context_, kv_width, quantized_cache_);
+        layer.values = KVCache(context_, kv_width, quantized_cache_);
         layers_.push_back(std::move(layer));
     }
     hidden_.resize(width_);
@@ -143,29 +146,29 @@ const std::vector<float> &Max::evaluate(std::int32_t token, const std::function<
         multiply(layer.v, normalized_, value_, cancelled);
         rotate(query_, heads_);
         rotate(key_, kv_heads_);
-        for (std::size_t i = 0; i < key_.size(); ++i) {
-            layer.keys[position_ * key_.size() + i] = to_half(key_[i]);
-            layer.values[position_ * value_.size() + i] = to_half(value_[i]);
-        }
+        layer.keys.write(position_, key_);
+        layer.values.write(position_, value_);
         executor_.parallel(heads_, [&](std::size_t first, std::size_t last) {
-            std::vector<float> scores(position_ + 1);
+            std::vector<float> scores(position_ + 1), cached(head_width_);
             for (auto h = first; h < last; ++h) {
                 if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
                 const auto kv_head = h / (heads_ / kv_heads_);
                 float maximum = -INFINITY;
                 for (std::size_t t = 0; t <= position_; ++t) {
                     float score = 0;
-                    for (std::size_t i = 0; i < head_width_; ++i) { score += query_[h * head_width_ + i] * half(layer.keys[t * key_.size() + kv_head * head_width_ + i]); }
+                    layer.keys.decode(t, kv_head * head_width_, cached);
+                    for (std::size_t i = 0; i < head_width_; ++i) { score += query_[h * head_width_ + i] * cached[i]; }
                     scores[t] = score / std::sqrt(static_cast<float>(head_width_));
                     maximum = std::max(maximum, scores[t]);
                 }
                 float denominator = 0;
                 for (auto &score : scores) { score = std::exp(score - maximum); denominator += score; }
                 for (auto &score : scores) { score /= denominator; }
-                for (std::size_t i = 0; i < head_width_; ++i) {
-                    float sum = 0;
-                    for (std::size_t t = 0; t <= position_; ++t) { sum += scores[t] * half(layer.values[t * value_.size() + kv_head * head_width_ + i]); }
-                    attended_[h * head_width_ + i] = sum;
+                auto result = std::span(attended_).subspan(h * head_width_, head_width_);
+                std::fill(result.begin(), result.end(), 0.0F);
+                for (std::size_t t = 0; t <= position_; ++t) {
+                    layer.values.decode(t, kv_head * head_width_, cached);
+                    for (std::size_t i = 0; i < head_width_; ++i) { result[i] += scores[t] * cached[i]; }
                 }
             }
         });
@@ -191,11 +194,18 @@ const std::vector<float> &Max::evaluate(std::int32_t token, const std::function<
 void Max::reset() {
     position_ = 0;
     for (auto &layer : layers_) {
-        std::fill(layer.keys.begin(), layer.keys.end(), std::uint16_t {0});
-        std::fill(layer.values.begin(), layer.values.end(), std::uint16_t {0});
+        layer.keys.clear(); layer.values.clear();
     }
 }
 std::size_t Max::state_bytes() const {
-    return layers_.size() * context_ * kv_heads_ * head_width_ * sizeof(std::uint16_t) * 2;
+    std::size_t bytes = 0;
+    for (const auto &layer : layers_) { bytes += layer.keys.bytes() + layer.values.bytes(); }
+    return bytes;
 }
+std::size_t Max::state_capacity_bytes() const {
+    std::size_t bytes = 0;
+    for (const auto &layer : layers_) { bytes += layer.keys.capacity_bytes() + layer.values.capacity_bytes(); }
+    return bytes;
+}
+
 }
