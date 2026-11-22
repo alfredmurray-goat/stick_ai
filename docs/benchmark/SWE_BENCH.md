@@ -47,3 +47,13 @@ python3 -m swebench.harness.run_evaluation \
 Use a **new run ID whenever predictions change**: the harness caches prior grades. Do not pass `gold` for model scoring. Keep the selected task count as denominator, disclose incomplete inference, build/test infrastructure errors and unresolved patches separately, and retain the full official reports. Report **one-attempt resolved rate (pass@1)** only after official grading. A generated or applicable patch is not a solved issue. Ten tasks are not 500 tasks. No result has been measured yet.
 
 [Official prediction format and evaluation details](https://www.swebench.com/SWE-bench/guides/evaluation/).
+
+## Managed grading after Kaggle finishes
+
+Send the Kaggle **Output ZIP** after both models finish. The assistant can validate its task manifest and prediction files and prepare a sanitized submission branch. No need to run the Docker commands yourself. Keep the original `swe-tasks.jsonl` and its `.meta.json`, plus both `swe-stellan-1-*/predictions.jsonl` files. Raw inference/model server logs are not needed on the submission branch.
+
+The manual **Grade SWE-bench pilot** workflow uses a standard Linux x86-64 GitHub Actions runner. Each of the twenty model/task pairs gets a fresh runner; `max-parallel: 1` and official `--max_workers 1` keep grading sequential. It checks Docker and free space, pins the official harness to `02e7a74ffd0b707aab73d203fe87bdc7c76afc8e`, loads the dataset revision recorded during inference, and verifies the selected issue/source commit match before grading. Gold tests are only loaded by the evaluator, never sent back to the model. Each run ID includes the Actions run number and attempt to avoid stale cached grades.
+
+Workflow input `submission_ref` identifies a same-repository branch containing the sanitized files under `benchmark-submission/`. No evaluation is launched until a valid submission is available. No rented machine, larger paid runner or hosted evaluation service is configured. Availability and account Actions policies still apply. A task that exceeds the runner's disk/time limits is reported as an infrastructure failure, not a model-quality result.
+
+Artifacts retain Docker details, pip freeze, invocation, prediction hash, official per-instance logs and report. `swe-pilot-summary` keeps **ten selected tasks per model** as the denominator, reports empty patches, missing outputs/reports and infrastructure problems separately, and leaves `passAt1` unset until grading is complete. Summary jobs fail when grading is incomplete so a green workflow cannot be mistaken for complete evaluation. A passing setup test is not a measured SWE-bench result.
