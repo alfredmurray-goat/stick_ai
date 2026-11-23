@@ -43,6 +43,18 @@ jobs:
         run: cmake --build experimental/stellan-runtime/build --config Release --parallel 2
       - name: Test native core and GGUF validation
         run: ctest --test-dir experimental/stellan-runtime/build -C Release --output-on-failure --timeout 60
+      - name: Compare ARM prefill kernels on the same runner
+        if: matrix.os == 'macos-15'
+        run: |
+          cmake --build experimental/stellan-runtime/build --config Release --parallel 2 --target stellan-batch-bench
+          python3 experimental/stellan-runtime/bench/compare-batch.py experimental/stellan-runtime/build/stellan-batch-bench experimental/stellan-runtime/arm-batch-ci.json
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'macos-15'
+        with:
+          name: stellan-arm-batch-comparison
+          path: experimental/stellan-runtime/arm-batch-ci.json
+          overwrite: true
+          if-no-files-found: error
 
   sanitize:
     runs-on: ubuntu-latest
