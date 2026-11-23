@@ -1,0 +1,144 @@
+{
+  "purpose": "Native-host Lite text smoke, not a speed/quality benchmark or full Node-backend replacement",
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "hostBinarySha256": "aef34c2db741ffed6325a704586a0829d69f6cf4b148374d7092d994be6318b4",
+  "wallMs": 7283.617636000145,
+  "prompt": "<s>[INST] Write a Python function add(a, b) that returns their sum. Return only code. [/INST]",
+  "matchesPriorMeasuredIds": true,
+  "events": [
+    {
+      "event": "ready",
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "verify_ms": 3503.73,
+      "native_host": true,
+      "input_mode": "utf8-hex",
+      "state_bytes": 276299776,
+      "state_capacity_bytes": 276299776,
+      "cache_type": "recurrent-f32"
+    },
+    {
+      "event": "status",
+      "protocol": 1,
+      "node_required": false,
+      "scope": "inference-only",
+      "state_bytes": 276299776,
+      "cached_tokens": 0
+    },
+    {
+      "event": "prompt_progress",
+      "request_id": 1,
+      "completed": 16,
+      "total": 23
+    },
+    {
+      "event": "prompt_progress",
+      "request_id": 1,
+      "completed": 23,
+      "total": 23
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 9557,
+      "bytes_hex": "20606060"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 18435,
+      "bytes_hex": "707974686f6e"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 781,
+      "bytes_hex": "0a"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 2038,
+      "bytes_hex": "646566"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 1735,
+      "bytes_hex": "20616464"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 29500,
+      "bytes_hex": "28"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 29476,
+      "bytes_hex": "61"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 29493,
+      "bytes_hex": "2c"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 1055,
+      "bytes_hex": "2062"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 2097,
+      "bytes_hex": "293a"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 781,
+      "bytes_hex": "0a"
+    },
+    {
+      "event": "token",
+      "request_id": 1,
+      "id": 3055,
+      "bytes_hex": "202020"
+    },
+    {
+      "event": "finished",
+      "request_id": 1,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 0,
+      "evaluated_prompt_tokens": 23,
+      "prompt_ms": 2318.83,
+      "decode_ms": 1369.79,
+      "generated": 12,
+      "cpu_ms": 6954.2,
+      "peak_rss_bytes": 4449902592
+    },
+    {
+      "event": "reset"
+    },
+    {
+      "event": "status",
+      "protocol": 1,
+      "node_required": false,
+      "scope": "inference-only",
+      "state_bytes": 276299776,
+      "cached_tokens": 0
+    },
+    {
+      "event": "stopped"
+    }
+  ],
+  "limitations": [
+    "One twelve-token public prompt",
+    "No HTTP/app/tool/approval/session-file service migrated",
+    "Max accepts token IDs only; native Tekken encoding remains future work",
+    "Pipe-only inference scope; no model downloads, shell commands or network listeners"
+  ]
+}

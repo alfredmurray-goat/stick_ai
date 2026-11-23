@@ -3,5 +3,6 @@
 #include <functional>
 
 namespace stellan {
-int session(int argc, char **argv, const std::function<bool()> &cancelled);
+struct SessionOptions { bool host = false; bool text = false; };
+int session(int argc, char **argv, const std::function<bool()> &cancelled, SessionOptions options = {});
 }
