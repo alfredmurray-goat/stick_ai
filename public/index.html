@@ -44,19 +44,19 @@
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <p class="kicker"><span class="tech-only">// a private coding assistant on a usb stick</span><span class="plain-only">// a private AI helper on a USB stick</span></p>
+        <p class="kicker"><span class="tech-only">// a private coding assistant on a usb stick</span><span class="plain-only">A little stick. A helpful AI. Yours.</span></p>
         <h1><span class="tech-only">Your code never leaves</span><span class="plain-only">Your files never leave</span> <span class="nowrap"><em>the&nbsp;stick.</em><span class="cursor" aria-hidden="true"></span></span></h1>
         <p class="lede tech-only">Plug it in, open it, ask. Stellan reads your project, plans the change and waits for your yes before it touches a line. The AI runs on your own computer. There's no account, no cloud and no server to send anything to.</p>
-        <p class="lede plain-only">An AI helper, like ChatGPT, that lives on a USB stick. Plug it into your computer and ask it, in everyday words, to build, fix or explain your website, app or code. It shows you exactly what it wants to change and only does it when you say yes. It all happens on your own computer: nothing you type is sent to the internet, and there's no account or subscription.</p>
+        <p class="lede plain-only">An AI helper, like ChatGPT, that lives on a USB stick. Plug it into your computer and ask it, in everyday words, to build, fix or explain your website, app or code. It shows you exactly what it wants to change and only does it when you say yes. It all happens on your own computer: local chat stays on your computer. Optional online tools ask before sending information. There's no subscription.</p>
         <div class="actions">
           <a class="btn" href="#price">€15 · see the launch</a>
-          <a class="btn ghost" href="#session">watch it work ↓</a>
+          <a class="btn ghost" href="#session">See an example</a>
         </div>
         <ul class="facts" aria-label="At a glance">
           <li class="tech-only"><b>80.5%</b> HumanEval pass@1 · Max</li>
           <li class="plain-only"><b>80.5% pass@1</b> on the HumanEval coding test</li>
           <li class="tech-only"><b>0 bytes</b> of code sent</li>
-          <li class="plain-only"><b>Nothing</b> sent online</li>
+          <li class="plain-only"><b>Local chat</b> on your computer</li>
           <li><b>Mac · Win · Linux</b> one stick</li>
         </ul>
       </div>
@@ -68,13 +68,13 @@
             <img src="/img/brand/logo-dark.png" alt="The stick_ai USB stick: a dark stick with a glowing violet edge, a small terminal face on its cap and stick_ai printed on its side" width="425" height="520">
           </picture>
         </div>
-        <figcaption><span>fig. 1</span> stick_ai, 64&nbsp;GB · not actual size</figcaption>
+        <figcaption><span class="tech-only">stick_ai, 64&nbsp;GB · </span><span class="plain-only">Your private coding helper · </span>not actual size</figcaption>
       </figure>
     </section>
 
     <section class="session" id="session" aria-labelledby="session-title">
       <div class="session-copy">
-        <p class="kicker">// how it works</p>
+        <p class="kicker"><span class="tech-only">// how it works</span><span class="plain-only">Simple from the first step</span></p>
         <h2 id="session-title">It asks before it acts.</h2>
         <ol class="steps">
           <li><span>01</span><div><b>Plug in, open.</b> The app for your computer is right on the stick. Nothing to install.</div></li>
@@ -82,10 +82,12 @@
           <li><span>03</span><div><b>Say yes or no.</b> Every edit and command shows the exact lines first. Your file stays as it was until you allow it.</div></li>
         </ol>
       </div>
-      <div class="plain-card plain-only">
-        <p><b>Think of it as a careful assistant sitting next to you.</b></p>
-        <p>You say: <i>"Why does my shop's checkout break when the basket is empty?"</i></p>
-        <p>It looks through your files, finds the one line that causes it, and explains it in plain words. Then it shows you the small change it wants to make and asks: <i>"Shall I fix it?"</i> Nothing changes until you click yes.</p>
+      <div class="plain-card conversation-demo plain-only" aria-label="Illustrative example: Stellan asks before fixing a checkout bug">
+        <p class="demo-caption">An example conversation</p>
+        <div class="chat-bubble question"><span>You</span><p>My checkout breaks when the basket is empty. Can you help?</p></div>
+        <div class="chat-bubble answer"><span>Stellan</span><p>I found the problem. The checkout tries to divide by zero when there are no items. I can fix that with a small change.</p></div>
+        <div class="approval-example"><b>You have the final say.</b><p>Review the proposed change, then choose whether to allow it.</p><span class="example-choice">Allow change</span><span class="example-choice secondary">Keep my file</span></div>
+        <p class="demo-caption">Illustration, not a live chat.</p>
       </div>
       <div class="term tech-only" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
         <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
@@ -107,7 +109,7 @@
     </section>
 
     <section class="features" id="features" aria-labelledby="features-title">
-      <p class="kicker">// built in</p>
+      <p class="kicker"><span class="tech-only">// built in</span><span class="plain-only">A little help with the whole task</span></p>
       <h2 id="features-title">Small stick, <em>grown-up tools.</em></h2>
       <div class="feature-grid">
         <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p class="tech-only">Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p><p class="plain-only">You can see what it's thinking and which files it's looking at while it works, so it never feels like a black box.</p></article>
@@ -119,12 +121,19 @@
       </div>
     </section>
 
-    <section class="features" id="our-runtime" aria-labelledby="runtime-title">
-      <p class="kicker">// in development</p>
-      <h2 id="runtime-title">Our own engine. <em>Built for Stellan.</em></h2>
-      <p class="lede narrow tech-only">We're developing an independent, MIT-licensed runtime for Stellan, focused on faster local replies, lower memory use and a carefully tested security boundary. It's experimental: today's app still uses llama.cpp. We'll switch only after correctness, security and real-device tests demonstrate the improvement.</p>
-      <p class="lede narrow plain-only">We're building our own engine to make Stellan quicker and gentler on your computer, while keeping its work local. It's still being developed and isn't in the app yet. We'll switch when testing shows it works correctly, safely and better than the current engine.</p>
-      <p><a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">Follow the runtime experiment</a></p>
+    <section class="our-stack" id="our-runtime" aria-labelledby="runtime-title">
+      <div class="stack-intro">
+        <p class="kicker"><span class="tech-only">// built by Locali Labs</span><span class="plain-only">Made by the people behind the stick</span></p>
+        <h2 id="runtime-title">Our software.<br><em>Your computer.</em></h2>
+        <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. Now we're building Stellan-Run: an independent, MIT-licensed inference engine designed around our models and local-first app.</p>
+        <p class="lede narrow plain-only">We build the software that helps Stellan plan, ask your permission and work on your files. And we're building its own engine, so we can keep improving how it runs on your computer.</p>
+      </div>
+      <div class="stack-grid">
+        <article><span class="stack-state">Original software</span><h3>The agent, built by us.</h3><p>Our own planning, tool approvals and project workflow. You choose the project and review changes before they happen.</p></article>
+        <article><span class="stack-state">In development</span><h3>Stellan-Run.</h3><p class="tech-only">Our C++ engine has its own model executor, CPU kernels and cache. The experimental runtime is independent of llama.cpp and ggml.</p><p class="plain-only">The engine is the part that runs the AI. We're making our own, with quicker replies and lower memory use as the goals.</p></article>
+        <article><span class="stack-state">Built in the open</span><h3>Show the work.</h3><p>Code, tests and measured results. Foundation models and third-party tools keep their credits. We publish what works and what still needs improving.</p></article>
+      </div>
+      <p class="stack-note"><b>What's ready today?</b> The app currently runs with llama.cpp. Stellan-Run is experimental and has not yet beaten it overall. Our native backend is the next development step. <a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">See the code and evidence</a>.</p>
     </section>
 
     <section class="bench" id="bench" aria-labelledby="bench-title">

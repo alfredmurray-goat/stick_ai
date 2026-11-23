@@ -20,3 +20,5 @@ The landing page for stick_ai. Plain HTML and CSS in `public/`: no build step, n
 ## Benchmark chart selection
 
 Owner preference (22 November 2026): the website chart is a selected historical comparison. Do not add comparison models whose published score exceeds Stellan-1 Max’s current measured score (currently 132/164, 80.5%). Models between Lite and Max are allowed. Keep the selection criterion visible and never present it as a complete leaderboard or evidence that Stellan outperforms all models. Retain primary sources, historical release/version labels and accurate per-row metrics; do not relabel unspecified pass@k or best-of-N scores as pass@1. Scores obtained with different metrics or setups are not evidence of a controlled head-to-head win.
+
+Non-tech mode changes the layout as well as the language: a chat illustration, softer panels, plain typography, clearer feature cards and a simpler footer. The original-software section distinguishes the agent workflow from the experimental Stellan-Run engine and planned native backend. Do not advertise a completed engine switch or superiority before the runtime qualifies.
