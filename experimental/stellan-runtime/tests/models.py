@@ -44,22 +44,28 @@ def silu(x):
 
 
 class Fixture:
-    def __init__(self, architecture, groups=1):
+    def __init__(self, architecture, groups=1, bpe=False):
         self.random = random.Random(8234)
         self.weights = {}
         self.tensors = []
         self.architecture = architecture
         self.groups = groups
         tokens = ["<unk>", "<s>", "</s>"] + [f"<0x{i:02X}>" for i in range(256)]
+        if bpe:
+            direct = set(range(33, 127)) | set(range(161, 173)) | set(range(174, 256))
+            extra = iter(range(256, 512))
+            tokens = ["<unk>", "<s>", "</s>"] + [chr(i if i in direct else next(extra)) for i in range(256)] + ["AB"]
         self.metadata = [
             ("general.architecture", 8, string(architecture)),
-            ("tokenizer.ggml.model", 8, string("llama")),
+            ("tokenizer.ggml.model", 8, string("gpt2" if bpe else "llama")),
             ("tokenizer.ggml.bos_token_id", 4, struct.pack("<I", 1)),
             ("tokenizer.ggml.eos_token_id", 4, struct.pack("<I", 2)),
             ("tokenizer.ggml.tokens", 9, struct.pack("<IQ", 8, len(tokens)) + b"".join(string(t) for t in tokens)),
             ("tokenizer.ggml.scores", 9, struct.pack("<IQ", 6, len(tokens)) + struct.pack("<" + "f" * len(tokens), *([0] * len(tokens)))),
-            ("tokenizer.ggml.token_type", 9, struct.pack("<IQ", 5, len(tokens)) + struct.pack("<" + "i" * len(tokens), *([2, 3, 3] + [6] * 256)))
+            ("tokenizer.ggml.token_type", 9, struct.pack("<IQ", 5, len(tokens)) + struct.pack("<" + "i" * len(tokens), *([2, 3, 3] + ([1] * 257 if bpe else [6] * 256))))
         ]
+        if bpe:
+            self.metadata += [("tokenizer.ggml.pre", 8, string("tekken")), ("tokenizer.ggml.merges", 9, struct.pack("<IQ", 8, 1) + string("A B"))]
         config = {"embedding_length": 4, "block_count": 2, "attention.layer_norm_rms_epsilon": 1e-5}
         if architecture == "mamba2":
             config.update({"ssm.inner_size": 8, "ssm.state_size": 2, "ssm.time_step_rank": 2 * groups, "ssm.group_count": groups, "ssm.conv_kernel": 4})
@@ -67,8 +73,8 @@ class Fixture:
             config.update({"attention.head_count": 2, "attention.head_count_kv": 1, "attention.key_length": 2, "attention.value_length": 2, "feed_forward_length": 6, "rope.dimension_count": 2, "rope.freq_base": 10000.0})
         for key, value in config.items():
             self.metadata.append((architecture + "." + key, 6 if isinstance(value, float) else 4, struct.pack("<f" if isinstance(value, float) else "<I", value)))
-        self.add("token_embd.weight", [4, 259])
-        self.add("output.weight", [4, 259])
+        self.add("token_embd.weight", [4, len(tokens)])
+        self.add("output.weight", [4, len(tokens)])
         self.add("output_norm.weight", [4], ones=True)
         for layer in range(2):
             prefix = f"blk.{layer}."
@@ -258,6 +264,23 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
             for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
             logits = fixture.step(event['id'])
+
+    def test_transformer_logits_survive_cache_chunk_growth(self):
+        tokens = [1] + [68 + i % 20 for i in range(258)]
+        for quantized in (False, True):
+            with self.subTest(quantized=quantized):
+                fixture = Fixture("llama"); fixture.quantized_cache = quantized
+                data = fixture.bytes(); self.file.write_bytes(data)
+                for token in tokens:
+                    logits = fixture.step(token)
+                result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "2", "2", "300"], env={**os.environ, 'STELLAN_RUNTIME_KV_Q8': '1' if quantized else ''}, capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+                for event in (json.loads(line) for line in result.stdout.splitlines()):
+                    if event['event'] != 'token':
+                        continue
+                    self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
+                    for item in event['top']:
+                        self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+                    logits = fixture.step(event['id'])
 
     def test_hash_mismatch_blocks_execution(self):
         result = self.invoke(Fixture("mamba2").bytes(), "decode", "0" * 64, "1", "1")

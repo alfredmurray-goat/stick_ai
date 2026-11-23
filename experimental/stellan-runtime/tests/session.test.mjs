@@ -15,16 +15,38 @@ const executable = process.env.STELLAN_TEST_ENGINE;
 const python = process.env.STELLAN_PYTHON;
 const directory = fileURLToPath(new URL('.', import.meta.url));
 const hash = data => createHash('sha256').update(data).digest('hex');
-async function fixture(architecture = 'mamba2') {
+async function fixture(architecture = 'mamba2', bpe = false) {
   const root = await mkdtemp(join(tmpdir(), 'stellan-session-'));
   const model = join(root, 'model é.gguf');
-  execFileSync(python, ['-c', 'import sys,pathlib;sys.path.insert(0,sys.argv[1]);target=sys.argv[2];architecture=sys.argv[3];sys.argv=["fixture","unused"];from models import Fixture;pathlib.Path(target).write_bytes(Fixture(architecture).bytes())', directory, model, architecture]);
+  execFileSync(python, ['-c', 'import sys,pathlib;sys.path.insert(0,sys.argv[1]);target=sys.argv[2];architecture=sys.argv[3];bpe=sys.argv[4] == "true";sys.argv=["fixture","unused"];from models import Fixture;pathlib.Path(target).write_bytes(Fixture(architecture, bpe=bpe).bytes())', directory, model, architecture, String(bpe)]);
   return { root, model, executable, executableSha256: hash(await readFile(executable)), sha256: hash(await readFile(model)), threads: 2, context: 128 };
 }
 const enabled = Boolean(executable && python);
 // Numerical fixture models are tiny; RAM-policy boundaries are tested separately.
 mock.method(os, 'totalmem', () => 32 * 1024 ** 3);
 syncBuiltinESMExports();
+
+test('persistent Max cache follows the requested mode instead of the inherited environment', { skip: !enabled }, async () => {
+  const options = await fixture('llama', true); let session;
+  const inherited = process.env.STELLAN_RUNTIME_KV_Q8;
+  try {
+    delete process.env.STELLAN_RUNTIME_KV_Q8;
+    session = await openNativeSession({ ...options, kvCache: 'q8_0' });
+    assert.equal(session.startup.cache_type, 'q8_0');
+    assert.equal((await session.generate('A B', { maxTokens: 2 })).tokens.length, 2);
+    const compressedCapacity = session.startup.state_capacity_bytes;
+    await session.close(); session = undefined;
+    process.env.STELLAN_RUNTIME_KV_Q8 = '1';
+    session = await openNativeSession({ ...options, kvCache: 'f16' });
+    assert.equal(session.startup.cache_type, 'f16');
+    // Tiny two-value heads pad Q8 blocks; the full checkpoint uses complete blocks.
+    assert.notEqual(session.startup.state_capacity_bytes, compressedCapacity);
+    assert.equal((await session.generate('A B', { maxTokens: 2 })).tokens.length, 2);
+  } finally {
+    if (inherited === undefined) delete process.env.STELLAN_RUNTIME_KV_Q8; else process.env.STELLAN_RUNTIME_KV_Q8 = inherited;
+    await session?.close(); await rm(options.root, { recursive: true, force: true });
+  }
+});
 
 test('persistent bridge matches fresh requests and reuses prefixes for both architectures', { skip: !enabled }, async () => {
   for (const architecture of ['mamba2', 'llama']) {

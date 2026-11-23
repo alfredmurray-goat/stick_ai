@@ -173,6 +173,31 @@ void recurrence() {
 }
 
 void cache_storage() {
+    // Cross chunk boundaries and a partial final chunk, including a partial Q8 block.
+    for (const bool quantized : {false, true}) {
+        stellan::KVCache cache(777, 35, quantized);
+        std::array<float, 35> row, decoded;
+        for (std::size_t position = 0; position < 777; ++position) {
+            row.fill(static_cast<float>(position % 7 + 1));
+            cache.write(position, row);
+        }
+        require(cache.bytes() == cache.capacity_bytes());
+        for (std::size_t position = 0; position < 777; ++position) {
+            cache.decode(position, 0, decoded);
+            for (const auto value : decoded) close(value, static_cast<double>(position % 7 + 1), quantized ? 0.002 : 0);
+            std::array<float, 4> tail;
+            cache.decode(position, 31, tail);
+            for (const auto value : tail) close(value, cache.read(position, 34), 0);
+        }
+        cache.clear(); require(cache.bytes() == 0);
+        row.fill(3); cache.write(776, row);
+        close(cache.read(0, 0), 0, 0);
+        close(cache.read(776, 34), 3, quantized ? 0.002 : 0);
+        row.fill(5); cache.write(255, row);
+        close(cache.read(255, 34), 5, quantized ? 0.002 : 0);
+        close(cache.read(256, 0), 0, 0);
+        cache.clear(); require(cache.bytes() == 0);
+    }
     stellan::KVCache half_cache(8192, 128, false), quantized_cache(8192, 128, true);
     require(half_cache.bytes() == 0 && quantized_cache.bytes() == 0);
     require(quantized_cache.capacity_bytes() * 64 == half_cache.capacity_bytes() * 34);

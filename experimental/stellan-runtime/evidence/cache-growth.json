@@ -1,0 +1,161 @@
+{
+  "purpose": "Isolated KV-cache allocation/write diagnostic, not full model inference or llama.cpp comparison",
+  "baselineCommit": "a98e743ba1373524ea68c13d0aae5b93b60c67e2",
+  "host": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "cpu": "AMD EPYC 9V45",
+  "compiler": "GCC 14.2.0 -O3 / Release",
+  "context": 65536,
+  "width": 1024,
+  "caches": 1,
+  "repetitions": 3,
+  "binarySha256": {
+    "before": "c9fa942b0181010e47e213931004f250ad83558e3ea15ba6978572c22231b2da",
+    "chunked": "f1bd8ecdd260a1ba743fdeaedc5f843fbeaa2394a4dac7952e146b0997c8ccd2"
+  },
+  "runs": [
+    {
+      "write_ms": 4280.84,
+      "peak_rss_bytes": 269438976,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 0,
+      "mode": "f16",
+      "arm": "before"
+    },
+    {
+      "write_ms": 135.921,
+      "peak_rss_bytes": 136708096,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 0,
+      "mode": "f16",
+      "arm": "chunked"
+    },
+    {
+      "write_ms": 2213.34,
+      "peak_rss_bytes": 143859712,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 0,
+      "mode": "q8",
+      "arm": "before"
+    },
+    {
+      "write_ms": 148.392,
+      "peak_rss_bytes": 73793536,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 0,
+      "mode": "q8",
+      "arm": "chunked"
+    },
+    {
+      "write_ms": 130.469,
+      "peak_rss_bytes": 136708096,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 1,
+      "mode": "f16",
+      "arm": "chunked"
+    },
+    {
+      "write_ms": 4005.69,
+      "peak_rss_bytes": 269443072,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 1,
+      "mode": "f16",
+      "arm": "before"
+    },
+    {
+      "write_ms": 167.86,
+      "peak_rss_bytes": 73793536,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 1,
+      "mode": "q8",
+      "arm": "chunked"
+    },
+    {
+      "write_ms": 2020.59,
+      "peak_rss_bytes": 143855616,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 1,
+      "mode": "q8",
+      "arm": "before"
+    },
+    {
+      "write_ms": 3745.39,
+      "peak_rss_bytes": 269443072,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 2,
+      "mode": "f16",
+      "arm": "before"
+    },
+    {
+      "write_ms": 130.003,
+      "peak_rss_bytes": 136708096,
+      "cache_bytes": 134217728,
+      "checksum": -60,
+      "repeat": 2,
+      "mode": "f16",
+      "arm": "chunked"
+    },
+    {
+      "write_ms": 2079.27,
+      "peak_rss_bytes": 143855616,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 2,
+      "mode": "q8",
+      "arm": "before"
+    },
+    {
+      "write_ms": 168.526,
+      "peak_rss_bytes": 73793536,
+      "cache_bytes": 71303168,
+      "checksum": -59.9963,
+      "repeat": 2,
+      "mode": "q8",
+      "arm": "chunked"
+    }
+  ],
+  "limitations": [
+    "One key or value cache, not all 80 Max caches, model weights or attention computation",
+    "Shared virtual host; alternating before/after order; peak RSS includes allocator retention",
+    "Same deterministic rows; checksum is a guard, numerical fixtures independently check all chunk boundaries",
+    "Cache data capacity unchanged; metadata overhead is excluded from cache_bytes but included in RSS"
+  ],
+  "summary": {
+    "f16": {
+      "before": {
+        "write_ms": 4005.69,
+        "peak_rss_bytes": 269443072,
+        "cache_bytes": 134217728,
+        "checksum": -60
+      },
+      "chunked": {
+        "write_ms": 130.469,
+        "peak_rss_bytes": 136708096,
+        "cache_bytes": 134217728,
+        "checksum": -60
+      }
+    },
+    "q8": {
+      "before": {
+        "write_ms": 2079.27,
+        "peak_rss_bytes": 143855616,
+        "cache_bytes": 71303168,
+        "checksum": -59.9963
+      },
+      "chunked": {
+        "write_ms": 167.86,
+        "peak_rss_bytes": 73793536,
+        "cache_bytes": 71303168,
+        "checksum": -59.9963
+      }
+    }
+  }
+}

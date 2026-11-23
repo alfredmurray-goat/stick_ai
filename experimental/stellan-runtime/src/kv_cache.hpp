@@ -18,7 +18,7 @@ private:
     static_assert(sizeof(Block) == 34);
     std::size_t context_ = 0, width_ = 0, positions_ = 0;
     bool quantized_ = false;
-    std::vector<std::uint16_t> halves_;
-    std::vector<Block> blocks_;
+    std::vector<std::vector<std::uint16_t>> halves_;
+    std::vector<std::vector<Block>> blocks_;
 };
 }

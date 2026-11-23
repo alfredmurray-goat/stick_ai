@@ -20,7 +20,7 @@ export async function openNativeSession({ executable, executableSha256, model, s
   if (signal?.aborted) { throw new Error('Session startup cancelled'); }
   const nativeEnv = { ...process.env };
   if (kvCache === "q8_0") nativeEnv.STELLAN_RUNTIME_KV_Q8 = "1"; else delete nativeEnv.STELLAN_RUNTIME_KV_Q8;
-  const child = spawn(resolve(executable), ['serve', resolve(model), sha256, String(threads), String(context), ...(forceMax ? ['--force-max'] : [])], { stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true });
+  const child = spawn(resolve(executable), ['serve', resolve(model), sha256, String(threads), String(context), ...(forceMax ? ['--force-max'] : [])], { stdio: ['pipe', 'pipe', 'pipe'], env: nativeEnv, shell: false, windowsHide: true });
   let buffer = '', diagnostic = '', pending, requestId = 0, stopped = false, ready = false, idleTimer, killTimer;
   let acceptReady, rejectReady, acceptClosed;
   const initialized = new Promise((accept, reject) => { acceptReady = accept; rejectReady = reject; });

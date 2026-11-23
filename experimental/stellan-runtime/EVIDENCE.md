@@ -88,3 +88,28 @@ Max no longer preallocates the entire attention window. Cache data grows in 256-
 The [real Lite upload smoke receipt](evidence/lite-upload-smoke.json) records a synthetic Python file passed through the shared document/text pipeline into Stellan-Run. The generated `add(a, b)` function returns `a + b`, checked by Python AST. The response also included explanatory prose despite the code-only instruction, so format adherence was not perfect. This is one functionality check, not a benchmark or pass@1 score. Verification checked the full pinned Lite file; no weights or private user files are in the receipt.
 
 The persistent-session portability follow-up at `1d804a505dc71c857118540273924b95d5315d4d` passed Apple Silicon, Intel Mac, Linux, Windows and sanitizer CI. Fixture RAM mocking is restricted to tiny test models; the production RAM policies remain tested and enforced. Windows' read mapping denies writes to a running model, so that test checks the file lock and post-close hash refusal. Later changes require their own CI result.
+
+## Cache growth follow-up — 23 November 2026
+
+Max now retains separate 256-token allocations instead of allocating a larger contiguous buffer and copying all prior cache data at every growth boundary. Reset releases every chunk. Configured capacity and cached values are unchanged; a partial last chunk respects the context limit. `state_bytes` counts cache data allocations, excluding small chunk-container metadata. The persistent Node bridge also now passes its prepared environment to the child: `kvCache: 'q8_0'` actually selects Q8, and the default FP16 request overrides an inherited Q8 environment setting.
+
+The [cache growth receipt](evidence/cache-growth.json) compares one 1,024-wide cache filled through 65,536 positions against `a98e743`, three repetitions with alternating before/after order. Both implementations retain the same data capacity and checksum. Median isolated results:
+
+| Cache mode | Previous fill time | Chunked fill time | Previous peak RSS | Chunked peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| FP16 | 4,005.69 ms | 130.469 ms | 257.0 MiB | 130.4 MiB |
+| Q8 | 2,079.27 ms | 167.86 ms | 137.2 MiB | 70.4 MiB |
+
+These are allocation/write stress measurements for **one cache**, not full Max generation, all 80 caches, attention computation, model weights, a quality benchmark or a comparison against llama.cpp. Shared virtual-host timings and allocator retention limit generalization. Full model RSS is not halved by this change. Independent cache tests cover all positions across multiple chunk boundaries, partial rows/blocks, overwrites, skipped positions and reset. Transformer logits after crossing the first chunk boundary are checked against the independent Python reference in FP16 and Q8. Session tests check that the requested cache mode reaches the real native child.
+
+To reproduce the cache-only workload, configure a Release build and run:
+
+```sh
+cmake --build experimental/stellan-runtime/build --target stellan-cache-bench --config Release
+experimental/stellan-runtime/build/stellan-cache-bench f16
+experimental/stellan-runtime/build/stellan-cache-bench q8
+```
+
+On Windows the executable is under `build/Release/`. The benchmark is excluded from normal builds; compile the same benchmark source against the earlier core for a before/after comparison, using its matching headers. Retain executable hashes and all trial outputs. No models or external services are needed.
+
+A separate [VNNI Q4 experiment](evidence/rejected-vnni-probe.json) was **rejected**. Three rotating-order rounds over two short coding prompts produced identical generated token IDs, but median prompt/decode times were worse on this host: 2,397/1,415 ms versus 2,279/1,346 ms for `a98e743`. The experimental kernel is not retained. Those binary hashes identify an uncommitted development experiment, not the shipped candidate; these short Lite trials do not qualify a replacement engine.
