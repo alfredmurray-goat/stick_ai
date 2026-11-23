@@ -1,6 +1,8 @@
 #include "session.hpp"
 #include "lite.hpp"
 #include "max.hpp"
+#include "host_input.hpp"
+#include <optional>
 
 #include <algorithm>
 #include <charconv>
@@ -23,6 +25,39 @@ unsigned number(std::string_view text, unsigned maximum) {
         throw std::runtime_error("Invalid session numeric option");
     }
     return value;
+}
+std::string from_hex(std::string_view encoded) {
+    if (encoded.empty() || encoded.size() > 2097152 || encoded.size() % 2) { throw std::runtime_error("Prompt must be bounded UTF-8 hex"); }
+    const auto nibble = [](char c) -> unsigned {
+        if (c >= '0' && c <= '9') return static_cast<unsigned>(c - '0');
+        if (c >= 'a' && c <= 'f') return static_cast<unsigned>(c - 'a' + 10);
+        if (c >= 'A' && c <= 'F') return static_cast<unsigned>(c - 'A' + 10);
+        throw std::runtime_error("Invalid prompt hex");
+    };
+    std::string text;
+    text.reserve(encoded.size() / 2);
+    for (std::size_t i = 0; i < encoded.size(); i += 2) text += static_cast<char>((nibble(encoded[i]) << 4) | nibble(encoded[i + 1]));
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const auto first = static_cast<unsigned char>(text[i]);
+        if (first < 128) continue;
+        const auto count = first >= 0xc2 && first <= 0xdf ? 1U : first >= 0xe0 && first <= 0xef ? 2U : first >= 0xf0 && first <= 0xf4 ? 3U : 0U;
+        if (!count || text.size() - i - 1 < count) throw std::runtime_error("Invalid prompt UTF-8");
+        unsigned code = first & ((1U << (6 - count)) - 1);
+        for (unsigned j = 0; j < count; ++j) {
+            const auto next = static_cast<unsigned char>(text[++i]);
+            if ((next & 0xc0) != 0x80) throw std::runtime_error("Invalid prompt UTF-8");
+            code = (code << 6) | (next & 63);
+        }
+        const auto minimum = count == 1 ? 128U : count == 2 ? 2048U : 65536U;
+        if (code < minimum || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) throw std::runtime_error("Invalid prompt UTF-8");
+    }
+    return text;
+}
+std::string to_hex(std::string_view bytes) {
+    constexpr char digits[] = "0123456789abcdef";
+    std::string text;
+    for (const unsigned char c : bytes) { text += digits[c >> 4]; text += digits[c & 15]; }
+    return text;
 }
 bool read_line(std::string &line) {
     line.clear();
@@ -56,7 +91,7 @@ std::vector<std::int32_t> ids(std::string_view csv, std::size_t vocabulary, std:
 }
 }
 
-int session(int argc, char **argv, const std::function<bool()> &cancelled) {
+int session(int argc, char **argv, const std::function<bool()> &cancelled, SessionOptions options) {
     if (argc < 6) { throw std::runtime_error("Usage: serve MODEL SHA256 THREADS CONTEXT [--force-max] [--split PATH SHA256]"); }
     bool force = false;
     std::filesystem::path split_path;
@@ -72,6 +107,8 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     }
     const auto threads = number(argv[4], 64);
     const auto context = number(argv[5], 262144);
+    std::optional<HostInput> host_input;
+    if (options.host) host_input.emplace();
     const auto path = std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[2])));
     const std::string expected(argv[3]);
     if (expected.size() != 64 || !std::all_of(expected.begin(), expected.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); })) {
@@ -101,6 +138,9 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     const auto boundary = model.number("tokenizer.ggml.eos_token_id");
     if (boundary < 0 || boundary >= static_cast<double>(model.vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
     const auto eos = static_cast<std::int32_t>(boundary);
+    std::optional<Tokenizer> tokenizer;
+    if (options.text && (model.architecture() != "mamba2" || model.text("tokenizer.ggml.model") != "llama")) throw std::runtime_error("Native host text currently supports Lite SentencePiece; use --token-ids for Max");
+    if (options.host) tokenizer.emplace(model);
     std::unique_ptr<Decoder> engine;
     if (model.architecture() == "mamba2") { engine = std::make_unique<Lite>(model, threads); }
     else if (model.architecture() == "llama") { engine = std::make_unique<Max>(model, threads, context); }
@@ -108,13 +148,24 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     std::vector<std::int32_t> processed;
     const std::vector<float> *logits = nullptr;
     std::cout << "{\"event\":\"ready\",\"model_sha256\":" << json_string(expected) << ",\"verify_ms\":" << verify_ms
+              << ",\"native_host\":" << (options.host ? "true" : "false") << ",\"input_mode\":" << json_string(options.text ? "utf8-hex" : "token-ids")
               << ",\"state_bytes\":" << engine->state_bytes() << ",\"state_capacity_bytes\":" << engine->state_capacity_bytes() << ",\"cache_type\":" << stellan::json_string(std::string(engine->cache_type())) << "}\n" << std::flush;
     std::string line;
-    while (!cancelled() && read_line(line)) {
+    while (!cancelled() && (host_input ? host_input->read_line(line, cancelled) : read_line(line))) {
         unsigned request = 0;
         try {
-            if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time ||
-                (split_mapping && (std::filesystem::file_size(split_path) != split_size || std::filesystem::last_write_time(split_path) != split_time))) {
+            if (options.host && line == "shutdown") {
+                std::cout << "{\"event\":\"stopped\"}\n" << std::flush; break;
+            }
+            if (options.host && line == "status") {
+                std::cout << "{\"event\":\"status\",\"protocol\":1,\"node_required\":false,\"scope\":\"inference-only\",\"state_bytes\":" << engine->state_bytes() << ",\"idle_timeout_seconds\":" << host_input->idle_seconds() << ",\"cached_tokens\":" << processed.size() << "}\n" << std::flush;
+                continue;
+            }
+            if (options.host && line == "reset") {
+                engine->reset(); processed.clear(); logits = nullptr;
+                std::cout << "{\"event\":\"reset\"}\n" << std::flush; continue;
+            }
+            if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time || (split_mapping && (std::filesystem::file_size(split_path) != split_size || std::filesystem::last_write_time(split_path) != split_time))) {
                 throw std::runtime_error("Model changed; restart and verify the session");
             }
             const auto first = line.find(' ');
@@ -122,7 +173,8 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
             if (first == std::string::npos || second == std::string::npos) { throw std::runtime_error("Invalid session request format"); }
             request = number(std::string_view(line).substr(0, first), std::numeric_limits<unsigned>::max());
             const auto limit = number(std::string_view(line).substr(first + 1, second - first - 1), 4096);
-            const auto tokens = ids(std::string_view(line).substr(second + 1), model.vocabulary().size(), context);
+            const auto payload = std::string_view(line).substr(second + 1);
+            const auto tokens = options.text ? tokenizer->encode(from_hex(payload)) : ids(payload, model.vocabulary().size(), context);
             if (tokens.size() + limit > context) { throw std::runtime_error("Session context is full"); }
             const bool reuse = !processed.empty() && tokens.size() >= processed.size() && std::equal(processed.begin(), processed.end(), tokens.begin());
             if (!reuse) { engine->reset(); processed.clear(); logits = nullptr; }
@@ -142,7 +194,9 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
             for (; generated < limit && !cancelled(); ) {
                 const auto token = static_cast<std::int32_t>(std::max_element(logits->begin(), logits->end()) - logits->begin());
                 ++generated;
-                std::cout << "{\"event\":\"token\",\"request_id\":" << request << ",\"id\":" << token << "}\n" << std::flush;
+                std::cout << "{\"event\":\"token\",\"request_id\":" << request << ",\"id\":" << token;
+                if (options.host) std::cout << ",\"bytes_hex\":" << json_string(to_hex(tokenizer->decode(token)));
+                std::cout << "}\n" << std::flush;
                 if (token == eos || generated == limit) { break; }
                 logits = &engine->step(token, cancelled);
                 processed.push_back(token);
@@ -159,6 +213,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
             if (cancelled()) { return 130; }
         }
     }
+    if (host_input && host_input->rested()) std::cout << "{\"event\":\"rested\",\"reason\":\"inactivity\"}\n" << std::flush;
     return cancelled() ? 130 : 0;
 }
 }
