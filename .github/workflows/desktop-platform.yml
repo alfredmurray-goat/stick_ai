@@ -38,7 +38,6 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: '13.5'
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
-      LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,41 +86,17 @@ jobs:
           else
             tar -xf release-assets/node-v24.22.1-${{ inputs.node }}.${{ inputs.archive }} -C release-assets
           fi
-      - uses: actions/cache/restore@v4
-        id: server-cache
-        with:
-          path: |
-            release-assets/llama-build/${{ inputs.server }}
-            release-assets/llama.cpp/LICENSE
-          key: desktop-server-${{ inputs.name }}-v0.9.0-static-crt-no-openmp-no-tls${{ inputs.name == 'macos-arm64' && '-metal-no-ui' || '' }}-${{ hashFiles('scripts/llama-split-dir.patch') }}
-      # Apple Silicon builds the Metal GPU backend (shaders embedded); other targets stay CPU-only.
-      # The app runs with --no-webui, so llama.cpp's downloadable web UI assets are not built.
-      - name: Build the pinned Mamba2-compatible server
-        if: steps.server-cache.outputs.cache-hit != 'true'
+      - name: Build and test our Stellan-Run engine
         run: |
-          git init release-assets/llama.cpp
-          git -C release-assets/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp.git
-          git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
-          git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
-          test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
-          # Locked models: later GGUF splits are read from LLAMA_SPLIT_DIR (src/portable/model-lock.ts).
-          git -C release-assets/llama.cpp apply "$GITHUB_WORKSPACE/scripts/llama-split-dir.patch"
-          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=${{ inputs.name == 'macos-arm64' && 'ON -DGGML_METAL_EMBED_LIBRARY=ON' || 'OFF' }} -DGGML_BLAS=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_UI=OFF
-          cmake --build release-assets/llama-build --config Release --target llama-server -j 3
-      - uses: actions/cache/save@v4
-        if: steps.server-cache.outputs.cache-hit != 'true'
-        with:
-          path: |
-            release-assets/llama-build/${{ inputs.server }}
-            release-assets/llama.cpp/LICENSE
-          key: ${{ steps.server-cache.outputs.cache-primary-key }}
+          cmake -S experimental/stellan-runtime -B release-assets/stellan-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          cmake --build release-assets/stellan-build --config Release --parallel 3
+          ctest --test-dir release-assets/stellan-build -C Release --output-on-failure --timeout 120
       - name: Collect native redistribution notices
         run: |
           node scripts/native-licenses.mjs release-assets/desktop-licenses
-          curl --fail --location --retry 3 "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/$LLAMA_COMMIT" --output release-assets/desktop-licenses/llama.cpp-source.tar.gz
       - name: Assemble the app and Lite with the pinned Max manifest
         run: |
-          node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ inputs.target }}/release/${{ inputs.app }}" --node release-assets/node-v24.22.1-${{ inputs.node }}/${{ inputs.executable }} --node-license release-assets/node-v24.22.1-${{ inputs.node }}/LICENSE --server release-assets/llama-build/${{ inputs.server }} --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses --max-release
+          node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ inputs.target }}/release/${{ inputs.app }}" --node release-assets/node-v24.22.1-${{ inputs.node }}/${{ inputs.executable }} --node-license release-assets/node-v24.22.1-${{ inputs.node }}/LICENSE --server release-assets/stellan-build/${{ inputs.server }} --server-license LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses --max-release
       - name: Remove copied inputs before archiving
         run: rm -f release-assets/stellan-1-lite-q4_k_m.gguf release-assets/node-*.tar.gz release-assets/node-*.zip
       - name: Verify native startup and real Lite tool exchange

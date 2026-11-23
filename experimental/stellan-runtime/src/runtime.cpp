@@ -269,7 +269,7 @@ Usage usage() {
 #endif
 }
 
-Model::Model(std::span<const std::byte> bytes) : bytes_(bytes) {
+Model::Model(std::span<const std::byte> bytes, bool continuation) : bytes_(bytes) {
     Reader reader(bytes);
     if (reader.integer(4) != 0x46554747) {
         throw std::runtime_error("Not a little-endian GGUF file");
@@ -312,6 +312,8 @@ Model::Model(std::span<const std::byte> bytes) : bytes_(bytes) {
                     token_types_.push_back(std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(reader.integer(4))));
                 } else { throw std::runtime_error("Unsupported vocabulary array encoding"); }
             }
+        } else if (key.starts_with("split.") && (type == 2 || type == 4 || type == 5)) {
+            numbers_[key] = static_cast<double>(reader.integer(type == 2 ? 2 : 4));
         } else if (key.starts_with("mamba2.") || key.starts_with("llama.") || key.starts_with("tokenizer.ggml.")) {
             if (type == 4 || type == 7) {
                 numbers_[key] = static_cast<double>(reader.integer(type == 4 ? 4 : 1));
@@ -326,7 +328,7 @@ Model::Model(std::span<const std::byte> bytes) : bytes_(bytes) {
             reader.skip_value(type);
         }
     }
-    if (architecture_.empty() || alignment == 0 || alignment > 1048576 || (alignment & (alignment - 1)) != 0) {
+    if ((!continuation && architecture_.empty()) || alignment == 0 || alignment > 1048576 || (alignment & (alignment - 1)) != 0) {
         throw std::runtime_error("Missing architecture or invalid alignment");
     }
     std::set<std::string> names;
@@ -371,6 +373,16 @@ Model::Model(std::span<const std::byte> bytes) : bytes_(bytes) {
 
 const std::string &Model::architecture() const { return architecture_; }
 const std::vector<Tensor> &Model::tensors() const { return tensors_; }
+void Model::attach(const Model &part) {
+    if (!external_.empty() || number("split.no") != 0 || number("split.count") != 2 || part.number("split.no") != 1 || part.number("split.count") != 2 ||
+        number("split.tensors.count") != part.number("split.tensors.count") || number("split.tensors.count") != static_cast<double>(tensors_.size() + part.tensors_.size()) || tensors_.size() + part.tensors_.size() > 100000) {
+        throw std::runtime_error("Invalid or incomplete GGUF split set");
+    }
+    std::set<std::string> names;
+    for (const auto &tensor : tensors_) names.insert(tensor.name);
+    for (const auto &tensor : part.tensors_) if (!names.insert(tensor.name).second) throw std::runtime_error("Duplicate split tensor");
+    for (const auto &tensor : part.tensors_) { external_.emplace(tensor.name, part.data(tensor)); tensors_.push_back(tensor); }
+}
 std::uint64_t Model::payload_offset() const { return payload_offset_; }
 double Model::number(const std::string &key) const {
     const auto item = numbers_.find(key);
@@ -388,6 +400,7 @@ const std::string &Model::text(const std::string &key) const {
 }
 bool Model::has(const std::string &key) const { return metadata_keys_.contains(key); }
 std::span<const std::byte> Model::data(const Tensor &tensor) const {
+    if (const auto found = external_.find(tensor.name); found != external_.end()) return found->second;
     const auto start = add(payload_offset_, tensor.offset);
     if (start > bytes_.size() || tensor.size > bytes_.size() - start) {
         throw std::runtime_error("Invalid tensor data range");

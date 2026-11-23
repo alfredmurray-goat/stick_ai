@@ -1,0 +1,102 @@
+{
+  "purpose": "Real Lite idle-release diagnostic, not a full app benchmark",
+  "hostBinarySha256": "1966a743d6fdb727813354c9d94bf6708e92f09746f883edd14c675711d367c4",
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "idleSeconds": 2,
+  "runs": [
+    {
+      "purpose": "Real Lite idle-release diagnostic, not a full app benchmark",
+      "hostBinarySha256": "1966a743d6fdb727813354c9d94bf6708e92f09746f883edd14c675711d367c4",
+      "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "idleSeconds": 2,
+      "ready": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2053.43,
+        "native_host": true,
+        "input_mode": "utf8-hex",
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "beforeIdle": {
+        "cpuTicks": 264,
+        "peakRssBytes": 4446765056
+      },
+      "afterOneSecond": {
+        "cpuTicks": 264,
+        "peakRssBytes": 4446765056
+      },
+      "observedIdleCpuMs": 0.0,
+      "observedIdleExitMs": 2069.9351440000555,
+      "events": [
+        {
+          "event": "rested",
+          "reason": "inactivity"
+        }
+      ],
+      "returnCode": 0,
+      "limitations": [
+        "One managed Linux observation; CPU tick resolution is coarse",
+        "Two seconds is a test override; normal default is ten minutes",
+        "Process exit releases owned mapping/state; no claim about filesystem cache or total system RAM",
+        "Windows pipe polling uses 100 ms sleeps and needs independent resource measurement"
+      ],
+      "background": "Runtime sanitizer compilation overlapped this pilot; it is not a comparative performance measurement."
+    },
+    {
+      "repeat": 1,
+      "background": "No other owned build/inference job active",
+      "ready": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2851.35,
+        "native_host": true,
+        "input_mode": "utf8-hex",
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "observedIdleCpuMs": 0.0,
+      "observedIdleExitMs": 2065.9820729999865,
+      "events": [
+        {
+          "event": "rested",
+          "reason": "inactivity"
+        }
+      ],
+      "returnCode": 0
+    },
+    {
+      "repeat": 2,
+      "background": "No other owned build/inference job active",
+      "ready": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2033.23,
+        "native_host": true,
+        "input_mode": "utf8-hex",
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "observedIdleCpuMs": 0.0,
+      "observedIdleExitMs": 2066.7220469999847,
+      "events": [
+        {
+          "event": "rested",
+          "reason": "inactivity"
+        }
+      ],
+      "returnCode": 0
+    }
+  ],
+  "limitations": [
+    "One managed Linux observation; CPU tick resolution is coarse",
+    "Two seconds is a test override; normal default is ten minutes",
+    "Process exit releases owned mapping/state; no claim about filesystem cache or total system RAM",
+    "Windows pipe polling uses 100 ms sleeps and needs independent resource measurement",
+    "All observations retained, including the overlapping-build pilot",
+    "No CPU ticks in a one-second sample means below measurement resolution, not literally zero CPU"
+  ]
+}

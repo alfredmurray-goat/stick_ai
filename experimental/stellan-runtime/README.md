@@ -150,4 +150,19 @@ The previous native binary is optional. Each engine runs alone with rotating ord
 
 Prefill now constructs immutable activation views once per batch and reuses each worker's result buffer instead of rebuilding them per matrix row. [Five further rotating-order rounds](evidence/lite-prefill-view-hoist.json) preserved all token IDs; the measured prompt difference was under 1%, so it is not a general speed claim.
 
-The separate native-host branch adds the first [C++ service-host prototype](NATIVE_HOST.md): verified persistent Lite text inference, status/reset/shutdown and raw token-byte streaming over private pipes without Node. It does not yet replace the app's authenticated web, approvals, files, tools or update services. Max text encoding, networking, inactivity ownership and full application parity remain work in progress.
+### Less CPU work during prefill
+
+A bounded 32-token microbatch and eight-vector Q4/Q6 tiles reduce repeated packed-weight work. On the longer matched-warmup diagnostic, prompt time fell about **19.8%** and request CPU time about **18.9% versus our previous engine**, with about **2.8 MiB** extra peak working memory. Weights are not expanded and the context budget does not grow. llama.cpp still leads on those longer prompts; [raw receipts and limits](EVIDENCE.md#bounded-32-token-prefill-and-eight-vector-tiles) retain both favorable and unfavorable results.
+
+```sh
+STELLAN_BENCH_WARMUP=1 node experimental/stellan-runtime/bench-paired.mjs \
+  /path/to/candidate /path/to/pinned-llama-server /path/to/model.gguf TRUSTED_SHA256 \
+  /path/to/new-report.json 5 /path/to/previous-native \
+  experimental/stellan-runtime/bench/prompts-prefill.json
+```
+
+Use the equivalent environment setting on Windows. Warmup costs remain in the report. This diagnostic does not qualify a runtime replacement or measure full Max/GPU performance.
+
+A further packed-Q6 experiment matched all 54 diagnostic responses but did not establish a useful end-to-end CPU saving; its best prefill-only trial differed by under 0.1% request CPU. The previous kernel is retained, with stronger extreme-value correctness fixtures. [Full trials and rejected variants](EVIDENCE.md#packed-q6-prefill-follow-up) remain recorded.
+
+The separate native-host branch adds the first [C++ service-host prototype](NATIVE_HOST.md): verified persistent Lite text inference, status/reset/shutdown and raw token-byte streaming over private pipes without Node. It does not yet replace the app's authenticated web, approvals, files, tools or update services. Max text encoding, networking and full application parity remain work in progress. The host rests after ten quiet minutes (developer-configurable), releasing the model process; idle pipe reads are interrupt-responsive and bounded. Input is appended in slices, and oversized request buffers are released between requests.

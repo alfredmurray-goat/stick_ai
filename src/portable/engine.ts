@@ -1,11 +1,13 @@
+import { startStellanServer } from "../../portable/stellan-server.mjs";
+import { type Manifest } from "./integrity.js";
 import { lockedNames, ModelLockError, unlockModel } from "./model-lock.js";
 import { resolveLocalModel } from "./local-models.js";
-import { writeSync } from "node:fs";
+import { writeSync, createReadStream } from "node:fs";
 import { type ServerStatus } from "./progress.js";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, readFile, rm, stat, statfs, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { totalmem } from "node:os";
 import { killProcessTree } from "../sandbox/process.js";
@@ -143,12 +145,15 @@ export class ManagedEngine implements Switchable {
   modelKey: ((model: ModelName) => Buffer | undefined) | undefined;
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
+  private nativeServer: Awaited<ReturnType<typeof startStellanServer>> | undefined;
+  nativeRuntime = false;
   gpuFailed = false;
   detectVirtualMachine: () => boolean = isVirtualMac;
   async start(model: ModelName, signal: AbortSignal): Promise<void> {
     const gpu = this.gpuFailed ? ["--gpu-layers", "0"] : gpuLayerArgs(this.target, model, totalmem(), process.env, this.detectVirtualMachine());
     try { await this.launch(model, signal, gpu); }
     catch (error) {
+      if (this.nativeRuntime) { throw error; }
       if (gpu[1] === "0") { await this.retryPlain(model, signal, error); return; }
       // A GPU that cannot load the model (driver, memory or unsupported operation) must not
       // leave the user without a model: retry once on the CPU and keep it for this session.
@@ -172,6 +177,8 @@ export class ManagedEngine implements Switchable {
     const selected = await resolveLocalModel(this.root, model === "stellan-1-max" ? "max" : "lite");
     if (model === "stellan-1-max" && !selected) { throw new Error("Choose your Max GGUF before starting Max."); }
     if (!selected) { throw new UserError("nomodel"); }
+    const manifest = JSON.parse(await readFile(join(this.root, "manifest.json"), "utf8").catch(error => { if (error.code === "ENOENT") return "{\"files\":[]}"; throw error; })) as Manifest;
+    this.nativeRuntime = manifest.runtime === "stellan-run";
     const reservation = await reservePort(this.port, this.port); await reservation.release();
     const keyFile = join(this.temp, "server-key"); await writeFile(keyFile, this.key, { mode: 0o600 });
     // Lite's slot is saved here (the computer's temp folder, not the stick) while Max runs; see codeWithSwap.
@@ -197,7 +204,20 @@ export class ManagedEngine implements Switchable {
     const templateArgs = await modelTemplateArgs(this.root, model);
     const planned = model === "stellan-1-max" ? this.plan.max : this.plan.lite;
     const contextSize = this.faster ? Math.min(planned, 4096) : planned;
-    const child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
+    let child: ChildProcess;
+    if (this.nativeRuntime) {
+      const enginePath = `bin/${this.target}/stellan-run${this.target === "windows-x64" ? ".exe" : ""}`;
+      const binary = manifest.files.find(file => file.path === enginePath);
+      if (!binary) throw new UserError("damaged");
+      const primary = selected.locked?.model.firstSha256 ?? (selected.source === "bundled" ? manifest.files.find(file => file.path === relative(this.root, selected.path).split(sep).join("/"))?.sha256 : await this.modelHash(modelPath, signal));
+      if (!primary) throw new UserError("damaged");
+      delete env.LLAMA_SPLIT_DIR;
+      try {
+        this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: 2, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
+      } catch (error) { await this.stop(); throw error; }
+      if (!this.child) throw new UserError("loading");
+      child = this.child;
+    } else child = spawn(join(this.root, "bin", this.target, executableName(this.target)), [
       "--model", modelPath, "--alias", model, "--ctx-size", String(contextSize),
       "--host", "127.0.0.1", "--port", String(this.port), "--api-key-file", keyFile,
       "--no-webui", "--no-warmup", ...gpu, ...modelRuntimeArgs(model, this.plainFallback), ...templateArgs, ...(model === "stellan-1-lite" ? ["--slot-save-path", slots] : [])
@@ -226,8 +246,17 @@ export class ManagedEngine implements Switchable {
       }
     } catch (error) { await this.stop(); throw error; }
   }
+  private async modelHash(path: string, signal: AbortSignal): Promise<string> {
+    const hash = createHash("sha256");
+    for await (const bytes of createReadStream(path, { signal })) hash.update(bytes);
+    return hash.digest("hex");
+  }
   async stop(): Promise<void> {
     await this.coder?.stop();
+    if (this.nativeServer) {
+      const server = this.nativeServer; this.nativeServer = undefined;
+      await server.close(); this.child = null; this.active = null; this.onProcess?.(null); return;
+    }
     const child = this.child;
     if (!child) { return; }
     const exited = child.exitCode !== null || child.signalCode !== null;

@@ -1,13 +1,16 @@
 """Exercise the native backend without invoking Node or shell commands."""
 import hashlib
+import os
+import time
 import json
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
 RUNTIME, HOST = sys.argv[1:3]
-from models import Fixture
+from models import Fixture, model
 
 class HostTests(unittest.TestCase):
     def setUp(self):
@@ -64,6 +67,64 @@ class HostTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse([e for e in events if e['event'] == 'error'])
         self.assertEqual(len([e for e in events if e['event'] == 'token']), 2)
+
+    def test_idle_pipe_releases_the_process_without_closing_stdin(self):
+        process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], env={**os.environ, 'STELLAN_HOST_IDLE_SECONDS':'1'}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        try:
+            ready = json.loads(process.stdout.readline()); self.assertEqual(ready['event'], 'ready')
+            process.wait(timeout=5)
+            self.assertEqual(process.returncode, 0, process.stderr.read())
+            events = [json.loads(line) for line in process.stdout.read().splitlines()]
+            self.assertIn({'event':'rested','reason':'inactivity'}, events)
+        finally:
+            if process.poll() is None: process.kill(); process.wait(timeout=5)
+            process.stdin.close(); process.stdout.close(); process.stderr.close()
+
+    def test_signal_stops_an_idle_pipe_without_input(self):
+        process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        try:
+            self.assertEqual(json.loads(process.stdout.readline())['event'], 'ready')
+            process.terminate(); process.wait(timeout=5)
+            if os.name != 'nt': self.assertEqual(process.returncode, 130)
+        finally:
+            if process.poll() is None: process.kill(); process.wait(timeout=5)
+            process.stdin.close(); process.stdout.close(); process.stderr.close()
+
+    def test_buffered_commands_crlf_and_invalid_timeout(self):
+        result, events = self.invoke('status\r\nreset\r\nstatus\r\nshutdown\r\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([e['event'] for e in events], ['ready','status','reset','status','stopped'])
+        self.assertEqual(events[1]['idle_timeout_seconds'], 600)
+        for value in ['0','-1','86401','bad']:
+            result = subprocess.run([HOST,str(self.model),self.digest,'2','128'],env={**os.environ,'STELLAN_HOST_IDLE_SECONDS':value},input='',capture_output=True,text=True,timeout=5)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('timeout', result.stderr)
+
+    def test_chunk_boundaries_and_line_limits(self):
+        for size in [4095, 4096, 4097, 4194304]:
+            result, events = self.invoke('x' * size + '\nstatus\r\nshutdown\n')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual([e['event'] for e in events], ['ready', 'error', 'status', 'stopped'])
+        result, _ = self.invoke('x' * 4194305 + '\n')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('exceeds limit', result.stderr)
+
+    def test_verified_split_host_matches_whole_model(self):
+        command='1 2 '+b'A B'.hex()+'\nshutdown\n'
+        original, reference=self.invoke(command)
+        self.assertEqual(original.returncode,0,original.stderr)
+        fixture=Fixture('mamba2');count=len(fixture.tensors)
+        def flags(index):
+            return [('split.no',2,struct.pack('<H',index)),('split.count',2,struct.pack('<H',2)),('split.tensors.count',5,struct.pack('<i',count))]
+        first=model(fixture.tensors[:3],fixture.metadata+flags(0));rest=model(fixture.tensors[3:],flags(1))
+        self.model.write_bytes(first);self.digest=hashlib.sha256(first).hexdigest()
+        part=Path(self.root.name)/'rest é.gguf';part.write_bytes(rest)
+        result, events=self.invoke(command,'--split',str(part),hashlib.sha256(rest).hexdigest())
+        self.assertEqual(result.returncode,0,result.stderr)
+        ids=lambda values:[e['id'] for e in values if e['event']=='token']
+        self.assertEqual(ids(events),ids(reference));self.assertEqual(len(ids(events)),2)
+        result,_=self.invoke(command,'--split',str(part),'0'*64)
+        self.assertNotEqual(result.returncode,0)
 
     def test_integrity_and_explicit_max_mode(self):
         result, events = self.invoke('status\n', digest='0' * 64)

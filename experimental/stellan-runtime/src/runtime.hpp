@@ -39,7 +39,8 @@ struct Tensor {
 
 class Model {
 public:
-    explicit Model(std::span<const std::byte> bytes);
+    explicit Model(std::span<const std::byte> bytes, bool continuation = false);
+    void attach(const Model &continuation);
     const std::string &architecture() const;
     const std::vector<Tensor> &tensors() const;
     std::span<const std::byte> data(const Tensor &tensor) const;
@@ -63,6 +64,7 @@ private:
     std::vector<std::string> merges_;
     std::map<std::string, std::string> texts_;
     std::set<std::string> metadata_keys_;
+    std::map<std::string, std::span<const std::byte>> external_;
 };
 
 float half(std::uint16_t bits);
@@ -83,6 +85,7 @@ std::uint64_t ram_bytes();
 bool environment_set(const char *name);
 struct Usage { std::uint64_t peak_rss_bytes; double cpu_ms; };
 Usage usage();
+inline constexpr std::size_t prefill_batch_limit = 32;
 struct alignas(32) QuantizedInput {
     std::array<std::int8_t, 256> values;
     std::array<std::int16_t, 16> sums;

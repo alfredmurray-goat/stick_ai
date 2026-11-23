@@ -81,15 +81,15 @@ void quantized() {
             }
         }
         close(stellan::dot(12, weights, input), expected, 2e-5);
-        std::array<std::vector<stellan::QuantizedInput>, 16> packed;
-        std::array<std::span<const stellan::QuantizedInput>, 16> views;
+        std::array<std::vector<stellan::QuantizedInput>, stellan::prefill_batch_limit> packed;
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
         for (std::size_t t = 0; t < packed.size(); ++t) {
             std::array<float, 512> values;
             for (std::size_t i = 0; i < values.size(); ++i) { values[i] = input[i] * static_cast<float>(t + 1) / 16 + static_cast<float>(t) / 31; }
             packed[t] = stellan::quantize_input(values); views[t] = packed[t];
         }
-        for (const std::size_t count : {1U, 2U, 7U, 16U}) {
-            std::array<float, 16> output;
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 12U, 15U, 16U, 17U, 23U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
             stellan::quantized_batch_dot(12, weights, std::span(views).first(count), std::span(output).first(count));
             for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(12, weights, views[t]), 2e-5); }
         }
@@ -227,6 +227,36 @@ void cache_storage() {
 
 void additional_kernels() {
     std::mt19937 random(42);
+    for (unsigned pattern = 0; pattern < 6; ++pattern) {
+        std::array<std::byte, 420> packed {};
+        std::array<stellan::QuantizedInput, 2> input {};
+        double expected = 0;
+        for (std::size_t b = 0; b < 2; ++b) {
+            set_half(packed, b * 210 + 208, 0x2000);
+            input[b].scale = 0.5f;
+            for (std::size_t i = 0; i < 256; ++i) {
+                const auto q = pattern == 0 ? 0U : pattern == 1 ? 63U : ((i / 16 + b) % 2 ? 63U : 0U);
+                const auto x = pattern == 4 ? -128 : pattern == 5 ? ((i / 16) % 2 ? -128 : 127) : pattern < 2 || (i / 16) % 2 ? 127 : -127;
+                const auto scale = (i / 16 + pattern + b) % 2 ? -128 : 127;
+                const auto quarter = (i % 128) / 32;
+                const auto lane = i % 32;
+                const auto base = b * 210;
+                packed[base + (i / 128) * 64 + (quarter % 2) * 32 + lane] |= static_cast<std::byte>((q & 15) << (quarter < 2 ? 0 : 4));
+                packed[base + 128 + (i / 128) * 32 + lane] |= static_cast<std::byte>((q >> 4) << (quarter * 2));
+                packed[base + 192 + i / 16] = static_cast<std::byte>(scale & 255);
+                input[b].values[i] = static_cast<std::int8_t>(x);
+                input[b].sums[i / 16] = static_cast<std::int16_t>(input[b].sums[i / 16] + x);
+                expected += (static_cast<int>(q) - 32) * scale * x * 0.5 * 0.0078125;
+            }
+        }
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
+        views.fill(input);
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 16U, 17U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
+            stellan::quantized_batch_dot(14, packed, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) close(output[t], expected, 0);
+        }
+    }
     for (unsigned trial = 0; trial < 100; ++trial) {
         std::array<std::byte, 210> packed {};
         std::array<float, 256> input {};
@@ -244,14 +274,14 @@ void additional_kernels() {
             expected += (static_cast<int>(value) - 32) * (raw < 128 ? raw : raw - 256) * 0.0078125 * input[i];
         }
         close(stellan::dot(14, packed, input), expected, 3e-5);
-        std::array<std::vector<stellan::QuantizedInput>, 16> inputs;
-        std::array<std::span<const stellan::QuantizedInput>, 16> views;
+        std::array<std::vector<stellan::QuantizedInput>, stellan::prefill_batch_limit> inputs;
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
         for (std::size_t t = 0; t < inputs.size(); ++t) {
             for (auto &value : input) { value = static_cast<float>(static_cast<int>(random() % 201) - 100) / 100; }
             inputs[t] = stellan::quantize_input(input); views[t] = inputs[t];
         }
-        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 16U}) {
-            std::array<float, 16> output;
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 16U, 17U, 23U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
             stellan::quantized_batch_dot(14, packed, std::span(views).first(count), std::span(output).first(count));
             for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(14, packed, views[t]), 3e-5); }
         }
