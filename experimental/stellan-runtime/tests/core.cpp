@@ -1,0 +1,388 @@
+#include "runtime.hpp"
+#include "executor.hpp"
+#include "kv_cache.hpp"
+
+#include <array>
+#include <algorithm>
+#include <atomic>
+#include <bit>
+#include <cmath>
+#include <iostream>
+#include <limits>
+#include <random>
+#include <stdexcept>
+
+namespace {
+unsigned checks = 0;
+void require(bool value) {
+    ++checks;
+    if (!value) { throw std::runtime_error("Check " + std::to_string(checks) + " failed"); }
+}
+void close(double actual, double expected, double tolerance = 1e-5) {
+    require(std::abs(actual - expected) <= tolerance * (1 + std::abs(expected)));
+}
+template<class F> void rejects(F action) {
+    bool rejected = false;
+    try { action(); } catch (const std::runtime_error &) { rejected = true; }
+    require(rejected);
+}
+void set_half(std::span<std::byte> bytes, std::size_t offset, std::uint16_t bits) {
+    bytes[offset] = static_cast<std::byte>(bits & 255);
+    bytes[offset + 1] = static_cast<std::byte>(bits >> 8);
+}
+
+void halves() {
+    for (unsigned bits = 0; bits < 65536; ++bits) {
+        const auto exponent = (bits >> 10) & 31;
+        const auto mantissa = bits & 1023;
+        const auto result = stellan::half(static_cast<std::uint16_t>(bits));
+        if (exponent != 31 || mantissa == 0) { require(stellan::to_half(result) == bits); }
+        if (exponent == 31) {
+            require(mantissa == 0 ? std::isinf(result) : std::isnan(result));
+        } else {
+            const auto expected = exponent == 0 ? std::ldexp(static_cast<double>(mantissa), -24) :
+                std::ldexp(1.0 + static_cast<double>(mantissa) / 1024, static_cast<int>(exponent) - 15);
+            require(result == ((bits & 32768) ? -expected : expected));
+            require(std::signbit(result) == ((bits & 32768) != 0));
+        }
+    }
+}
+
+void quantized() {
+    std::mt19937 random(1201);
+    for (unsigned trial = 0; trial < 200; ++trial) {
+        std::array<std::byte, 288> weights {};
+        std::array<float, 512> input {};
+        double expected = 0;
+        for (std::size_t block = 0; block < 2; ++block) {
+            const auto base = block * 144;
+            set_half(weights, base, 0x2800);
+            set_half(weights, base + 2, 0x2400);
+            std::array<unsigned, 8> scales {};
+            std::array<unsigned, 8> minima {};
+            for (std::size_t g = 0; g < 8; ++g) {
+                scales[g] = static_cast<unsigned>(random() % 64);
+                minima[g] = static_cast<unsigned>(random() % 64);
+            }
+            for (std::size_t g = 0; g < 4; ++g) {
+                weights[base + 4 + g] = static_cast<std::byte>(scales[g] | ((scales[g + 4] >> 4) << 6));
+                weights[base + 8 + g] = static_cast<std::byte>(minima[g] | ((minima[g + 4] >> 4) << 6));
+                weights[base + 12 + g] = static_cast<std::byte>((scales[g + 4] & 15) | ((minima[g + 4] & 15) << 4));
+            }
+            for (std::size_t g = 0; g < 8; ++g) {
+                for (std::size_t j = 0; j < 32; ++j) {
+                    const auto q = static_cast<unsigned>(random() % 16);
+                    weights[base + 16 + (g / 2) * 32 + j] |= static_cast<std::byte>(q << ((g % 2) * 4));
+                    const auto index = block * 256 + g * 32 + j;
+                    input[index] = static_cast<float>(static_cast<int>(random() % 2001) - 1000) / 1000;
+                    const double expanded = 0.03125 * scales[g] * q - 0.015625 * minima[g];
+                    expected += expanded * input[index];
+                }
+            }
+        }
+        close(stellan::dot(12, weights, input), expected, 2e-5);
+        std::array<std::vector<stellan::QuantizedInput>, stellan::prefill_batch_limit> packed;
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
+        for (std::size_t t = 0; t < packed.size(); ++t) {
+            std::array<float, 512> values;
+            for (std::size_t i = 0; i < values.size(); ++i) { values[i] = input[i] * static_cast<float>(t + 1) / 16 + static_cast<float>(t) / 31; }
+            packed[t] = stellan::quantize_input(values); views[t] = packed[t];
+        }
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 12U, 15U, 16U, 17U, 23U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
+            stellan::quantized_batch_dot(12, weights, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(12, weights, views[t]), 2e-5); }
+        }
+        rejects([&] { stellan::quantized_batch_dot(12, weights, {}, {}); });
+        rejects([&] { std::array<float, 1> output; stellan::quantized_batch_dot(12, weights, std::span(views).first(2), output); });
+
+    }
+    std::array<std::byte, 34> q8 {};
+    set_half(q8, 0, 0x3800);
+    std::array<float, 32> input;
+    input.fill(1);
+    for (std::size_t i = 0; i < 32; ++i) { q8[2 + i] = static_cast<std::byte>(i % 2 == 0 ? 128 : 127); }
+    close(stellan::dot(8, q8, input), -8);
+    rejects([&] { stellan::dot(8, std::span(q8).first(33), input); });
+    rejects([] { stellan::row_bytes(12, 255); });
+    rejects([] { stellan::row_bytes(999, 256); });
+    rejects([] { stellan::row_bytes(0, std::numeric_limits<std::size_t>::max()); });
+    const std::array<float, 6> values {1, 2, 3, -1, -2, -3};
+    const std::array<float, 3> vector {4, 5, 6};
+    std::array<float, 2> output {};
+    stellan::matvec(0, std::as_bytes(std::span(values)), 2, vector, output);
+    close(output[0], 32);
+    close(output[1], -32);
+    rejects([&] { stellan::matvec(0, std::as_bytes(std::span(values)), 3, vector, output); });
+    const std::array<std::byte, 4> f16 {std::byte(0), std::byte(0x3c), std::byte(0), std::byte(0xc0)};
+    const std::array<float, 2> pair {3, 4};
+    close(stellan::dot(1, f16, pair), -5);
+}
+
+void recurrence() {
+    constexpr std::size_t heads = 4;
+    constexpr std::size_t width = 3;
+    constexpr std::size_t states = 5;
+    constexpr std::size_t groups = 2;
+    std::array<float, heads * width> x {};
+    const std::array<float, heads> dt {0.1F, 0.2F, 0.3F, 0.4F};
+    const std::array<float, heads> decay {-1, -2, -3, -4};
+    const std::array<float, heads> skip {1, 2, 3, 4};
+    std::array<float, groups * states> b {};
+    std::array<float, groups * states> c {};
+    for (std::size_t i = 0; i < b.size(); ++i) { b[i] = static_cast<float>(i + 1) / 10; c[i] = 1 - b[i]; }
+    std::array<float, heads * width * states> state {};
+    std::array<float, heads * width> output {};
+    std::vector<std::array<float, heads * width>> history;
+    for (unsigned step = 0; step < 7; ++step) {
+        for (std::size_t i = 0; i < x.size(); ++i) { x[i] = static_cast<float>(i + step + 1) / 7; }
+        history.push_back(x);
+        stellan::mamba2_step(heads, width, states, groups, x, dt, decay, b, c, skip, state, output);
+        for (std::size_t h = 0; h < heads; ++h) {
+            for (std::size_t p = 0; p < width; ++p) {
+                const auto channel = h * width + p;
+                double expected = skip[h] * x[channel];
+                for (std::size_t n = 0; n < states; ++n) {
+                    double memory = 0;
+                    for (std::size_t t = 0; t < history.size(); ++t) {
+                        memory += std::exp(static_cast<double>(dt[h]) * decay[h] * static_cast<double>(history.size() - t - 1)) *
+                            dt[h] * b[(h / 2) * states + n] * history[t][channel];
+                    }
+                    expected += c[(h / 2) * states + n] * memory;
+                }
+                close(output[channel], expected);
+            }
+        }
+    }
+    auto saved = state;
+    stellan::mamba2_step(heads, width, states, groups, x, dt, decay, b, c, skip, state, output);
+    const auto expected = output;
+    stellan::mamba2_step(heads, width, states, groups, x, dt, decay, b, c, skip, saved, output);
+    require(expected == output);
+    rejects([&] { stellan::mamba2_step(heads, width, states, 3, x, dt, decay, b, c, skip, state, output); });
+    for (const auto bad : {-1.0F, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()}) {
+        auto invalid = dt;
+        invalid[3] = bad;
+        const auto before = state;
+        rejects([&] { stellan::mamba2_step(heads, width, states, groups, x, invalid, decay, b, c, skip, state, output); });
+        require(before == state);
+    }
+    auto invalid_decay = decay;
+    invalid_decay[0] = 1;
+    rejects([&] { stellan::mamba2_step(heads, width, states, groups, x, dt, invalid_decay, b, c, skip, state, output); });
+}
+
+void cache_storage() {
+    // Cross chunk boundaries and a partial final chunk, including a partial Q8 block.
+    for (const bool quantized : {false, true}) {
+        stellan::KVCache cache(777, 35, quantized);
+        std::array<float, 35> row, decoded;
+        for (std::size_t position = 0; position < 777; ++position) {
+            row.fill(static_cast<float>(position % 7 + 1));
+            cache.write(position, row);
+        }
+        require(cache.bytes() == cache.capacity_bytes());
+        for (std::size_t position = 0; position < 777; ++position) {
+            cache.decode(position, 0, decoded);
+            for (const auto value : decoded) close(value, static_cast<double>(position % 7 + 1), quantized ? 0.002 : 0);
+            std::array<float, 4> tail;
+            cache.decode(position, 31, tail);
+            for (const auto value : tail) close(value, cache.read(position, 34), 0);
+        }
+        cache.clear(); require(cache.bytes() == 0);
+        row.fill(3); cache.write(776, row);
+        close(cache.read(0, 0), 0, 0);
+        close(cache.read(776, 34), 3, quantized ? 0.002 : 0);
+        row.fill(5); cache.write(255, row);
+        close(cache.read(255, 34), 5, quantized ? 0.002 : 0);
+        close(cache.read(256, 0), 0, 0);
+        cache.clear(); require(cache.bytes() == 0);
+    }
+    stellan::KVCache half_cache(8192, 128, false), quantized_cache(8192, 128, true);
+    require(half_cache.bytes() == 0 && quantized_cache.bytes() == 0);
+    require(quantized_cache.capacity_bytes() * 64 == half_cache.capacity_bytes() * 34);
+    std::mt19937 random(8761);
+    std::array<float, 128> values, decoded;
+    for (std::size_t position = 0; position < 270; ++position) {
+        for (auto &value : values) value = static_cast<float>(static_cast<int>(random() % 20001) - 10000) / 1000;
+        half_cache.write(position, values); quantized_cache.write(position, values);
+        quantized_cache.decode(position, 0, decoded);
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            close(half_cache.read(position, i), stellan::half(stellan::to_half(values[i])), 0);
+            require(std::abs(decoded[i] - values[i]) < 0.09F);
+            close(decoded[i], quantized_cache.read(position, i), 0);
+        }
+    }
+    require(half_cache.bytes() < half_cache.capacity_bytes());
+    require(quantized_cache.bytes() * 64 == half_cache.bytes() * 34);
+    rejects([&] { quantized_cache.read(8192, 0); });
+    rejects([&] { quantized_cache.decode(0, 127, decoded); });
+    quantized_cache.clear(); require(quantized_cache.bytes() == 0); rejects([&] { quantized_cache.read(0, 0); });
+    values.fill(0); quantized_cache.write(0, values); quantized_cache.decode(0, 0, decoded);
+    require(std::all_of(decoded.begin(), decoded.end(), [](float value) { return value == 0; }));
+    values[7] = std::numeric_limits<float>::quiet_NaN();
+    rejects([&] { quantized_cache.write(0, values); });
+    rejects([] { stellan::KVCache invalid(65537, 128, true); });
+}
+
+void additional_kernels() {
+    std::mt19937 random(42);
+    for (unsigned pattern = 0; pattern < 6; ++pattern) {
+        std::array<std::byte, 420> packed {};
+        std::array<stellan::QuantizedInput, 2> input {};
+        double expected = 0;
+        for (std::size_t b = 0; b < 2; ++b) {
+            set_half(packed, b * 210 + 208, 0x2000);
+            input[b].scale = 0.5f;
+            for (std::size_t i = 0; i < 256; ++i) {
+                const auto q = pattern == 0 ? 0U : pattern == 1 ? 63U : ((i / 16 + b) % 2 ? 63U : 0U);
+                const auto x = pattern == 4 ? -128 : pattern == 5 ? ((i / 16) % 2 ? -128 : 127) : pattern < 2 || (i / 16) % 2 ? 127 : -127;
+                const auto scale = (i / 16 + pattern + b) % 2 ? -128 : 127;
+                const auto quarter = (i % 128) / 32;
+                const auto lane = i % 32;
+                const auto base = b * 210;
+                packed[base + (i / 128) * 64 + (quarter % 2) * 32 + lane] |= static_cast<std::byte>((q & 15) << (quarter < 2 ? 0 : 4));
+                packed[base + 128 + (i / 128) * 32 + lane] |= static_cast<std::byte>((q >> 4) << (quarter * 2));
+                packed[base + 192 + i / 16] = static_cast<std::byte>(scale & 255);
+                input[b].values[i] = static_cast<std::int8_t>(x);
+                input[b].sums[i / 16] = static_cast<std::int16_t>(input[b].sums[i / 16] + x);
+                expected += (static_cast<int>(q) - 32) * scale * x * 0.5 * 0.0078125;
+            }
+        }
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
+        views.fill(input);
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 16U, 17U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
+            stellan::quantized_batch_dot(14, packed, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) close(output[t], expected, 0);
+        }
+    }
+    for (unsigned trial = 0; trial < 100; ++trial) {
+        std::array<std::byte, 210> packed {};
+        std::array<float, 256> input {};
+        set_half(packed, 208, 0x2000);
+        double expected = 0;
+        for (std::size_t i = 0; i < 16; ++i) { packed[192 + i] = static_cast<std::byte>(random() % 256); }
+        for (std::size_t i = 0; i < 256; ++i) {
+            const auto value = static_cast<unsigned>(random() % 64);
+            const auto quarter = (i % 128) / 32;
+            const auto lane = i % 32;
+            packed[(i / 128) * 64 + (quarter % 2) * 32 + lane] |= static_cast<std::byte>((value & 15) << (quarter < 2 ? 0 : 4));
+            packed[128 + (i / 128) * 32 + lane] |= static_cast<std::byte>((value >> 4) << (quarter * 2));
+            input[i] = static_cast<float>(static_cast<int>(random() % 201) - 100) / 100;
+            const auto raw = std::to_integer<int>(packed[192 + i / 16]);
+            expected += (static_cast<int>(value) - 32) * (raw < 128 ? raw : raw - 256) * 0.0078125 * input[i];
+        }
+        close(stellan::dot(14, packed, input), expected, 3e-5);
+        std::array<std::vector<stellan::QuantizedInput>, stellan::prefill_batch_limit> inputs;
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
+        for (std::size_t t = 0; t < inputs.size(); ++t) {
+            for (auto &value : input) { value = static_cast<float>(static_cast<int>(random() % 201) - 100) / 100; }
+            inputs[t] = stellan::quantize_input(input); views[t] = inputs[t];
+        }
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 7U, 8U, 9U, 16U, 17U, 23U, 31U, 32U}) {
+            std::array<float, stellan::prefill_batch_limit> output;
+            stellan::quantized_batch_dot(14, packed, std::span(views).first(count), std::span(output).first(count));
+            for (std::size_t t = 0; t < count; ++t) { close(output[t], stellan::quantized_dot(14, packed, views[t]), 3e-5); }
+        }
+    }
+    require(stellan::sha256({}) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    const std::string abc = "abc";
+    require(stellan::sha256(std::as_bytes(std::span(abc))) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    const std::string padding = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    require(stellan::sha256(std::as_bytes(std::span(padding))) == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    const std::string million(1000000, 'a');
+    require(stellan::sha256(std::as_bytes(std::span(million))) == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+    for (const auto threads : {1U, 2U, 7U}) {
+        stellan::Executor executor(threads);
+        std::vector<unsigned> values(1009);
+        for (unsigned iteration = 0; iteration < 20; ++iteration) {
+            executor.parallel(values.size(), [&](std::size_t first, std::size_t last) {
+                for (auto i = first; i < last; ++i) { values[i] = iteration; }
+            });
+            require(std::all_of(values.begin(), values.end(), [&](unsigned value) { return value == iteration; }));
+        }
+        rejects([&] { executor.parallel(values.size(), [](auto, auto) { throw std::runtime_error("worker failure"); }); });
+        executor.parallel(0, [](auto first, auto last) { if (first != last) { throw std::runtime_error("range"); } });
+    }
+    rejects([] { stellan::Executor executor(0); });
+    rejects([] { stellan::Executor executor(65); });
+    require(stellan::to_half(1.00048828125F) == 0x3c00);
+    require(stellan::to_half(1.00146484375F) == 0x3c02);
+    require(stellan::to_half(std::ldexp(1.0F, -25)) == 0);
+    for (const auto type : {12U, 14U}) {
+        const auto stride = type == 12 ? 144U : 210U;
+        for (unsigned trial = 0; trial < 100; ++trial) {
+            std::vector<std::byte> weights(stride * 3);
+            std::vector<float> input(768);
+            for (auto &byte : weights) { byte = static_cast<std::byte>(random() % 256); }
+            for (auto &value : input) { value = static_cast<float>(static_cast<int>(random() % 2001) - 1000) / 1000; }
+            for (std::size_t block = 0; block < 3; ++block) {
+                set_half(weights, block * stride + (type == 12 ? 0 : 208), 0x2800);
+                if (type == 12) { set_half(weights, block * stride + 2, 0x2400); }
+            }
+            const auto quantized = stellan::quantize_input(input);
+            std::vector<float> represented(input.size());
+            for (std::size_t block = 0; block < 3; ++block) {
+                for (std::size_t group = 0; group < 16; ++group) {
+                    int sum = 0;
+                    for (std::size_t i = 0; i < 16; ++i) { sum += quantized[block].values[group * 16 + i]; }
+                    require(sum == quantized[block].sums[group]);
+                }
+                for (std::size_t i = 0; i < 256; ++i) { represented[block * 256 + i] = quantized[block].values[i] * quantized[block].scale; }
+            }
+            const auto actual = stellan::quantized_dot(type, weights, quantized);
+            const auto expected = stellan::dot(type, weights, represented);
+            require(std::abs(actual - expected) <= 0.005F + std::abs(expected) * 0.00005F);
+        }
+    }
+    const std::array<float, 256> zero {};
+    const auto quantized_zero = stellan::quantize_input(zero);
+    std::array<std::byte, 144> weights {};
+    require(stellan::quantized_dot(12, weights, quantized_zero) == 0);
+    auto tiny = zero;
+    tiny[0] = std::numeric_limits<float>::denorm_min();
+    require(std::isfinite(stellan::quantize_input(tiny)[0].scale));
+    tiny[0] = std::numeric_limits<float>::infinity();
+    rejects([&] { stellan::quantize_input(tiny); });
+    std::array<float, 128> b {};
+    std::array<float, 128> c {};
+    for (std::size_t i = 0; i < b.size(); ++i) { b[i] = static_cast<float>(i) / 512; c[i] = 0.5F - b[i]; }
+    std::array<float, 256> state {};
+    std::array<double, 256> reference {};
+    const std::array<float, 2> x {0.5F, -0.2F};
+    const std::array<float, 1> dt {0.1F};
+    const std::array<float, 1> decay {-2};
+    const std::array<float, 1> skip {0.1F};
+    std::array<float, 2> output {};
+    for (unsigned step = 0; step < 10; ++step) {
+        stellan::mamba2_step(1, 2, 128, 1, x, dt, decay, b, c, skip, state, output);
+        for (std::size_t channel = 0; channel < 2; ++channel) {
+            double expected = skip[0] * x[channel];
+            for (std::size_t i = 0; i < 128; ++i) {
+                auto &memory = reference[channel * 128 + i];
+                memory = std::exp(static_cast<double>(dt[0]) * decay[0]) * memory + dt[0] * b[i] * x[channel];
+                expected += c[i] * memory;
+                close(state[channel * 128 + i], memory);
+            }
+            close(output[channel], expected);
+        }
+    }
+}
+}
+
+int main() {
+    try {
+        halves();
+        quantized();
+        recurrence();
+        additional_kernels();
+        cache_storage();
+        require(stellan::json_string("a\n\"\\") == "\"a\\u000a\\\"\\\\\"");
+        std::cout << checks << " checks passed\n";
+        return 0;
+    } catch (const std::exception &error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}

@@ -12,7 +12,6 @@ jobs:
     timeout-minutes: 90
     env:
       MACOSX_DEPLOYMENT_TARGET: '13.5'
-      LLAMA_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,40 +51,18 @@ jobs:
         run: node scripts/fetch-intel-assets.mjs release-assets
       - name: Extract portable Node
         run: tar -xzf release-assets/node-v24.22.1-darwin-x64.tar.gz -C release-assets
-      - uses: actions/cache/restore@v4
-        id: server-cache
-        with:
-          path: |
-            release-assets/llama-build/bin/llama-server
-            release-assets/llama.cpp/LICENSE
-          key: intel-server-v0.9.0-static-no-openmp-no-tls-${{ hashFiles('scripts/llama-split-dir.patch') }}
-      - name: Build the pinned Mamba2-compatible inference server
-        if: steps.server-cache.outputs.cache-hit != 'true'
-        shell: bash
+      - name: Build our Stellan-Run engine
         run: |
-          git init release-assets/llama.cpp
-          git -C release-assets/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp.git
-          git -C release-assets/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT"
-          git -C release-assets/llama.cpp checkout --detach FETCH_HEAD
-          git -C release-assets/llama.cpp apply "$GITHUB_WORKSPACE/scripts/llama-split-dir.patch"
-          test "$(git -C release-assets/llama.cpp rev-parse HEAD)" = "$LLAMA_COMMIT"
-          cmake -S release-assets/llama.cpp -B release-assets/llama-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_CURL=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
-          cmake --build release-assets/llama-build --config Release --target llama-server -j 3
-      - uses: actions/cache/save@v4
-        if: steps.server-cache.outputs.cache-hit != 'true'
-        with:
-          path: |
-            release-assets/llama-build/bin/llama-server
-            release-assets/llama.cpp/LICENSE
-          key: ${{ steps.server-cache.outputs.cache-primary-key }}
+          cmake -S experimental/stellan-runtime -B release-assets/stellan-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5
+          cmake --build release-assets/stellan-build --parallel 3
+          ctest --test-dir release-assets/stellan-build --output-on-failure
       - name: Collect native redistribution notices
         run: |
           node scripts/native-licenses.mjs release-assets/desktop-licenses
-          curl --fail --location --retry 3 "https://codeload.github.com/ggml-org/llama.cpp/tar.gz/$LLAMA_COMMIT" --output release-assets/desktop-licenses/llama.cpp-source.tar.gz
       - name: Assemble the complete Intel Mac folder
         shell: bash
         run: |
-          node scripts/package-intel.ts --out "dist/Stick AI Intel" --app "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Stick AI.app" --node release-assets/node-v24.22.1-darwin-x64/bin/node --node-license release-assets/node-v24.22.1-darwin-x64/LICENSE --server release-assets/llama-build/bin/llama-server --server-license release-assets/llama.cpp/LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses
+          node scripts/package-intel.ts --out "dist/Stick AI Intel" --app "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Stick AI.app" --node release-assets/node-v24.22.1-darwin-x64/bin/node --node-license release-assets/node-v24.22.1-darwin-x64/LICENSE --server release-assets/stellan-build/stellan-run --server-license LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses
       - name: Verify the real Lite server and tagged chat response
         run: node scripts/smoke-intel.mjs "dist/Stick AI Intel"
       - name: Preserve executable bits in the download

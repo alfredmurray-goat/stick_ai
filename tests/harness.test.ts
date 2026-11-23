@@ -8,10 +8,11 @@ const GiB = 1024 ** 3;
 
 it("sizes each model's window to the computer, and Long context mode raises both", () => {
   expect(contextPlan(8 * GiB)).toEqual({ lite: 65536, max: 8192, historyBytes: 49152, projectBytes: 8192 });
-  expect(contextPlan(24 * GiB).max).toBe(16384);
-  expect(contextPlan(32 * GiB).max).toBe(32768);
+  expect(contextPlan(24 * GiB).max).toBe(8192);
+  expect(contextPlan(32 * GiB).max).toBe(8192);
   expect(contextPlan(32 * GiB, true)).toEqual({ lite: 262144, max: 65536, historyBytes: 393216, projectBytes: 32768 });
   expect(contextPlan(16 * GiB, true).max).toBe(16384);
+  expect(contextPlan(24 * GiB, true).max).toBe(32768);
 });
 
 function conversation(tasks: number, padding: number): Message[] {

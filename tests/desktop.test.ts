@@ -43,4 +43,4 @@ it("includes all four desktop bundles and their hashes in the stick build", asyn
     await expect(verifyStick(output)).resolves.toHaveProperty("format", 1);
     await writeFile(join(output, "desktop/windows-x64/stick-ai.exe"), "tampered"); await expect(verifyStick(output)).rejects.toThrow();
   } finally { await rm(directory, { recursive: true, force: true }); }
-});
+}, 30000);

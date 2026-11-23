@@ -14,6 +14,7 @@ let streaming;
 let streamKind;
 let working = false;
 let lastTask = "";
+let lastTaskAttachments = [];
 let retryStart = true;
 let nativeStarted = 0;
 let errorAction = "Retry";
@@ -276,15 +277,59 @@ function beginTurn(text) {
   for (const id of ["thinking", "coding"]) { byId(id).textContent = ""; }
   byId("thoughts").open = true; byId("thoughts").hidden = false; byId("code-preview").hidden = true;
 }
-async function task(text) {
+let pendingAttachments = [];
+let readingAttachments = false;
+let sendingTask = false;
+function renderAttachments() {
+  const list = byId("attachments"); list.replaceChildren(); list.hidden = !pendingAttachments.length;
+  for (const item of pendingAttachments) {
+    const chip = document.createElement("div"), name = document.createElement("span"), remove = document.createElement("button");
+    chip.className = "attachment-chip"; name.textContent = `${item.name} · ${Math.ceil(item.size / 1024)} KB`;
+    remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", `Remove ${item.name}`);
+    remove.onclick = () => { if (sendingTask || working) return; pendingAttachments = pendingAttachments.filter(value => value !== item); renderAttachments(); };
+    chip.append(name, remove); list.append(chip);
+  }
+}
+async function addAttachments(files) {
+  if (native || working || repositoryBusy || sendingTask || readingAttachments) return;
+  readingAttachments = true; byId("attach-files").disabled = true;
+  try {
+    const selected = [...files];
+    if (pendingAttachments.length + selected.length > 4) throw Error("Attach up to four files per message.");
+    let total = pendingAttachments.reduce((sum, item) => sum + item.size, 0); const additions = [];
+    for (const file of selected) {
+      total += file.size;
+      if (!file.size || file.size > 2 * 1024 ** 2 || total > 4 * 1024 ** 2) throw Error("Attach nonempty files, up to 2 MB each and 4 MB total.");
+      if (/\.(png|jpe?g|gif|webp|heic|bmp|mp3|mp4|wav|mov|ogg)$/i.test(file.name)) throw Error("Lite and Max read text. Images, audio and video are not supported.");
+      const bytes = new Uint8Array(await file.arrayBuffer()); let binary = "";
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      additions.push({name:file.name, size:file.size, data:btoa(binary)});
+    }
+    pendingAttachments.push(...additions); renderAttachments();
+  } catch (error) { toast(error.message); }
+  finally { readingAttachments = false; byId("attach-files").disabled = working || repositoryBusy; byId("attachment-files").value = ""; }
+}
+byId("attach-files").onclick = () => byId("attachment-files").click();
+byId("attachment-files").onchange = event => void addAttachments(event.target.files);
+byId("prompt").addEventListener("paste", event => { const files = event.clipboardData?.files; if (files?.length) { event.preventDefault(); void addAttachments(files); } });
+byId("question").addEventListener("dragover", event => { event.preventDefault(); byId("question").classList.add("dragging"); });
+byId("question").addEventListener("dragleave", () => byId("question").classList.remove("dragging"));
+byId("question").addEventListener("drop", event => { event.preventDefault(); byId("question").classList.remove("dragging"); void addAttachments(event.dataTransfer?.files || []); });
+async function task(text, retryAttachments) {
   if (text.trim() === "/skills") { openSettings("skills"); return; }
   if (text.trim() === "/mcp") { openSettings("mcp"); return; }
   if (["/clear","/new"].includes(text.trim())) { byId("new-session").click(); return; }
-  if (!text.trim() || working || repositoryBusy || native) { return; }
+  if ((!text.trim() && !(retryAttachments || pendingAttachments).length) || working || repositoryBusy || native || sendingTask || readingAttachments) { return; }
   if (hasUnsavedFile()) { toast("Save or discard your file edits before starting a task."); return; }
   retryStart = false; lastTask = text; byId("error").hidden = true;
-  byId("prompt").value = ""; byId("prompt").style.height = "";
-  try { byId("send").disabled = true; await api("/api/task", { text }); } catch (error) { showError({message:error.message}); }
+  const attachments = (retryAttachments || pendingAttachments).slice(); lastTaskAttachments = attachments; sendingTask = true;
+  try {
+    byId("send").disabled = true;
+    await api("/api/task", { text: text.trim() ? text : "Read the attached files.", attachments: attachments.map(({name,data}) => ({name,data})) });
+    if (byId("prompt").value === text) { byId("prompt").value = ""; byId("prompt").style.height = ""; }
+    pendingAttachments = pendingAttachments.filter(item => !attachments.includes(item)); renderAttachments();
+  } catch (error) { showError({message:error.message}); byId("send").disabled = false; }
+  finally { sendingTask = false; }
 }
 byId("start").onclick = () => start();
 byId("question").onsubmit = (event) => { event.preventDefault(); void task(byId("prompt").value); };
@@ -295,7 +340,7 @@ byId("error-action").onclick = async () => {
   byId("error").hidden = true;
   if (errorAction === "OK") { if (!native) { await api("/api/dismiss", {}).catch(() => {}); } else { byId("welcome").hidden = false; } return; }
   if (errorAction === "Switch to a faster setting") { await start(true); return; }
-  if (retryStart) { await start(); } else { await task(lastTask); }
+  if (retryStart) { await start(); } else { await task(lastTask, lastTaskAttachments); }
 };
 byId("stop").onclick = () => { if (hasUnsavedFile()) { toast("Save or discard your file edits before closing."); return; } void api("/api/stop", {}).catch(() => {}); };
 async function update() {
@@ -325,7 +370,13 @@ async function update() {
     byId("branch-label").textContent = state.repository?.branch || "local";
     if (!filesLoaded && state.phase === "ready") void refreshFiles();
     byId("stop").hidden = state.desktop;
-    byId("send").disabled = state.phase !== "ready" || state.repositoryBusy;
+    byId("send").disabled = state.phase !== "ready" || state.repositoryBusy || sendingTask || readingAttachments;
+    if (state.chatMemory) {
+      byId("chat-memory-enabled").checked = state.chatMemory.enabled;
+      byId("chat-memory-status").textContent = state.chatMemory.enabled ? `${state.chatMemory.turns} recent notes saved locally` : "Memory saving is off. Existing notes stay until you forget them.";
+    } else { byId("chat-memory-status").textContent = "Chat memory is unavailable. Your current conversation still works."; }
+    for (const id of ["chat-memory-enabled", "forget-chat-memory"]) byId(id).disabled = state.phase !== "ready" || state.repositoryBusy || !state.chatMemory;
+    byId("attach-files").disabled = state.phase !== "ready" || state.repositoryBusy || sendingTask || readingAttachments;
     byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
     if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
     if (document.activeElement !== byId("allow-internet")) byId("allow-internet").checked = state.internet !== false;
@@ -336,6 +387,16 @@ async function update() {
     else if (disk && disk.free < disk.comfortable) byId("disk-warning").textContent = `This computer has ${mb(disk.free)} free. Stick AI works, but new conversations start a little slower. With ${mb(disk.comfortable)} free it uses faster start-up caches.`;
     internetAllowed = state.internet !== false; maybeCheckUpdates();
     if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
+    const context = state.contextUsage;
+    const knownUsage = context && Number.isSafeInteger(context.used) && context.used >= 0 && context.capacity > 0;
+    const percentage = knownUsage ? Math.min(100, Math.round(context.used / context.capacity * 100)) : null;
+    byId("context-fill").setAttribute("stroke-dasharray", `${percentage ?? 0} 100`);
+    byId("context-percent").textContent = percentage === null ? "—" : `${percentage}%`;
+    byId("context-wheel").setAttribute("aria-label", knownUsage ? `${context.used.toLocaleString()} of ${context.capacity.toLocaleString()} context tokens, last reported reply` : "Context token usage has not been reported");
+    byId("context-used").textContent = knownUsage ? `${context.used.toLocaleString()} / ${context.capacity.toLocaleString()} · last reply` : "Usage not yet reported";
+    byId("context-capacity").textContent = `${state.longContext ? "Long" : "Normal"} · ${(context?.capacity || 0).toLocaleString()} tokens`;
+    byId("sidebar-memory-state").textContent = state.chatMemory?.enabled ? "on" : "off";
+    byId("long-context").disabled = state.phase !== "ready" || state.repositoryBusy;
     if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
@@ -346,9 +407,10 @@ async function update() {
     for (const event of state.events) {
       after = event.id;
       if (event.kind === "user") { beginTurn(event.text); }
+      if (event.kind === "attachments") { message(`Attached: ${event.data.map(file => file.name).join(", ")} · read locally as text`, "status"); }
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
-      if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
+      if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; lastTaskAttachments = []; pendingAttachments = []; renderAttachments(); if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
       if (event.kind === "skill") { toast("Skill loaded: " + event.data.names.join(", ")); }
       if (event.kind === "hook") { toast(event.data.blocked ? `A hook stopped this: ${event.data.blocked}` : event.data.problems.join(" ")); }
       if (event.kind === "tool") { renderTool(event.data); }
@@ -697,7 +759,7 @@ byId("copy-file").onclick = async () => { if (!currentFile) return; try { await 
 byId("new-session").onclick = async () => {
   if (native || working || repositoryBusy) return;
   if (currentFile && byId("file-editor").value !== originalFile) { toast("Save or discard your file edits first."); return; }
-  try { await api("/api/session/reset",{}); byId("messages").textContent = ""; byId("chat-empty").hidden = false; byId("thinking").textContent = ""; byId("coding").textContent = ""; byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Model reasoning will stream here. Some responses do not emit separate reasoning."; byId("prompt").focus(); } catch (error) { toast(error.message); }
+  try { await api("/api/session/reset",{}); pendingAttachments = []; renderAttachments(); byId("messages").textContent = ""; byId("chat-empty").hidden = false; byId("thinking").textContent = ""; byId("coding").textContent = ""; byId("thinking-empty").hidden = false; byId("thinking-empty").textContent = "Model reasoning will stream here. Some responses do not emit separate reasoning."; byId("prompt").focus(); } catch (error) { toast(error.message); }
 };
 byId("local-project").onclick = () => { if (native) return; if (lastRepository) byId("github-disconnect").click(); else void refreshFiles(); };
 byId("prompt").addEventListener("keydown", event => { if (!byId("skill-menu").hidden && ["ArrowDown","ArrowUp","Enter","Escape"].includes(event.key)) { event.preventDefault(); if (event.key === "Escape") byId("skill-menu").hidden = true; else if (event.key === "Enter") chooseSkillMenu(); else { skillMenuIndex += event.key === "ArrowDown" ? 1 : -1; highlightSkillMenu(); } return; } if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!byId("send").disabled) byId("question").requestSubmit(); } });
@@ -848,3 +910,7 @@ function highlightSkillMenu(){if(!skillMenuItems.length)return;skillMenuIndex=(s
 function chooseSkillMenu(){const selected=skillMenuItems[skillMenuIndex];if(!selected)return;byId("prompt").value=`/${selected.name} `;byId("skill-menu").hidden=true;byId("prompt").focus();}
 byId("skill-picker").onclick=()=>renderSkillMenu(true);
 if(native){byId("mcp-message").textContent="Open the workspace first to configure tool servers.";byId("skills-message").textContent="Open the workspace to browse, create and enable skills.";for(const id of ["mcp-add","mcp-save","mcp-import-project","mcp-import-json","mcp-refresh","skills-refresh","skill-save","skill-import-file"])byId(id).disabled=true;}
+
+byId("chat-memory-enabled").onchange = async event => { try { await api("/api/chat-memory", { enabled:event.target.checked }); } catch (error) { toast(error.message); } };
+byId("view-chat-memory").onclick = async () => { try { const data=await api("/api/chat-memory"); byId("chat-memory-preview").textContent=data.notes; byId("chat-memory-preview").hidden=false; } catch (error) { toast(error.message); } };
+byId("forget-chat-memory").onclick = async () => { try { await api("/api/chat-memory", {forget:true}); byId("chat-memory-preview").textContent="Saved notes for this chat were removed. The open conversation is kept."; byId("chat-memory-preview").hidden=false; } catch (error) { toast(error.message); } };

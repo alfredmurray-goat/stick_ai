@@ -21,6 +21,8 @@ import { ProgressTracker } from "./progress.js";
 import { coderSystem } from "../agent/delegate.js";
 import { agentInstructions, runAgent } from "../agent/index.js";
 import { Ollama } from "../model/ollama.js";
+import { ChatMemory } from "./chat-memory.js";
+import { inputCapabilities, prepareAttachments, inputPrompt, InputError } from "../model/inputs.js";
 import { Tools } from "../tools/index.js";
 import { Sandbox } from "../sandbox/paths.js";
 import { ramStatus } from "../config/models.js";
@@ -41,8 +43,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   let faster = options.faster ?? false;
   const progress = new ProgressTracker();
   let progressView = progress.view();
+  const tokenCounts = new Map<ModelName, number>();
+  engine.onUsage = (model, tokens) => { if (Number.isSafeInteger(tokens) && tokens >= 0) tokenCounts.set(model, tokens); };
   const fail = (error: unknown): void => {
-    lastError = error; problem = error instanceof McpError || error instanceof SkillError || error instanceof HookError ? {kind:"extension",message:error.message,explanation:"Open MCP or Skills in workspace settings to manage extensions.",action:"OK"} : friendlyError(error); failure = problem.message;
+    lastError = error; problem = error instanceof InputError ? {kind:"attachment",message:error.message,explanation:"Attach readable text, code, PDF or DOCX within the size limits. Files stay local.",action:"OK"} : error instanceof McpError || error instanceof SkillError || error instanceof HookError ? {kind:"extension",message:error.message,explanation:"Open MCP or Skills in workspace settings to manage extensions.",action:"OK"} : friendlyError(error); failure = problem.message;
     publish("problem", undefined, problem);
   };
   engine.onOutput = (text, thinking) => { progress.output(); publish(thinking ? "thinking" : "coding", text); };
@@ -59,6 +63,12 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   };
   await mkdir(join(root, "app", "project"), { recursive: true });
   let box = await Sandbox.create(join(root, "app", "project"));
+  let chatMemory: ChatMemory | undefined;
+  const openChatMemory = async (): Promise<void> => {
+    chatMemory = undefined;
+    try { chatMemory = await ChatMemory.open(root, box.root); } catch (error) { log(error); }
+  };
+  await openChatMemory();
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID();
     const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
@@ -157,18 +167,23 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     await engine.stop(); resting = model; report("Resting to free memory. Your next message wakes the model.");
     for (const wake of waiters) { wake(); }
   };
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); box = next; tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
+    tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
     progress.begin("loading"); report("Starting your private assistant...");
     try { resting = undefined; await engine.start(model as "stellan-1-lite" | "stellan-1-max", loading.signal); phase = "ready"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); warm(true); scheduleRest(); notifyHooks("SessionStart", { source: "startup", model }); }
     catch (error) { log(error); fail(error); phase = "error"; }
     finally { loading = undefined; }
   };
-  const task = async (text: string): Promise<void> => {
+  const task = async (text: string, attachments?: unknown): Promise<void> => {
     let answer = ""; let status = "finished";
     active = new AbortController(); publish("user", text); phase = "working"; problem = undefined; failure = ""; progress.begin("reading"); clearTimeout(restTimer);
     try {
+      const files = await prepareAttachments(attachments, active.signal);
+      const remembered = !history.length && !maxHistory.length ? chatMemory?.recall() : "";
+      const modelText = inputPrompt(text, files) + (remembered ? "\n\n<saved_chat_notes>\n" + JSON.stringify(remembered).replaceAll("<", "\\u003c") + "\n</saved_chat_notes>" : "");
+      if (files.length) { publish("attachments", undefined, files.map(({ name, kind, text: content }) => ({ name, kind, textBytes: Buffer.byteLength(content) }))); }
       await restWork;
       if (resting) {
         const model = resting; progress.begin("loading"); report("Waking up the model..."); publish("status", "Waking up the model...");
@@ -187,16 +202,16 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       }
       const taskInstructions = [skill.instructions, notes ? `Notes from the user's hooks:\n${notes}` : ""].filter(Boolean).join("\n\n");
       if (selected === "stellan-1-max") {
-        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true }).complete([{ role: "system", content: coderSystem + (taskInstructions ? "\n" + taskInstructions : "") }, ...maxHistory, { role: "user", content: text }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
-        if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: text }, { role: "assistant", content: result.content }); return;
+        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (taskInstructions ? "\n" + taskInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
+        if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: modelText }, { role: "assistant", content: result.content }); return;
       }
       await runAgent({
-        task: text, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,
+        task: modelText, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,
         hooks: hooks.active ? {
           before: async (call, signal) => (await runHooks("PreToolUse", { tool_name: call.function.name, tool_input: toolInput(call.function.arguments) }, signal)).blocked,
           after: async (call, result, signal) => { const outcome = await runHooks("PostToolUse", { tool_name: call.function.name, tool_input: toolInput(call.function.arguments), tool_response: result.slice(0, 20000) }, signal); return [outcome.blocked, outcome.context].filter(Boolean).join("\n"); }
         } : undefined,
-        model: { complete: (...args) => { progress.begin("thinking"); return new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes }).complete(...args); } },
+        model: { complete: (...args) => { progress.begin("thinking"); return new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete(...args); } },
         tools: { execute: async (call, signal) => {
           if (["mcp_tools", "mcp_call", "use_skill", "web_search", "read_web_page"].includes(call.function.name)) {
             const args: unknown = JSON.parse(call.function.arguments); if (!args || typeof args !== "object" || Array.isArray(args)) return "Error: extension arguments must be a JSON object.";
@@ -225,6 +240,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       });
     } catch (error) { if (status !== "blocked") { status = active?.signal.aborted ? "cancelled" : "failed"; } log(error); fail(error); }
     finally {
+      try { await chatMemory?.record(text, answer, status); } catch (error) { log(error); publish("status", "This chat’s memory could not be saved. Your current conversation is still available."); }
       if (status !== "blocked") { notifyHooks("Stop", { status, prompt: text, last_assistant_message: answer.slice(0, 8000) }); }
       publish("task-complete"); extensionStatus = ""; active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); scheduleRest(); }
   };
@@ -242,9 +258,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         const asset = assets[url.pathname]!; response.writeHead(200, { "Content-Type": asset[1] }); response.end(await readFile(join(root, "app", "ui", asset[0]))); return;
       }
       if (request.headers.authorization !== `Bearer ${token}` || request.headers.origin && request.headers.origin !== origin) { send(response, 403, {}); return; }
+      if (request.method === "GET" && url.pathname === "/api/chat-memory") { send(response, 200, { ...(chatMemory?.view() ?? {}), notes: chatMemory?.notes() ?? "Chat memory is unavailable." }); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -279,7 +296,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.method === "GET" && url.pathname === "/api/github/workspaces") { send(response, 200, { workspaces: await github.list() }); return; }
       if (request.method !== "POST" || request.headers.origin !== origin || request.headers["content-type"] !== "application/json") { send(response, 403, {}); return; }
       const chunks: Buffer[] = []; let bodyBytes = 0;
-      for await (const chunk of request) { const bytes = Buffer.from(chunk); bodyBytes += bytes.length; if (bodyBytes > 2 * 1024 ** 2) { throw new Error("UI body too large"); } chunks.push(bytes); }
+      for await (const chunk of request) { const bytes = Buffer.from(chunk); bodyBytes += bytes.length; if (bodyBytes > (url.pathname === "/api/task" ? 8 : 2) * 1024 ** 2) { throw new Error("UI body too large"); } chunks.push(bytes); }
       const data = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
       if (url.pathname.startsWith("/api/mcp/") || url.pathname.startsWith("/api/skills/") || url.pathname.startsWith("/api/hooks/")) {
         if (active || loading || repositoryOperation) { send(response,409,{error:"Stop the current task before changing extension settings."}); return; }
@@ -307,7 +324,22 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         } catch(error) { send(response,400,{error:controller.signal.aborted?"Extension operation cancelled.":error instanceof McpError||error instanceof SkillError||error instanceof HookError?error.message:"The extension operation could not finish. Check its configuration."}); return; }
         finally { repositoryOperation=undefined; finish(); repositoryDone=undefined; }
       }
-      if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) { history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); return; }
+      if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) {
+        repositoryOperation = new AbortController();
+        try { await chatMemory?.newChat(); tokenCounts.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); }
+        finally { repositoryOperation = undefined; }
+        return;
+      }
+      if (url.pathname === "/api/chat-memory" && !active && !loading && !repositoryOperation && chatMemory) {
+        repositoryOperation = new AbortController();
+        try {
+          if (typeof data.enabled === "boolean") await chatMemory.setEnabled(data.enabled);
+          else if (data.forget === true) await chatMemory.forget();
+          else { send(response, 400, { error: "Choose a memory setting." }); return; }
+          send(response, 200, chatMemory.view());
+        } finally { repositoryOperation = undefined; }
+        return;
+      }
       if (url.pathname === "/api/file" && !active && !loading && !repositoryOperation && typeof data.path === "string" && typeof data.content === "string") {
         const controller = new AbortController(); repositoryOperation = controller;
         let finishEdit!: () => void; repositoryDone = new Promise<void>((resolve) => { finishEdit = resolve; });
@@ -346,7 +378,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       }
       if (url.pathname === "/api/start" && needsActivation()) { pendingModel = typeof data.model === "string" && options.choices.includes(data.model) ? data.model : "stellan-1-lite"; phase = "activate"; send(response, 409, { error: "Enter your activation code first." }); return; }
       if (url.pathname === "/api/start" && ["choose", "error"].includes(phase) && typeof data.model === "string" && !repositoryOperation && options.choices.includes(data.model)) { work = launch(data.model); send(response, 202, {}); return; }
-      if (url.pathname === "/api/task" && phase === "ready" && typeof data.text === "string" && !repositoryOperation && data.text.trim()) { work = task(data.text.slice(0, 100000)); send(response, 202, {}); return; }
+      if (url.pathname === "/api/task" && phase === "ready" && typeof data.text === "string" && !repositoryOperation && data.text.trim()) { work = task(data.text.slice(0, 100000), data.attachments); send(response, 202, {}); return; }
       if (url.pathname === "/api/approve" && typeof data.id === "string") { approvals.get(data.id)?.(data.allow === true); send(response, 200, {}); return; }
       if (url.pathname === "/api/cancel") { active?.abort(); loading?.abort(); repositoryOperation?.abort(); send(response, 200, {}); return; }
       if (url.pathname === "/api/dismiss") { problem = undefined; failure = ""; send(response, 200, {}); return; }

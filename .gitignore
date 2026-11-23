@@ -8,3 +8,6 @@ src-tauri/target/
 src-tauri/gen/
 
 release-assets/
+experimental/stellan-runtime/build/
+experimental/stellan-runtime/tests/__pycache__/
+node_modules

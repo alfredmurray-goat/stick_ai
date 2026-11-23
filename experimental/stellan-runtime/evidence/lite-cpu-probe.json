@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "purpose": "CPU diagnostic only; not release qualification",
+  "baselineIsShippingConfiguration": false,
+  "physicalHardwareValidated": false,
+  "hardware": {
+    "platform": "linux",
+    "arch": "x64",
+    "ramBytes": 10451427328,
+    "threads": 2
+  },
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "nativeSha256": "ce002dbc84b7079b2d4560c07cde3711bbc79a63b56be6cdabb36d421680ff81",
+  "referenceSha256": "e0255d14add742b8bd9565846cf3918455610d77ff635b5dfe3b0a7e9ca0bdfd",
+  "promptTokensSha256": "f907fe6ab9730ce2c021a3a80714d48e6144c53c00c41922ca3cd439a7c54b86",
+  "tokenLimit": 3,
+  "context": 8192,
+  "activationMode": "q8",
+  "runs": [
+    {
+      "repeat": 0,
+      "candidate": {
+        "metrics": {
+          "event": "finished",
+          "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+          "verify_ms": 18370.7,
+          "prompt_ms": 294.12,
+          "first_token_ms": 294.139,
+          "decode_ms": 314.748,
+          "generated": 3,
+          "state_bytes": 276299776,
+          "threads": 2,
+          "cpu_ms": 1045.1,
+          "peak_rss_bytes": 4446990336
+        },
+        "wallMsIncludingStartup": 19438.189766,
+        "generatedIds": [
+          29493,
+          781,
+          781
+        ]
+      },
+      "baseline": {
+        "metrics": {
+          "event": "finished",
+          "prompt_ms": 206.864,
+          "decode_ms": 241.185,
+          "generated": 3,
+          "repack": false,
+          "cpu_only": true,
+          "cpu_ms": 885.401,
+          "peak_rss_bytes": 4446212096
+        },
+        "wallMsIncludingStartup": 624.4260770000001,
+        "generatedIds": [
+          29493,
+          781,
+          781
+        ]
+      },
+      "identicalGeneratedIds": true
+    }
+  ],
+  "developmentSnapshot": true,
+  "notReleaseQualification": true,
+  "notes": [
+    "One paired observation only on a managed Linux host, not physical buyer hardware.",
+    "CPU reference uses batched prompt evaluation with weight repacking disabled.",
+    "Candidate internally verifies the model; compare compute metrics separately from startup.",
+    "No Max, GPU, complete agent task or desktop integration qualification."
+  ]
+}

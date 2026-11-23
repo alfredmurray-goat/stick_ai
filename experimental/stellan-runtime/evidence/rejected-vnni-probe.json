@@ -1,0 +1,809 @@
+{
+  "date": "2026-11-23T02:23:32.537Z",
+  "baselineCommit": "a98e743ba1373524ea68c13d0aae5b93b60c67e2",
+  "cpu": "AMD EPYC 9V45",
+  "threads": 2,
+  "context": 8192,
+  "maxTokens": 12,
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "compiler": "GCC 14.2.0, CMake Release",
+  "arms": [
+    {
+      "name": "a98-baseline",
+      "executable": "/tmp/stellan-before-vnni/stellan-runtime",
+      "executableSha256": "e553ecf0c2b62a8a895682a1e34772082e82dfbaf10f006d379570ba9c2b847b"
+    },
+    {
+      "name": "candidate-fallback",
+      "executable": "/tmp/stellan-vnni/stellan-runtime",
+      "disabled": true,
+      "executableSha256": "eea48da1e47dd22b6ec6fc2b5552bb4a64020403f5fbc51e0d3035a38c248760"
+    },
+    {
+      "name": "candidate-vnni",
+      "executable": "/tmp/stellan-vnni/stellan-runtime",
+      "executableSha256": "eea48da1e47dd22b6ec6fc2b5552bb4a64020403f5fbc51e0d3035a38c248760"
+    }
+  ],
+  "prompts": [
+    "<s>[INST] Write a Python function add(a, b) that returns their sum. Return only code. [/INST]",
+    "<s>[INST] Write a Python function square(n) that returns n times n. Return only code. [/INST]"
+  ],
+  "runs": [
+    {
+      "repeat": 0,
+      "arm": "a98-baseline",
+      "prompt": 0,
+      "startupMs": 3868.586373,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2957.75,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2367.99,
+        "decode_ms": 1353.37,
+        "generated": 12,
+        "cpu_ms": 7053.64,
+        "peak_rss_bytes": 4449865728
+      }
+    },
+    {
+      "repeat": 0,
+      "arm": "a98-baseline",
+      "prompt": 1,
+      "startupMs": 3868.586373,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2957.75,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2190.5,
+        "decode_ms": 1391.38,
+        "generated": 12,
+        "cpu_ms": 6783.62,
+        "peak_rss_bytes": 4449865728
+      }
+    },
+    {
+      "repeat": 0,
+      "arm": "candidate-fallback",
+      "prompt": 0,
+      "startupMs": 2144.2006010000005,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1912.71,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2272.24,
+        "decode_ms": 1329.45,
+        "generated": 12,
+        "cpu_ms": 6819.03,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 0,
+      "arm": "candidate-fallback",
+      "prompt": 1,
+      "startupMs": 2144.2006010000005,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1912.71,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2152.01,
+        "decode_ms": 1367.64,
+        "generated": 12,
+        "cpu_ms": 6657.45,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 0,
+      "arm": "candidate-vnni",
+      "prompt": 0,
+      "startupMs": 2338.127124999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1964.47,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2452.8,
+        "decode_ms": 1568.5,
+        "generated": 12,
+        "cpu_ms": 7653.83,
+        "peak_rss_bytes": 4449996800
+      }
+    },
+    {
+      "repeat": 0,
+      "arm": "candidate-vnni",
+      "prompt": 1,
+      "startupMs": 2338.127124999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1964.47,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2326.94,
+        "decode_ms": 1427.71,
+        "generated": 12,
+        "cpu_ms": 7154.14,
+        "peak_rss_bytes": 4449996800
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "candidate-fallback",
+      "prompt": 0,
+      "startupMs": 2187.6386920000004,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1950.15,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2282.02,
+        "decode_ms": 1367.75,
+        "generated": 12,
+        "cpu_ms": 6883.45,
+        "peak_rss_bytes": 4449873920
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "candidate-fallback",
+      "prompt": 1,
+      "startupMs": 2187.6386920000004,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1950.15,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2159.49,
+        "decode_ms": 1365.38,
+        "generated": 12,
+        "cpu_ms": 6675.1,
+        "peak_rss_bytes": 4449873920
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "candidate-vnni",
+      "prompt": 0,
+      "startupMs": 2190.9298160000035,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1918.08,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2450.83,
+        "decode_ms": 1410.64,
+        "generated": 12,
+        "cpu_ms": 7322.59,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "candidate-vnni",
+      "prompt": 1,
+      "startupMs": 2190.9298160000035,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1918.08,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2329.58,
+        "decode_ms": 1410.03,
+        "generated": 12,
+        "cpu_ms": 7138.02,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "a98-baseline",
+      "prompt": 0,
+      "startupMs": 2099.146622,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1927.98,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2556.22,
+        "decode_ms": 1316.93,
+        "generated": 12,
+        "cpu_ms": 7287.81,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 1,
+      "arm": "a98-baseline",
+      "prompt": 1,
+      "startupMs": 2099.146622,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1927.98,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2172.5,
+        "decode_ms": 1339.34,
+        "generated": 12,
+        "cpu_ms": 6670.93,
+        "peak_rss_bytes": 4449882112
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "candidate-vnni",
+      "prompt": 0,
+      "startupMs": 2240.062904999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1936.57,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2466,
+        "decode_ms": 1398.51,
+        "generated": 12,
+        "cpu_ms": 7344.13,
+        "peak_rss_bytes": 4449996800
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "candidate-vnni",
+      "prompt": 1,
+      "startupMs": 2240.062904999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1936.57,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": true,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2343.81,
+        "decode_ms": 1418.88,
+        "generated": 12,
+        "cpu_ms": 7140.7,
+        "peak_rss_bytes": 4449996800
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "a98-baseline",
+      "prompt": 0,
+      "startupMs": 2137.9729170000064,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1923.24,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2385.53,
+        "decode_ms": 1357.87,
+        "generated": 12,
+        "cpu_ms": 7064,
+        "peak_rss_bytes": 4449914880
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "a98-baseline",
+      "prompt": 1,
+      "startupMs": 2137.9729170000064,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1923.24,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2132.64,
+        "decode_ms": 1309.85,
+        "generated": 12,
+        "cpu_ms": 6560.47,
+        "peak_rss_bytes": 4449914880
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "candidate-fallback",
+      "prompt": 0,
+      "startupMs": 2080.352536999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1919,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef add(a, b):\n   ",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        1735,
+        29500,
+        29476,
+        29493,
+        1055,
+        2097,
+        781,
+        3055
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 23,
+        "prompt_ms": 2258.22,
+        "decode_ms": 1380.17,
+        "generated": 12,
+        "cpu_ms": 6889.06,
+        "peak_rss_bytes": 4449873920
+      }
+    },
+    {
+      "repeat": 2,
+      "arm": "candidate-fallback",
+      "prompt": 1,
+      "startupMs": 2080.352536999999,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1919,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "q4_vnni": false,
+        "cache_type": "recurrent-f32"
+      },
+      "text": " ```python\ndef square(n):\n    return n",
+      "tokens": [
+        9557,
+        18435,
+        781,
+        2038,
+        8698,
+        29500,
+        29479,
+        2097,
+        781,
+        3055,
+        1372,
+        1075
+      ],
+      "metrics": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 22,
+        "prompt_ms": 2246.05,
+        "decode_ms": 1357,
+        "generated": 12,
+        "cpu_ms": 6785.69,
+        "peak_rss_bytes": 4449873920
+      }
+    }
+  ],
+  "limitations": [
+    "Shared virtual CPU host; warm filesystem cache; three rotating-order repeats; short coding prompts only; no llama.cpp comparison; no Max weights run; not a quality benchmark."
+  ],
+  "decision": "Rejected: VNNI was slower on this host; no VNNI kernel retained in the candidate.",
+  "summary": {
+    "a98-baseline": {
+      "prompt_ms": 2279.245,
+      "decode_ms": 1346.355,
+      "cpu_ms": 6918.63,
+      "peak_rss_bytes": 4449882112.0
+    },
+    "candidate-fallback": {
+      "prompt_ms": 2252.135,
+      "decode_ms": 1366.5100000000002,
+      "cpu_ms": 6802.36,
+      "peak_rss_bytes": 4449873920.0
+    },
+    "candidate-vnni": {
+      "prompt_ms": 2397.3199999999997,
+      "decode_ms": 1414.7600000000002,
+      "cpu_ms": 7238.365,
+      "peak_rss_bytes": 4449996800.0
+    }
+  },
+  "identicalGeneratedTokens": true
+}

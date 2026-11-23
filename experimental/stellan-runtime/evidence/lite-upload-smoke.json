@@ -1,0 +1,31 @@
+{
+  "purpose": "one real Lite upload-path smoke test, not an agent or model benchmark",
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "binarySha256": "e553ecf0c2b62a8a895682a1e34772082e82dfbaf10f006d379570ba9c2b847b",
+  "source": "def add(a, b):\n    return a - b\n",
+  "request": "Fix the attached add function to return the sum. Return only the corrected function.",
+  "response": " Here is the corrected Python function:\n\n```python\ndef add(a, b):\n    return a + b\n```\n\nThe function now correctly returns the sum of the two input parameters `a` and `b`.",
+  "functionASTCorrect": true,
+  "returnedOnlyCode": false,
+  "metrics": {
+    "event": "finished",
+    "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+    "verify_ms": 3205.51,
+    "prompt_ms": 13464.9,
+    "first_token_ms": 13464.9,
+    "decode_ms": 6707.54,
+    "generated": 51,
+    "state_bytes": 276299776,
+    "state_capacity_bytes": 276299776,
+    "cache_type": "recurrent-f32",
+    "threads": 2,
+    "cpu_ms": 36946.4,
+    "peak_rss_bytes": 4379168768
+  },
+  "limitations": [
+    "One synthetic source attachment and one response",
+    "Function is correct; answer also contains explanatory prose despite the format instruction",
+    "No official coding benchmark or Max checkpoint evaluation",
+    "Timing is diagnostic and not matched to llama.cpp"
+  ]
+}

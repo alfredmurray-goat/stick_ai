@@ -28,10 +28,14 @@ export async function buildPlatform(project: string, output: string, target: Tar
   try {
     for (const path of ["app/project", `bin/${target}`, "models", "LICENSES", "logs"]) { await mkdir(join(staging, path), { recursive: true }); }
     for (const name of ["launcher", "stick-verify", "stick-update", "stick-models", "stick-mcp"]) {
-      await build({ entryPoints: [join(project, name === "launcher" ? "src/portable/entry.ts" : name === "stick-update" ? "src/portable/update-entry.ts" : name === "stick-models" ? "src/portable/models-entry.ts" : name === "stick-mcp" ? "src/portable/mcp-stdio-entry.ts" : "src/portable/verify.ts")], outfile: join(staging, `app/${name}.cjs`), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
+      await build({ entryPoints: [join(project, name === "launcher" ? "src/portable/entry.ts" : name === "stick-update" ? "src/portable/update-entry.ts" : name === "stick-models" ? "src/portable/models-entry.ts" : name === "stick-mcp" ? "src/portable/mcp-stdio-entry.ts" : "src/portable/verify.ts")], outfile: join(staging, `app/${name}.cjs`), bundle: true, platform: "node", format: "cjs", define: { "import.meta.url": "__stickImportMetaUrl" }, banner: { js: 'const __stickImportMetaUrl = require("node:url").pathToFileURL(__filename).href;' }, target: "node24", legalComments: "none", minify: true });
     }
     await writeFile(join(staging, "app/update-config.json"), JSON.stringify({ format: 1, repository: "alfredmurray-goat/stick_ai", target, sequence: Number(process.env.GITHUB_RUN_ID ?? 0), source: process.env.GITHUB_SHA ?? "development", feed: process.env.STICK_UPDATE_FEED ?? defaultUpdateFeed }) + "\n");
     await writeFile(join(staging, "app/model-templates.json"), JSON.stringify({ "stellan-1-lite": "mistral-v1" }) + "\n");
+    await build({ entryPoints: [join(project, "portable/input-worker.mjs")], outfile: join(staging, "app/stick-inputs.mjs"), bundle: true, platform: "node", format: "esm", target: "node24", legalComments: "none", minify: true });
+    await build({ entryPoints: [join(project, "portable/stellan-server.mjs")], outfile: join(staging, "app/stick-engine.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
+    await cp(input.server, join(staging, `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`));
+    await chmod(join(staging, `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`), 0o755);
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await cp(input.app, join(staging, desktop), { recursive: true, preserveTimestamps: true });
     await cp(input.node, join(staging, node)); await cp(input.server, join(staging, server));
@@ -45,7 +49,7 @@ export async function buildPlatform(project: string, output: string, target: Tar
     }
     for (const file of ["LICENSE", "NOTICE", "MODEL_LICENSE.md", "THIRD_PARTY_LICENSES.md"]) { await cp(join(project, file), join(staging, "LICENSES", file)); }
     await cp(join(project, "licenses/Apache-2.0.txt"), join(staging, "LICENSES/Apache-2.0.txt"));
-    await cp(input.nodeLicense, join(staging, "LICENSES/Node.txt")); await cp(input.serverLicense, join(staging, "LICENSES/llama.cpp.txt"));
+    await cp(input.nodeLicense, join(staging, "LICENSES/Node.txt")); await cp(input.serverLicense, join(staging, "LICENSES/Stellan-Run.txt"));
     await cp(input.desktopLicenses, join(staging, "LICENSES/desktop"), { recursive: true });
     const runtime = (await hashFile(join(staging, node))).sha256;
     const launcher = (await hashFile(join(staging, "app/launcher.cjs"))).sha256;
@@ -54,7 +58,7 @@ export async function buildPlatform(project: string, output: string, target: Tar
     await writeFile(join(staging, fallback), target === "windows-x64" ? windowsStart(runtime, launcher) : posixStart(mac, hashes, launcher), { mode: 0o755 });
     const requirement = mac ? "macOS 13.5 or newer" : target === "windows-x64" ? "Windows 10 or newer with Microsoft Edge WebView2 already available" : "Linux x64 with glibc 2.35 or newer, GTK 3 and WebKitGTK 4.1 already available";
     await writeFile(join(staging, "README.txt"), `YOUR PRIVATE ASSISTANT\n\nKeep this folder together and open ${desktop}, then click Start. Your computer needs ${requirement} and at least 8 GB of memory.\n\n${input.max || input.maxRelease ? "Lite and Max are included in the complete release. Lite + Max is the default on computers with at least 16 GiB RAM. Below that, use Lite." : "Lite is included. Choose your existing Stellan-1 Max GGUF to enable Max; at least 16 GiB RAM is required."} You can also link an existing Max GGUF on your stick without copying it. Your questions and project files stay on this computer. Keep the stick connected. Close the app before safely ejecting it.\n\nThis is an unsigned test build. If your computer blocks it, ask the person who supplied it for a signed copy. Do not turn off security settings.\n\n${fallback} is a fallback for technical users that opens a terminal and a browser. If the desktop cannot open, ask the person who supplied this copy for help.\nIf macOS blocks this, right-click Start and choose Open, once.\nIf Windows blocks the fallback, choose More info and Run anyway only if you trust this stick.\n`);
-    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, targets: [target], files: [] };
+    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, runtime: "stellan-run", targets: [target], files: [] };
     for (const path of await staticFiles(staging)) {
       const info = await lstat(join(staging, path));
       manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111), ...(path === bundledMax.path || path === "models/stellan-1-lite-q4_k_m.gguf" ? { optional: true } : {}) });
