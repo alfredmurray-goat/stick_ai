@@ -1,6 +1,7 @@
+import {parseMcpMessage} from './mcp-wire.js';
 import spawn from 'cross-spawn';
 import type {ChildProcess} from 'node:child_process';
-import {JSONRPCMessageSchema,type JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
+import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
 import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 import {killProcessTree} from '../sandbox/process.js';
 /** NDJSON MCP transport with an isolated, supervised process group. */
@@ -17,7 +18,7 @@ export class McpProcessTransport implements Transport {
    child.stdin?.on('error',error=>this.onerror?.(error));child.stderr?.on('data',this.diagnostic);
    child.stdout?.on('data',(chunk:Buffer)=>{try{
     this.buffer=Buffer.concat([this.buffer,chunk]);let end:number;
-    while((end=this.buffer.indexOf(10))>=0){if(end>4*1024**2)throw Error('MCP message is too large');const line=this.buffer.subarray(0,end);this.buffer=this.buffer.subarray(end+1);if(line.length)this.onmessage?.(JSONRPCMessageSchema.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(line))));}
+    while((end=this.buffer.indexOf(10))>=0){if(end>4*1024**2)throw Error('MCP message is too large');const line=this.buffer.subarray(0,end);this.buffer=this.buffer.subarray(end+1);if(line.length)this.onmessage?.(parseMcpMessage(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(line))));}
     if(this.buffer.length>4*1024**2)throw Error('MCP message is too large');
    }catch(error){this.onerror?.(error instanceof Error?error:new Error('Invalid MCP response'));void this.close();}});
   });

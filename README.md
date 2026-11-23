@@ -344,3 +344,5 @@ The shared [project plan](docs/PROJECT_PLAN.md) records Stellan-Run, the unified
 Stellan-Run development now avoids whole-cache copies during Max cache growth and correctly forwards the persistent-session cache mode. [Isolated cache measurements](experimental/stellan-runtime/EVIDENCE.md#cache-growth-follow-up--23-november-2026) show lower temporary RAM and allocation time; full-model superiority has not been established, and the production engine remains llama.cpp.
 
 See the [own-component roadmap](docs/OWN_COMPONENTS.md) for proposed replacements beyond inference, ranked by useful product gains and compatibility work.
+
+The separate [original MCP client work](docs/MCP_CLIENT.md) starts with bounded protocol-envelope validation in our existing request/transport code. SDK transports and operation schemas remain until compatibility is complete.

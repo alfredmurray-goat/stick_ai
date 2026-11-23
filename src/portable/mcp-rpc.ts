@@ -1,5 +1,6 @@
+import {parseMcpMessage} from './mcp-wire.js';
 import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
-import {InitializeResultSchema,LATEST_PROTOCOL_VERSION,SUPPORTED_PROTOCOL_VERSIONS,JSONRPCMessageSchema,type JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
+import {InitializeResultSchema,LATEST_PROTOCOL_VERSION,SUPPORTED_PROTOCOL_VERSIONS,type JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
 export class McpError extends Error {constructor(message:string){super(message);this.name='McpError';}}
 /** MCP request lifecycle without an artificial tool-call deadline. Stop closes the transport. */
 export class McpRpc {
@@ -11,7 +12,7 @@ export class McpRpc {
  }
  private finish(error:Error){this.closed=true;this.ready=false;for(const entry of this.pending.values()){entry.cleanup();entry.reject(error);}this.pending.clear();}
  private async receive(input:JSONRPCMessage){
-  const message=JSONRPCMessageSchema.parse(input);
+  const message=parseMcpMessage(input);
   if('method' in message){
    if('id' in message){await this.transport.send(message.method==='ping'?{jsonrpc:'2.0',id:message.id,result:{}}:{jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'This client does not enable sampling or elicitation.'}});}
    else this.notification(message.method,(message.params??{}) as Record<string,unknown>);
