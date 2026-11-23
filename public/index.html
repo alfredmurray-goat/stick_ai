@@ -39,7 +39,7 @@
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <a class="launch-pill" href="#our-runtime"><span>Built by Locali Labs</span> Meet Stellan-Run</a>
+        <a class="launch-pill" href="#our-runtime"><span>Built by localilabs</span> Meet Stellan-Run</a>
         <h1 class="tech-only">Your coding agent.<br><em>On your machine.</em></h1>
         <h1 class="plain-only">A little more help.<br><em>A lot more yours.</em></h1>
         <p class="lede tech-only">A local coding assistant, from the agent to the engine. Read, plan and review changes in one workspace. Your project, your approvals, your computer.</p>
@@ -47,6 +47,12 @@
         <div class="actions"><a class="btn" href="#notify">Meet your €15 coding companion</a><a class="btn ghost" href="#session">Explore the app</a></div>
         <p class="hero-note">One payment. No subscription. Mac, Windows &amp; Linux.<br><span>Not on sale yet · EU launch planned for February 2027.</span></p>
       </div>
+      <aside class="runtime-brief tech-only" aria-label="Stellan-Run architecture">
+        <div class="runtime-brief-head"><span>runtime.config</span><span>Stellan-Run</span></div>
+        <dl><div><dt>engine</dt><dd>independent C++20</dd></div><div><dt>compute</dt><dd>CPU · greedy decoding</dd></div><div><dt>weights</dt><dd>verified GGUF mappings</dd></div><div><dt>sessions</dt><dd>private stdin / stdout</dd></div><div><dt>context</dt><dd>bounded · exact prefix reuse</dd></div><div><dt>tools</dt><dd>explicit approval required</dd></div></dl>
+        <p>Local inference. Inspectable source.<br>Architecture summary, not live telemetry.</p>
+        <a href="https://github.com/alfredmurray-goat/stick_ai/tree/main/experimental/stellan-runtime">Read the runtime source</a>
+      </aside>
       <figure class="product-window hero-product">
         <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>stick_ai / your workspace</span><span class="window-local">Local AI</span></div>
         <a class="tech-only" href="/img/app/workspace-dark.png" target="_blank" rel="noopener" aria-label="Open full-size dark app screenshot"><img src="/img/app/workspace-dark.png" alt="The actual Stick AI workspace: project files, a formatted code explanation and live thinking and tool activity" width="2880" height="1800" fetchpriority="high"></a>
@@ -79,7 +85,7 @@
 
     <section class="our-stack" id="our-runtime" aria-labelledby="runtime-title">
       <div class="stack-intro">
-        <p class="kicker"><span class="tech-only">// built by Locali Labs</span><span class="plain-only">Made by the people behind the stick</span></p>
+        <p class="kicker"><span class="tech-only">// built by localilabs</span><span class="plain-only">Made by the people behind the stick</span></p>
         <h2 id="runtime-title">Built closer to<br><em>the way you work.</em></h2>
         <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. The next app release is built on Stellan-Run: our independent, MIT-licensed C++ model engine. Own kernels, own model loading, own context controls.</p>
         <p class="lede narrow plain-only">We build the software that helps Stellan plan, ask your permission and work on your files. Its next release uses our own engine, Stellan-Run, so we can improve the way it runs on your computer.</p>
@@ -189,7 +195,7 @@
       </div>
       <div class="plain-card plain-only">
         <p><b>What you need:</b> a normal Mac, Windows or Linux computer from the last few years with at least 8 GB of memory (most do). A computer with 24 GB or more can use the bigger, smarter AI too.</p>
-        <p><b>What you don't need:</b> internet, an account, a subscription or any installing. Plug in the stick and open the app on it.</p>
+        <p><b>After first-time online activation:</b> local coding needs no cloud AI account or subscription. Plug in the stick and open the app on it.</p>
       </div>
       <div class="tree-wrap tech-only">
         <p class="kicker">// what's on it</p>
@@ -273,11 +279,17 @@
     </section>
   </main>
 
-  <footer class="foot">
+  <footer class="foot" id="footer">
+    <div class="giant" aria-hidden="true"><p class="giant-prompt"><span>~ $</span> stick_ai --banner</p><pre>         __  _      __             _
+   _____/ /_(_)____/ /__    ____ _(_)
+  / ___/ __/ / ___/ //_/   / __ `/ /
+ (__  ) /_/ / /__/ ,&lt;     / /_/ / /
+/____/\__/_/\___/_/|_|____\__,_/_/
+                    /_____/</pre></div>
     <div class="footer-brand"><img class="mode-logo-dark" src="/img/brand/icon-dark.png" alt="" width="48" height="48"><img class="mode-logo-light" src="/img/brand/icon-light.png" alt="" width="48" height="48"><span>stick_ai<span>Small stick. Your possibilities.</span></span><a href="https://github.com/alfredmurray-goat/stick_ai">Explore the source on GitHub</a></div>
     <div class="foot-row">
-      <p>stick_ai by Localilabs · private, offline coding help</p>
-      <p><a href="/start">help</a> · <a href="/privacy">privacy</a> · © 2026 Localilabs. Not yet launched: details and prices may change.</p>
+      <p>stick_ai by localilabs · private, offline coding help</p>
+      <p><a href="/start">help</a> · <a href="/privacy">privacy</a> · © 2026 localilabs. Not yet launched: details and prices may change.</p>
     </div>
   </footer>
 </body>

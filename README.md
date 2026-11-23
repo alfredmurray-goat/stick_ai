@@ -28,3 +28,5 @@ The homepage switch now pairs non-tech mode with a light palette and technical m
 ## Product presentation
 
 The homepage leads with actual app screenshots copied without modification from main's README assets: `docs/hero.png`, `docs/welcome-light.png`, `docs/approval.png` and `docs/settings.png`. These are example project screens, not benchmark or performance evidence. They are served locally under `public/img/app/`, with full-size links and no third-party requests. Non-tech is a light product landing page; technical keeps the same product focus in dark mode with more engineering detail. Both retain the transparent benchmark selection, launch status, activation and connectivity disclosures. `product.css` styles only the homepage; support pages retain `style.css`.
+
+Brand spelling is **localilabs**, lowercase. Technical mode keeps a monospace workbench layout and a static architecture summary alongside the real app screens. The original large ASCII `stick_ai` footer is visible in both modes. The architecture panel is labeled as configuration information, not live telemetry.
