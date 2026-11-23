@@ -132,3 +132,18 @@ The optional Q8 bridge supports an explicitly requested context up to 65,536 wit
 ### Cache growth without whole-cache copies
 
 Max now keeps separate 256-token cache allocations, so extending a conversation does not copy all previously cached keys/values. Reset still releases the cache. An isolated 65,536-position, one-cache stress test reduced median FP16 allocation/write time from 4.01 s to 0.13 s and peak process RSS from 257.0 MiB to 130.4 MiB. Q8 showed a similar reduction in temporary memory. This is a cache-only diagnostic, not a measured full-model speedup or RAM reduction; [raw measurements and reproduction](EVIDENCE.md#cache-growth-follow-up--23-november-2026) retain the limits. The persistent bridge now correctly forwards the requested Q8/FP16 mode to its native child.
+
+### Head scheduling and rotating-order comparisons
+
+Lite decode now splits independent recurrent heads across workers even when they share coefficient groups. Five rotating-order CPU rounds over two prompts reduced median decode time from **1,378.16 ms to 1,323.51 ms** versus our previous build, with identical generated IDs and essentially unchanged RAM. llama.cpp still led at 1,288.25 ms decode and 1,978.15 ms prompt versus our 2,288.43 ms prompt. These short Lite diagnostics do not qualify a production replacement; see [full receipts and limits](EVIDENCE.md#lite-head-scheduling--23-november-2026).
+
+Prefer this comparison script over the older grouped-order probe:
+
+```sh
+node experimental/stellan-runtime/bench-paired.mjs \
+  /path/to/candidate-stellan-runtime /path/to/pinned-llama-server \
+  /path/to/model.gguf TRUSTED_MODEL_SHA256 /path/to/new-report.json \
+  5 /path/to/previous-stellan-runtime
+```
+
+The previous native binary is optional. Each engine runs alone with rotating order, two CPU threads, 8,192 context and twelve greedy tokens over two prompts; independent prompts use no prefix reuse. Max compares explicitly selected Q8 caches and is refused below 24 GiB reported RAM. The script records hashes, partial results, CPU/RSS where available, exact output and timings. Source-commit provenance must still be verified separately. It neither downloads weights nor rents hardware, and a larger physical-device/agent test suite remains necessary.

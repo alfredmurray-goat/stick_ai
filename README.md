@@ -342,3 +342,5 @@ The sidebar context wheel shows the local server's last reported usage, with a *
 The shared [project plan](docs/PROJECT_PLAN.md) records Stellan-Run, the unified unnamed benchmark/learning project, our own core-component direction, and the low-RAM/sidebar context defaults.
 
 Stellan-Run development now avoids whole-cache copies during Max cache growth and correctly forwards the persistent-session cache mode. [Isolated cache measurements](experimental/stellan-runtime/EVIDENCE.md#cache-growth-follow-up--23-november-2026) show lower temporary RAM and allocation time; full-model superiority has not been established, and the production engine remains llama.cpp.
+
+See the [own-component roadmap](docs/OWN_COMPONENTS.md) for proposed replacements beyond inference, ranked by useful product gains and compatibility work.

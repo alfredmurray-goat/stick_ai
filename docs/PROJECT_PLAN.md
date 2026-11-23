@@ -23,3 +23,7 @@ Prefer progressively replacing major third-party components with original Locali
 ## Memory and context defaults
 
 Prioritize low RAM by default. Keep a larger, potentially slower context window as an obvious sidebar option next to a context-usage wheel. Allocate Max's cache as tokens are used instead of reserving the full window upfront. Retain per-chat memory files locally and recall bounded notes rather than forcing the entire conversation into active context. A larger window is not a change to model weights or a guarantee of better reasoning.
+
+## Replacement priorities
+
+The [own-component roadmap](OWN_COMPONENTS.md) maps actual dependencies to proposed replacements and measurable completion conditions. Finish Stellan-Run and its tokenizer/serving compatibility first. Then consider completing our MCP compatibility layer and consolidating the portable service into an original native host. Desktop-shell and document-parser rewrites are later, higher-maintenance options. Keep standard cryptography and OS security primitives.

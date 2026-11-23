@@ -113,3 +113,21 @@ experimental/stellan-runtime/build/stellan-cache-bench q8
 On Windows the executable is under `build/Release/`. The benchmark is excluded from normal builds; compile the same benchmark source against the earlier core for a before/after comparison, using its matching headers. Retain executable hashes and all trial outputs. No models or external services are needed.
 
 A separate [VNNI Q4 experiment](evidence/rejected-vnni-probe.json) was **rejected**. Three rotating-order rounds over two short coding prompts produced identical generated token IDs, but median prompt/decode times were worse on this host: 2,397/1,415 ms versus 2,279/1,346 ms for `a98e743`. The experimental kernel is not retained. Those binary hashes identify an uncommitted development experiment, not the shipped candidate; these short Lite trials do not qualify a replacement engine.
+
+## Lite head scheduling — 23 November 2026
+
+Lite decode now distributes independent recurrent heads across workers instead of partitioning only shared coefficient groups. A one-group layer previously left this work on one worker even with multiple threads configured. B/C coefficients remain shared read-only; each head updates disjoint state. No additional recurrent-state allocation or arithmetic precision change is introduced. Prefill is unchanged.
+
+The [complete rotating-order receipt](evidence/lite-head-split.json) contains five rounds, three engines and two prompts per engine: 30 twelve-token responses. All generated token IDs match. Engines run sequentially, with their starting order rotated each round. Native builds use GCC 14.2 Release; the reference is rebuilt from pinned llama.cpp `cd959bae99ff4bed22bef2604f45241c09bbb8c8` with the app's split-directory patch and CPU build flags. Same full pinned Lite weights, greedy prompts, two threads and 8,192 context:
+
+| Engine | Median prompt time | Median decode time | Median request CPU time |
+| --- | ---: | ---: | ---: |
+| llama.cpp | 1,978.15 ms | 1,288.25 ms | 6,445.00 ms |
+| Previous Stellan-Run (`bfaee2e`) | 2,280.32 ms | 1,378.16 ms | 6,939.25 ms |
+| Head-scheduled Stellan-Run | 2,288.43 ms | 1,323.51 ms | 6,825.75 ms |
+
+Decode takes about **4.0% less time than our previous version** in this diagnostic. Prompt computation is unchanged; the small observed difference is noise, not a prefill improvement. Native peak RSS is essentially unchanged at about 4.45 billion bytes. The reference reports about 4.74 billion bytes, but its checkpoint/production features differ; this is not feature-parity proof of a memory win. Reference CPU is measured through Linux process ticks; native CPU uses its request counters.
+
+llama.cpp still leads on both prompt and decode medians. Shared virtual hardware, two short synthetic prompts, warm page cache, CPU-only execution and incomplete native production features prevent replacement qualification. Startup verification is not matched between engines. Matching short token streams is not an agent-quality benchmark or pass@1 score. Full Max weights were not run: they are absent and the host does not meet the 24 GiB diagnostic guard. Physical GPU/CPU devices and full Max/agent workloads still need testing.
+
+The original `bench-sessions.mjs` is a historical grouped-order probe. Prefer the new `bench-paired.mjs`, which rotates independent engine sessions, records executable hashes and raw CPU/RSS/output/timings, saves partial reports on interruption and accepts an optional previous native binary. Its reports are diagnostics, not automatic promotion reports.

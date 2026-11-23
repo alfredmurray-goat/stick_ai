@@ -165,19 +165,20 @@ void Lite::prepare_mix(Layer &layer, const std::function<bool()> &cancelled) {
 
 void Lite::mix(Layer &layer, const std::function<bool()> &cancelled) {
     prepare_mix(layer, cancelled);
-    executor_.parallel(groups_, [&](std::size_t first, std::size_t last) {
-        if (first == last) { return; }
-        if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
-        const auto first_head = first * (heads_ / groups_);
-        const auto local_heads = (last - first) * (heads_ / groups_);
+    // Heads own disjoint state; splitting only by shared B/C groups can leave cores idle.
+    executor_.parallel(heads_, [&](std::size_t first, std::size_t last) {
         const auto head_width = inner_ / heads_;
-        const auto channel_start = first_head * head_width;
-        const auto channels = local_heads * head_width;
-        mamba2_step(local_heads, head_width, states_, last - first,
-            std::span(convolution_).subspan(channel_start, channels), std::span(delta_).subspan(first_head, local_heads),
-            std::span(layer.decay).subspan(first_head, local_heads), std::span(convolution_).subspan(inner_ + first * states_, (last - first) * states_),
-            std::span(convolution_).subspan(inner_ + groups_ * states_ + first * states_, (last - first) * states_),
-            std::span(layer.skip).subspan(first_head, local_heads), std::span(layer.state).subspan(channel_start * states_, channels * states_), std::span(mixed_).subspan(channel_start, channels));
+        for (auto head = first; head < last; ++head) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            const auto group = head / (heads_ / groups_);
+            const auto channel = head * head_width;
+            mamba2_step(1, head_width, states_, 1,
+                std::span(convolution_).subspan(channel, head_width), std::span(delta_).subspan(head, 1),
+                std::span(layer.decay).subspan(head, 1), std::span(convolution_).subspan(inner_ + group * states_, states_),
+                std::span(convolution_).subspan(inner_ + groups_ * states_ + group * states_, states_),
+                std::span(layer.skip).subspan(head, 1), std::span(layer.state).subspan(channel * states_, head_width * states_),
+                std::span(mixed_).subspan(channel, head_width));
+        }
     });
     for (std::size_t i = 0; i < inner_; ++i) { mixed_[i] *= silu(projection_[i]); }
     const auto group_width = inner_ / groups_;

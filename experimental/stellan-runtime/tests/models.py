@@ -240,16 +240,20 @@ class ExecutionTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0); self.assertNotIn('ready', result.stdout)
 
     def test_parallel_recurrent_groups_match_independent_reference(self):
-        for groups in (2, 4):
+        for groups in (1, 2, 4):
             for threads in (1, 2, 3, 8):
                 fixture = Fixture("mamba2", groups)
                 data = fixture.bytes(); self.file.write_bytes(data)
                 tokens = [1, 68, 69, 70, 71]
                 for token in tokens: logits = fixture.step(token)
-                result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "1", str(threads)], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
-                event = next(json.loads(line) for line in result.stdout.splitlines() if json.loads(line)['event'] == 'token')
-                self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
-                for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+                result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "3", str(threads)], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+                for event in (json.loads(line) for line in result.stdout.splitlines()):
+                    if event['event'] != 'token':
+                        continue
+                    self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
+                    for item in event['top']:
+                        self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+                    logits = fixture.step(event['id'])
 
     def test_quantized_transformer_cache_matches_independent_reference(self):
         fixture = Fixture("llama"); fixture.quantized_cache = True
