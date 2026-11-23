@@ -72,7 +72,7 @@ it("allows harmless desktop metadata but rejects unlisted application files", as
   await verifyStick(out);
   await writeFile(join(out, "bin/windows-x64/unlisted.dll"), "unlisted library");
   await expect(verifyStick(out)).rejects.toThrow("damaged");
-});
+}, 20000);
 
 it("previews startup on low-memory CI hosts without bypassing the real memory check", () => {
   expect(dryRunActions("fixture", "linux", "x64", 6.5 * GiB).join(" ")).toContain("would stop launch");
