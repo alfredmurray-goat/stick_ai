@@ -5,7 +5,7 @@ import {parseMcpInitialization,MCP_PROTOCOL_VERSION,MCP_PROTOCOL_VERSIONS} from 
 export class McpError extends Error {constructor(message:string){super(message);this.name='McpError';}}
 /** MCP request lifecycle without an artificial tool-call deadline. Stop closes the transport. */
 export class McpRpc {
- private connecting=false;private stopped=new AbortController();
+ private connecting=false;private stopped=new AbortController();private responding=0;
  private next=0;private pendingBytes=0;private pending=new Map<number,{resolve(value:unknown):void;reject(error:unknown):void;cleanup():void}>();closed=false;ready=false;private closing:Promise<void>|undefined;
  constructor(private transport:Transport,private notification:(method:string,params:Record<string,unknown>)=>void=()=>{}) {
   transport.onmessage=message=>{void this.receive(message).catch(()=>this.close());};
@@ -14,9 +14,17 @@ export class McpRpc {
  }
  private finish(error:Error){this.closed=true;this.ready=false;this.stopped.abort(error);for(const entry of this.pending.values()){entry.cleanup();entry.reject(error);}this.pending.clear();}
  private async receive(input:JSONRPCMessage){
+  if(this.closed)return;
   const message=parseMcpMessage(input);
   if('method' in message){
-   if('id' in message){await this.transport.send(message.method==='ping'?{jsonrpc:'2.0',id:message.id,result:{}}:{jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'This client does not enable sampling or elicitation.'}});}
+   if('id' in message){
+    const reply:JSONRPCMessage=message.method==='ping'?{jsonrpc:'2.0',id:message.id,result:{}}:{jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'This client does not enable sampling or elicitation.'}};
+    const bytes=Buffer.byteLength(JSON.stringify(reply));
+    // A server must not turn slow transport writes into an unbounded reply queue.
+    if(this.responding>=16||bytes>4*1024**2-this.pendingBytes){await this.close();return;}
+    ++this.responding;this.pendingBytes+=bytes;
+    try{await this.transport.send(reply);}finally{--this.responding;this.pendingBytes-=bytes;}
+   }
    else this.notification(message.method,(message.params??{}) as Record<string,unknown>);
    return;
   }
