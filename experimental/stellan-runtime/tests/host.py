@@ -24,7 +24,10 @@ class HostTests(unittest.TestCase):
         self.root.cleanup()
 
     def invoke(self, lines, *options, digest=None):
-        result = subprocess.run([HOST, str(self.model), digest or self.digest, '2', '128', *options], input=lines, capture_output=True, text=True, encoding='utf-8', timeout=15)
+        result = subprocess.run([HOST, str(self.model), digest or self.digest, '2', '128', *options], input=lines.encode('utf-8'), capture_output=True, timeout=15)
+        # Send exact protocol bytes: text-mode stdin expands CRLF twice on Windows.
+        result.stdout = result.stdout.decode('utf-8')
+        result.stderr = result.stderr.decode('utf-8')
         return result, [json.loads(line) for line in result.stdout.splitlines()]
 
     def test_text_matches_token_ids_and_reset_discards_state(self):
