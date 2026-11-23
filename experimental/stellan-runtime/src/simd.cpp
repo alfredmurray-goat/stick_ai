@@ -342,7 +342,18 @@ bool accelerated_ssm(std::size_t, std::size_t, std::span<const float>, float, fl
 }
 #endif
 
-#if !defined(__x86_64__) && !defined(__i386__) && !defined(_M_X64)
+#if defined(__aarch64__) || defined(__arm64__)
+namespace stellan {
+bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    if (environment_set("STELLAN_RUNTIME_SCALAR")) { return false; }
+    // Reuse the checked integer NEON dot path instead of scalar float reductions in prefill.
+    for (std::size_t t = 0; t < input.size(); ++t) {
+        if (!accelerated_quantized_dot(type, row, input[t], output[t])) { return false; }
+    }
+    return true;
+}
+}
+#elif !defined(__x86_64__) && !defined(__i386__) && !defined(_M_X64)
 namespace stellan {
 bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>) { return false; }
 }

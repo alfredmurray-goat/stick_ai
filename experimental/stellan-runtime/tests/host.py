@@ -83,6 +83,18 @@ class HostTests(unittest.TestCase):
             if process.poll() is None: process.kill(); process.wait(timeout=5)
             process.stdin.close(); process.stdout.close(); process.stderr.close()
 
+    def test_closed_output_stops_the_host_without_closing_stdin(self):
+        process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        try:
+            self.assertEqual(json.loads(process.stdout.readline())['event'], 'ready')
+            process.stdout.close()
+            process.stdin.write('status\n'); process.stdin.flush()
+            process.wait(timeout=5)
+            self.assertNotEqual(process.returncode, 0)
+        finally:
+            if process.poll() is None: process.kill(); process.wait(timeout=5)
+            process.stdin.close(); process.stderr.close()
+
     def test_signal_stops_an_idle_pipe_without_input(self):
         process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
         try:
