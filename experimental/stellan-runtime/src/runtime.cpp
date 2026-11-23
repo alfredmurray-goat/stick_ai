@@ -165,7 +165,7 @@ std::pair<std::size_t, std::size_t> layout(std::uint32_t type) {
 }
 
 Mapping::Mapping(const std::filesystem::path &path) {
-    if (sizeof(std::size_t) < 8 || std::endian::native != std::endian::little) {
+    if constexpr (sizeof(std::size_t) < 8 || std::endian::native != std::endian::little) {
         throw std::runtime_error("This prototype needs a little-endian 64-bit computer");
     }
 #ifdef _WIN32
