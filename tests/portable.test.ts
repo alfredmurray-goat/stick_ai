@@ -13,7 +13,8 @@ import { buildStick, userReadme, type StickInputs } from "../src/portable/build.
 import { dryRunActions } from "../src/portable/entry.js";
 
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
+// Windows can briefly retain executable handles after the dry-run child exits.
+afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }))); }, 20000);
 async function temp() { const path = await mkdtemp(join(tmpdir(), "stick-portable-")); roots.push(path); return path; }
 it.each([["darwin", "arm64", "macos-arm64"], ["darwin", "x64", "macos-x64"], ["win32", "x64", "windows-x64"], ["linux", "x64", "linux-x64"]])("selects %s %s", (platform, arch, expected) => { expect(targetFor(platform!, arch!)).toBe(expected); });
 it("refuses unsupported CPUs", () => { expect(() => targetFor("win32", "arm64")).toThrow(); expect(() => targetFor("linux", "arm64")).toThrow(); });

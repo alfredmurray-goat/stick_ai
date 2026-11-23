@@ -54,8 +54,8 @@ test("special tokens stay intact and explicit BOS is not doubled", () => {
   assert.throws(() => tokenizer.decodeBytes(-1));
 });
 
-test("RAM gates Lite and Max at 8GB, 15.9GB and 16GB", () => {
-  for (const gb of [8, 15.9, 16]) {
+test("RAM gates accept nominal 8 GB Lite machines and retain the Max guard", () => {
+  for (const gb of [7, 7.7, 8, 15.9, 16]) {
     const args = { ramBytes: gb * 1024 ** 3, tokens: [1] };
     assert.equal(launchPlan({ ...args, mode: "llama" }).mode, "llama");
     if (gb < 16) {
@@ -63,7 +63,7 @@ test("RAM gates Lite and Max at 8GB, 15.9GB and 16GB", () => {
       assert.match(launchPlan({ ...args, mode: "gpt2", forceMax: true }).warning, /slow or crash/);
     } else { assert.equal(launchPlan({ ...args, mode: "gpt2" }).warning, null); }
   }
-  assert.throws(() => launchPlan({ mode: "llama", ramBytes: 7 * 1024 ** 3, tokens: [1] }), /8 GB/);
+  assert.throws(() => launchPlan({ mode: "llama", ramBytes: 7 * 1024 ** 3 - 1, tokens: [1] }), /8 GB/);
   assert.throws(() => launchPlan({ mode: "gpt2", ramBytes: 32 * 1024 ** 3, tokens: [1], maxTokens: 100, context: 50 }), /context/);
 });
 
