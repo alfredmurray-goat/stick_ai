@@ -6,11 +6,10 @@
   <title>stick_ai · A private coding assistant on a USB stick</title>
   <meta name="description" content="stick_ai is a €15 USB stick with a private coding assistant. Stellan-1 Lite scored 73.2% and Max 80.5% on HumanEval pass@1. Both run on your own computer. EU orders from February 2027, worldwide from May 2027.">
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#0e0c14" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#fcf8f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0c14">
   <link rel="canonical" href="https://stick-ai.localilabs.com/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="stick_ai · Your code never leaves the stick">
+  <meta property="og:title" content="stick_ai · Private coding, on your computer">
   <meta property="og:description" content="A private coding assistant on a €15 USB stick. Plug it in, open it, ask. Your code stays on your computer.">
   <meta property="og:url" content="https://stick-ai.localilabs.com/">
   <meta property="og:image" content="https://stick-ai.localilabs.com/img/brand/logo-dark.png">
@@ -21,8 +20,9 @@
   <link rel="preload" href="/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/product.css">
 </head>
-<body>
+<body class="landing">
   <a class="skip" href="#main">Skip to content</a>
   <header class="bar">
     <a class="mark" href="#top" aria-label="stick_ai home">
@@ -30,102 +30,58 @@
       <span>stick_ai</span>
     </a>
     <nav aria-label="Main">
-      <a href="#session"><span class="tech-only">./how</span><span class="plain-only">How it works</span></a>
-      <a href="#features"><span class="tech-only">./features</span><span class="plain-only">What it does</span></a>
-      <a href="#bench"><span class="tech-only">./benchmarks</span><span class="plain-only">How good is it</span></a>
-      <a href="#specs"><span class="tech-only">./specs</span><span class="plain-only">What you need</span></a>
-      <a href="#price"><span class="tech-only">./price</span><span class="plain-only">Price</span></a>
-      <a href="#faq"><span class="tech-only">./faq</span><span class="plain-only">Questions</span></a>
+      <a href="#session">The app</a><a href="#features">Features</a><a href="#our-runtime">Our technology</a><a href="#price">Pricing</a>
     </nav>
-    <span class="status"><i aria-hidden="true"></i>not on sale yet</span>
-    <label class="mode" title="Non-tech mode uses a light theme; technical mode uses a dark theme"><input type="checkbox" id="plain" role="switch"><span>non-tech mode</span></label>
+    <label class="mode" title="Switch between dark technical mode and light non-tech mode"><input type="checkbox" id="plain" role="switch" aria-label="Non-tech mode"><span class="tech-only">Technical</span><span class="plain-only">Non-tech</span></label>
+    <a class="nav-cta" href="#notify">Get launch updates</a>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <p class="kicker"><span class="tech-only">// a private coding assistant on a usb stick</span><span class="plain-only">A little stick. A helpful AI. Yours.</span></p>
-        <h1><span class="tech-only">Your code never leaves</span><span class="plain-only">Your files never leave</span> <span class="nowrap"><em>the&nbsp;stick.</em><span class="cursor" aria-hidden="true"></span></span></h1>
-        <p class="lede tech-only">Plug it in, open it, ask. Stellan reads your project, plans the change and waits for your yes before it touches a line. The AI runs on your own computer. There's no account, no cloud and no server to send anything to.</p>
-        <p class="lede plain-only">An AI helper, like ChatGPT, that lives on a USB stick. Plug it into your computer and ask it, in everyday words, to build, fix or explain your website, app or code. It shows you exactly what it wants to change and only does it when you say yes. It all happens on your own computer: local chat stays on your computer. Optional online tools ask before sending information. There's no subscription.</p>
-        <div class="actions">
-          <a class="btn" href="#price">€15 · see the launch</a>
-          <a class="btn ghost" href="#session">See an example</a>
-        </div>
-        <ul class="facts" aria-label="At a glance">
-          <li class="tech-only"><b>80.5%</b> HumanEval pass@1 · Max</li>
-          <li class="plain-only"><b>80.5% pass@1</b> on the HumanEval coding test</li>
-          <li class="tech-only"><b>0 bytes</b> of code sent</li>
-          <li class="plain-only"><b>Local chat</b> on your computer</li>
-          <li><b>Mac · Win · Linux</b> one stick</li>
-        </ul>
+        <a class="launch-pill" href="#our-runtime"><span>Built by Locali Labs</span> Meet Stellan-Run</a>
+        <h1 class="tech-only">Your coding agent.<br><em>On your machine.</em></h1>
+        <h1 class="plain-only">A little more help.<br><em>A lot more yours.</em></h1>
+        <p class="lede tech-only">A local coding assistant, from the agent to the engine. Read, plan and review changes in one workspace. Your project, your approvals, your computer.</p>
+        <p class="lede plain-only">Build, fix and understand your code with a private AI on a USB stick. Tell Stellan what you need. See what it’s doing. Stay in control of every change.</p>
+        <div class="actions"><a class="btn" href="#notify">Meet your €15 coding companion</a><a class="btn ghost" href="#session">Explore the app</a></div>
+        <p class="hero-note">One payment. No subscription. Mac, Windows &amp; Linux.<br><span>Not on sale yet · EU launch planned for February 2027.</span></p>
       </div>
-      <figure class="specimen">
-        <div class="bench-plate">
-          <span class="glow" aria-hidden="true"></span>
-          <picture>
-            <source srcset="/img/brand/logo-light.png" media="(prefers-color-scheme: light)">
-            <img src="/img/brand/logo-dark.png" alt="The stick_ai USB stick: a dark stick with a glowing violet edge, a small terminal face on its cap and stick_ai printed on its side" width="425" height="520">
-          </picture>
-        </div>
-        <figcaption><span class="tech-only">stick_ai, 64&nbsp;GB · </span><span class="plain-only">Your private coding helper · </span>not actual size</figcaption>
+      <figure class="product-window hero-product">
+        <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>stick_ai / your workspace</span><span class="window-local">Local AI</span></div>
+        <a class="tech-only" href="/img/app/workspace-dark.png" target="_blank" rel="noopener" aria-label="Open full-size dark app screenshot"><img src="/img/app/workspace-dark.png" alt="The actual Stick AI workspace: project files, a formatted code explanation and live thinking and tool activity" width="2880" height="1800" fetchpriority="high"></a>
+        <a class="plain-only" href="/img/app/workspace-light.png" target="_blank" rel="noopener" aria-label="Open full-size light app screenshot"><img src="/img/app/workspace-light.png" alt="The actual Stick AI app in light mode, explaining a project alongside its files and tool activity" width="2880" height="1800" fetchpriority="high"></a>
+        <figcaption>Actual app screenshot · example project · click to explore full-size</figcaption>
       </figure>
+      <div class="benefit-strip"><div><b>Local by default</b><span>Chat and coding run on your computer.</span></div><div><b>Yours to approve</b><span>Review file changes before they happen.</span></div><div><b>Ready to move</b><span>One stick for your supported computers.</span></div></div>
     </section>
 
     <section class="session" id="session" aria-labelledby="session-title">
       <div class="session-copy">
-        <p class="kicker"><span class="tech-only">// how it works</span><span class="plain-only">Simple from the first step</span></p>
-        <h2 id="session-title">It asks before it acts.</h2>
-        <ol class="steps">
-          <li><span>01</span><div><b>Plug in, open.</b> The app for your computer is right on the stick. Nothing to install.</div></li>
-          <li><span>02</span><div><b>Ask in plain words.</b> Stellan explores the project you choose, and only that project.</div></li>
-          <li><span>03</span><div><b>Say yes or no.</b> Every edit and command shows the exact lines first. Your file stays as it was until you allow it.</div></li>
-        </ol>
+        <p class="kicker"><span class="tech-only">A workspace, not a black box</span><span class="plain-only">From “can you help?” to “that’s fixed.”</span></p>
+        <h2 id="session-title">It does the work.<br><em>You have the final say.</em></h2>
+        <p class="lede">Stellan looks through the project you choose, explains what it finds and shows you the proposed change. Nothing gets saved until you allow it.</p>
+        <ol class="steps"><li><div><b>Open your project.</b> Pick a folder on your computer, or connect a GitHub repository.</div></li><li><div><b>Ask for what you need.</b> Explain a tricky file, fix a bug or build something new.</div></li><li><div><b>Review the change.</b> See the before and after. Keep your file or allow the edit.</div></li></ol>
+        <a class="text-link" href="/start">See the first-open guide</a>
       </div>
-      <div class="plain-card conversation-demo plain-only" aria-label="Illustrative example: Stellan asks before fixing a checkout bug">
-        <p class="demo-caption">An example conversation</p>
-        <div class="chat-bubble question"><span>You</span><p>My checkout breaks when the basket is empty. Can you help?</p></div>
-        <div class="chat-bubble answer"><span>Stellan</span><p>I found the problem. The checkout tries to divide by zero when there are no items. I can fix that with a small change.</p></div>
-        <div class="approval-example"><b>You have the final say.</b><p>Review the proposed change, then choose whether to allow it.</p><span class="example-choice">Allow change</span><span class="example-choice secondary">Keep my file</span></div>
-        <p class="demo-caption">Illustration, not a live chat.</p>
-      </div>
-      <div class="term tech-only" role="img" aria-label="A Stick AI session: Stellan finds a divide-by-zero bug in checkout.ts and asks permission before changing it">
-        <div class="term-top"><span>~/projects/shop</span><span>stellan · local</span></div>
-<pre><span class="ln"><span class="dim">$</span> stick_ai open ~/projects/shop</span>
-<span class="ln"><span class="ok">✓</span> models checked · running on this computer · <span class="ok">0 bytes of code sent</span></span>
-
-<span class="ln"><span class="you">you ›</span> why does checkout crash when the cart is empty?</span>
-
-<span class="ln"><span class="think">  thinking · it only fails at checkout, so the totals…</span></span>
-<span class="ln"><span class="ai">stellan ›</span> <span class="dim">reading src/cart.ts … src/checkout.ts …</span></span>
-<span class="ln"><span class="ai">stellan ›</span> found it: average() divides by items.length,</span>
-<span class="ln">          which is 0 for an empty cart.</span>
-
-<span class="ln"><span class="dim">┌ edit</span> src/checkout.ts</span>
-<span class="ln"><span class="dim">│</span> <span class="del">- const avg = total / items.length;</span></span>
-<span class="ln"><span class="dim">│</span> <span class="add">+ const avg = items.length ? total / items.length : 0;</span></span>
-<span class="ln"><span class="dim">└</span> <span class="ask">Allow changes? [y/N]</span> <span class="cursor small" aria-hidden="true"></span></span></pre>
-      </div>
+      <figure class="product-window approval-shot"><a href="/img/app/approval.png" target="_blank" rel="noopener"><img src="/img/app/approval.png" alt="Actual app approval screen showing a proposed change to greet.ts and the Keep my file and Allow changes choices" width="2880" height="1800" loading="lazy"></a><figcaption>Real app. Visible reasoning, a before-and-after diff, and your decision.</figcaption></figure>
     </section>
 
     <section class="features" id="features" aria-labelledby="features-title">
-      <p class="kicker"><span class="tech-only">// built in</span><span class="plain-only">A little help with the whole task</span></p>
-      <h2 id="features-title">Small stick, <em>grown-up tools.</em></h2>
+      <div class="section-heading"><p class="kicker">Everything around the answer</p><h2 id="features-title">More than a chat box.<br><em>A place to get things done.</em></h2><p class="lede">The conversation, your files and every step of the work. Together, where you can see them.</p></div>
       <div class="feature-grid">
-        <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p class="tech-only">Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p><p class="plain-only">You can see what it's thinking and which files it's looking at while it works, so it never feels like a black box.</p></article>
-        <article><span class="feature-tag">memory</span><h3>Rests when you do.</h3><p>After 10 quiet minutes it gives your computer its memory back. Your next message reloads the model and continues the conversation.</p></article>
-        <article><span class="feature-tag">hooks</span><h3><span class="tech-only">Hooks, like Claude Code.</span><span class="plain-only">It can tell you when it’s done.</span></h3><p class="tech-only">Run your own command, or tell another app, when Stellan finishes or needs you. A hook can stop a step. It can never approve one.</p><p class="plain-only">It can let another app (or your phone) know when it has finished or needs your answer, so you don't have to sit and watch.</p></article>
-        <article><span class="feature-tag">github</span><h3>Works with your GitHub.</h3><p class="tech-only">Connect the app to your GitHub account with a short code, no tokens to set up. Stellan works on the repositories you pick and opens a pull request for you to review.</p><p class="plain-only">If your code is kept on GitHub (where most developers store their projects), it can work on it there too, and hands its changes back for you to check before anything is final.</p></article>
-        <article><span class="feature-tag">memory</span><h3>More room when you need it.</h3><p>Keep memory use modest by default. Turn on a longer conversation window in the sidebar for larger tasks, and keep private notes for each chat.</p></article>
-        <article><span class="feature-tag">web</span><h3>Web search, if you say so.</h3><p class="tech-only">It can look up docs and error messages with Actuent. It asks first every time, and only the search words leave. Your code never does.</p><p class="plain-only">If it needs to look something up online, it asks you first, every time. Only the search words go out; your files never do. You can switch the internet off completely.</p></article>
+        <article><span class="feature-tag">Visible progress</span><h3>Follow the work.</h3><p>See which files Stellan reads and the tools it uses. Thinking and activity fold away when you want a quieter workspace.</p></article>
+        <article><span class="feature-tag">Your context</span><h3>Room to think.</h3><p>Keep memory use modest by default. Choose a longer context window in the sidebar for larger tasks, with private notes for each chat.</p></article>
+        <article><span class="feature-tag">Your workflow</span><h3>Connect what matters.</h3><p class="tech-only">GitHub workspaces, MCP tools, skills and hooks. Tool approvals remain mandatory; online services use their own permissions.</p><p class="plain-only">Work on a GitHub project or connect tools from other apps. Stellan asks before using connected tools.</p></article>
       </div>
+      <div class="control-panel"><div><p class="kicker">Make it yours</p><h3>Your models.<br>Your connections.<br>Your rules.</h3><p>Choose Lite or Max, link model files and manage the services you connect. Local coding works offline after first-time activation. Online tools stay optional.</p><a class="text-link" href="#specs">Check your computer</a></div><figure class="product-window"><a href="/img/app/settings.png" target="_blank" rel="noopener"><img src="/img/app/settings.png" alt="Actual Stick AI settings with Models, GitHub, MCP, Skills and Updates tabs and linked model controls" width="2880" height="1800" loading="lazy"></a><figcaption>The app’s real settings · no cloud account needed for local chat</figcaption></figure></div>
     </section>
 
     <section class="our-stack" id="our-runtime" aria-labelledby="runtime-title">
       <div class="stack-intro">
         <p class="kicker"><span class="tech-only">// built by Locali Labs</span><span class="plain-only">Made by the people behind the stick</span></p>
-        <h2 id="runtime-title">Our software.<br><em>Your computer.</em></h2>
-        <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. Our next app release runs Stellan-Run: our independent, MIT-licensed C++ model engine. Own kernels, own model loading, own context controls.</p>
+        <h2 id="runtime-title">Built closer to<br><em>the way you work.</em></h2>
+        <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. The next app release is built on Stellan-Run: our independent, MIT-licensed C++ model engine. Own kernels, own model loading, own context controls.</p>
         <p class="lede narrow plain-only">We build the software that helps Stellan plan, ask your permission and work on your files. Its next release uses our own engine, Stellan-Run, so we can improve the way it runs on your computer.</p>
       </div>
       <div class="stack-grid">
@@ -136,12 +92,12 @@
         <article><span class="stack-state">Private by design</span><h3>Memory that stays here.</h3><p>Our context controls and per-chat notes keep useful information close. Choose a larger window when the task needs it; your notes stay local.</p></article>
         <article><span class="stack-state">Built in the open</span><h3>Show the work.</h3><p>Code, tests and measured results. Foundation models and third-party tools keep their credits. We publish useful gains and rejected experiments.</p></article>
       </div>
-      <p class="stack-note"><b>The release transition.</b> Stellan-Run is selected for the next desktop release while platform builds and real tool checks run. It currently uses the CPU; it has not beaten llama.cpp overall. The native host and MCP client continue on separate branches. <a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">See the code and evidence</a>.</p>
+      <p class="stack-note"><b>The release transition.</b> Stellan-Run is selected for the next desktop release while platform builds and real tool checks run. It currently uses the CPU; it has not beaten llama.cpp overall. The native-host prototype and original MCP client are now merged into main. <a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">See the code and evidence</a>.</p>
     </section>
 
     <section class="bench" id="bench" aria-labelledby="bench-title">
       <p class="kicker">// benchmarks</p>
-      <h2 id="bench-title">80.5% on HumanEval pass@1. <em>On your own computer.</em></h2>
+      <h2 id="bench-title">Small models.<br><em>Measured results.</em></h2>
       <p class="bench-method">These model scores were measured with the earlier llama.cpp harness. Full HumanEval results have not yet been measured on Stellan-Run.</p>
       <p class="lede narrow plain-only"><b>In plain words:</b> we tested the two AIs on the stick with 164 short Python programming puzzles. Lite solved 120 (73.2% pass@1); Max solved 132 (80.5% pass@1). These tests measure small coding tasks, not the ability to finish a whole project.</p>
       <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. Our results are pass@1. Historical scores use different prompts and setups; their metrics are labeled separately. A repository-level SWE-bench evaluation is next.</p>
@@ -212,20 +168,7 @@
       </details>
     </section>
 
-    <section class="planet" id="planet" aria-labelledby="planet-title">
-      <p class="kicker">// no data centre</p>
-      <h2 id="planet-title">Your questions never visit <em>a data centre.</em></h2>
-      <p class="lede narrow">Cloud AI like ChatGPT and Gemini answers from huge data centres that run around the clock, and many of them are cooled with water. stick_ai answers on the computer you already have, so your questions use none of that.</p>
-      <div class="feature-grid">
-        <article><span class="feature-tag">water</span><h3>No cooling water.</h3><p>Your questions never reach a data centre, so none of the water data centres use for cooling goes into your answers.</p></article>
-        <article><span class="feature-tag">hardware</span><h3>Nothing new to build.</h3><p>It runs on the computer you already own. No servers are built, or kept running day and night, to answer you.</p></article>
-        <article><span class="feature-tag">power</span><h3>Only on when you are.</h3><p>It uses your computer's power only while it's working, and rests by itself after 10 quiet minutes.</p></article>
-      </div>
-      <details class="fine">
-        <summary>To be fair, the small print</summary>
-        <p>Cloud AI has become very efficient per answer. Google reports about 0.24 Wh of electricity and 0.26 ml of water for a typical Gemini text prompt (<a href="https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference">August 2025</a>), and OpenAI about 0.34 Wh for an average ChatGPT question (<a href="https://www.datacenterdynamics.com/en/news/sam-altman-chatgpt-queries-consume-034-watt-hours-of-electricity-and-0000085-gallons-of-water/">June 2025</a>). A laptop working on an answer can use more electricity than that, so we don't claim stick_ai uses less energy per answer. What it avoids is the data centre itself: its cooling water, its servers and keeping them running around the clock.</p>
-      </details>
-    </section>
+    <section class="privacy-panel" id="planet" aria-labelledby="planet-title"><div><p class="kicker">Private by design</p><h2 id="planet-title">Your project stays<br><em>your business.</em></h2></div><div><p>Local chat and coding run on the computer you already own. You don’t need a cloud AI account or a monthly plan.</p><p>First-time activation needs an internet connection. Optional GitHub, search and remote tools use the internet with your approval. You choose what to connect.</p><a class="text-link" href="/privacy">Read our privacy policy</a></div></section>
 
     <section class="specs" id="specs" aria-labelledby="specs-title">
       <div class="label">
@@ -235,7 +178,7 @@
           <div><dt>Models</dt><dd>Stellan-1 Lite (7.3B) · Stellan-1 Max (23.6B)</dd></div>
           <div><dt>Runs on</dt><dd>macOS 13.5+ (Apple Silicon &amp; Intel) · Windows 10/11 · Linux x64</dd></div>
           <div><dt>Memory</dt><dd>Lite: 8 GB · Max: 16 GB minimum, 24 GB+ recommended</dd></div>
-          <div><dt>Internet</dt><dd>Not needed. Optional web search asks first</dd></div>
+          <div><dt>Internet</dt><dd>First-time activation online; local coding offline afterward</dd></div>
           <div><dt>Stick</dt><dd>64 GB USB, exFAT, everything preinstalled</dd></div>
           <div><dt>Approvals</dt><dd>Every edit, command and tool call</dd></div>
           <div><dt>Extensions</dt><dd>MCP servers · skills · hooks</dd></div>
@@ -252,7 +195,7 @@
         <p class="kicker">// what's on it</p>
         <h3>One stick, every computer.</h3>
         <p>The app for each computer sits at the top. Everything they share, including one copy of each model, lives in <code>stellan/</code>.</p>
-<pre class="tree" aria-label="The folders on the stick">STICK_AI/
+<pre class="tree tech-only" aria-label="The folders on the stick">STICK_AI/
 ├── <b>Stick AI.app</b>     <span>mac (apple silicon + intel)</span>
 ├── <b>Stick AI.exe</b>     <span>windows</span>
 ├── <b>stick-ai</b>         <span>linux</span>
@@ -262,6 +205,7 @@
     │   └── stellan-1.0-q4_k_m.gguf
     ├── app/  bin/      <span>the engine, per computer</span>
     └── manifest.json   <span>every file, checked</span></pre>
+        <div class="device-list plain-only"><div><b>Mac</b><span>Apple Silicon or Intel · macOS 13.5 or newer</span></div><div><b>Windows</b><span>Windows 10 or 11 · 64-bit Intel or AMD · WebView2</span></div><div><b>Linux</b><span>64-bit · glibc 2.35+ · GTK 3 · WebKitGTK 4.1</span></div></div>
       </div>
     </section>
 
@@ -297,7 +241,7 @@
           </div>
           <label class="trap" aria-hidden="true">Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label>
           <label class="consent"><input type="checkbox" name="consent" value="yes" required><span>Email me once when orders open where I live. Nothing else, no newsletter. I can ask for my email to be deleted any time (<a href="/privacy">privacy policy</a>).</span></label>
-          <button class="btn" type="submit">Notify me →</button>
+          <button class="btn" type="submit">Keep me posted</button>
         </form>
       </div>
     </section>
@@ -314,7 +258,7 @@
       <details><summary>Which computers does it work on?</summary><p>Macs with Apple Silicon or Intel running macOS 13.5 or newer, Windows 10 and 11 on 64-bit Intel or AMD computers, and supported 64-bit Linux computers. Windows needs Edge WebView2; Linux needs glibc 2.35 or newer, GTK 3 and WebKitGTK 4.1. Lite is intended for computers with 8 GB of memory. Max can be selected from 16 GB, with 24 GB or more recommended.</p></details>
       <details><summary>What is the difference between Lite and Max?</summary><p>Lite is the smaller model: it handles the conversation, plans the work and uses tools. Max is the larger coding model for bigger changes. On computers with 24 GB of memory or more, Lite can ask Max for coding help automatically. You can also use Lite on its own or choose Max directly when your computer has enough memory.</p></details>
       <details><summary>Why can Max be slow on a 16 GB computer?</summary><p>Its model file is about 14.3 GB, which leaves little memory for the app and your operating system. The computer may repeatedly read data from the stick, making replies take many minutes or appear stuck. Lite is the default on 16 GB computers, and Max is never switched on automatically there. The app warns you before choosing Max directly.</p></details>
-      <details><summary>Do I need a separate graphics card?</summary><p>No. The app can run on the computer's processor. On supported Apple Silicon Macs it can also use the built-in graphics processor, with a processor-only fallback if that cannot start. Having enough memory still matters, especially for Max.</p></details>
+      <details><summary>Do I need a separate graphics card?</summary><p>No. Stellan-Run currently uses your computer’s processor on every platform. GPU offload is not part of this release. Having enough memory still matters, especially for Max.</p></details>
       <details><summary>Why do some replies take a while?</summary><p>The app checks the model files on the first start and loads the selected model. After that, reply times depend on your processor, available memory, stick speed and the size of the task. Follow-up steps can reuse work the model has already done. Watch the progress and thinking in the conversation; you can cancel the current step without closing the app.</p></details>
       <details><summary>Can I use the same stick on different computers?</summary><p>Yes. The same stick includes apps for supported Macs, Windows PCs and Linux computers, sharing the model files on the stick. Close the app and safely eject the stick before moving it. Each computer still needs to meet the operating-system and memory requirements.</p></details>
       <details><summary>Can it change files without asking me?</summary><p>It can read and search inside your project to understand the task. Saving or editing files, running commands and calling connected tools require your approval. File changes are shown as a before-and-after comparison. Review what you allow and keep backups or version history: AI can still make mistakes.</p></details>
@@ -330,12 +274,7 @@
   </main>
 
   <footer class="foot">
-    <div class="giant" aria-hidden="true"><p class="giant-prompt"><span>~ $</span> stick_ai --banner</p><pre>         __  _      __             _
-   _____/ /_(_)____/ /__    ____ _(_)
-  / ___/ __/ / ___/ //_/   / __ `/ /
- (__  ) /_/ / /__/ ,&lt;     / /_/ / /
-/____/\__/_/\___/_/|_|____\__,_/_/
-                    /_____/</pre></div>
+    <div class="footer-brand"><img class="mode-logo-dark" src="/img/brand/icon-dark.png" alt="" width="48" height="48"><img class="mode-logo-light" src="/img/brand/icon-light.png" alt="" width="48" height="48"><span>stick_ai<span>Small stick. Your possibilities.</span></span><a href="https://github.com/alfredmurray-goat/stick_ai">Explore the source on GitHub</a></div>
     <div class="foot-row">
       <p>stick_ai by Localilabs · private, offline coding help</p>
       <p><a href="/start">help</a> · <a href="/privacy">privacy</a> · © 2026 Localilabs. Not yet launched: details and prices may change.</p>
