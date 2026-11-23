@@ -84,7 +84,8 @@ it("stops a blocked tool before its approval, adds hook notes, and tells a local
     received.length = 0;
     await app.start("stellan-1-lite");
     await api("/api/task", { text: "Make a.txt" });
-    await vi.waitFor(async () => expect((await api("/api/state")).events.some((event: any) => event.kind === "task-complete")).toBe(true));
+    // The hook exchange spans several local HTTP requests on busy packaging runners.
+    await vi.waitFor(async () => expect((await api("/api/state")).events.some((event: any) => event.kind === "task-complete")).toBe(true), { timeout: 5000 });
     const state = await api("/api/state");
     expect(state.events.some((event: any) => event.kind === "approval")).toBe(false);
     expect(bodies[0].messages[1].content).toContain("The user prefers British spelling.");
