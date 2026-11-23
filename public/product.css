@@ -175,3 +175,9 @@ body:not(:has(#plain:checked)) .kicker::after { content: ' */'; }
 @media (max-width: 560px) { .runtime-brief { font-size: 11px; } .runtime-brief dl div { grid-template-columns: 72px minmax(0,1fr); } .runtime-brief dl { padding: 14px; } }
 .runtime-brief { font-size: 14px; }
 @media (max-width: 560px) { .runtime-brief { font-size: 14px; } }
+/* Keep the original orange-to-purple signature in both reading modes. */
+.landing .giant pre { --banner-orange: #ffb340; --banner-purple: #a47bff; }
+body:has(#plain:checked) .giant pre { --banner-orange: #bf6511; --banner-purple: #7140d6; }
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .landing .giant pre { background: linear-gradient(105deg,var(--banner-orange) 5%,var(--banner-purple) 85%); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+}
