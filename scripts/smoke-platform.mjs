@@ -42,19 +42,20 @@ const heartbeat = setInterval(() => { void reportMemory().catch(console.error); 
 try {
   await promisify(execFile)(join(root, native), ["--dry-run"]);
   if (process.platform === "darwin") {
-  for (const file of [`bin/${target}/node`, `bin/${target}/llama-server`, native]) {
+  for (const file of [`bin/${target}/node`, `bin/${target}/stellan-run`, native]) {
     const { stdout } = await promisify(execFile)("/usr/bin/otool", ["-L", join(root, file)]);
     const dependencies = stdout.split("\n").slice(1).map((line) => line.trim().split(" ")[0]).filter(Boolean);
     if (dependencies.some((path) => !path.startsWith("/usr/lib/") && !path.startsWith("/System/Library/"))) { throw new Error(`Non-portable library dependency in ${file}: ${dependencies.join(", ")}`); }
   }
   }
   if (process.platform === "linux") {
-    for (const file of [`bin/${target}/node`, `bin/${target}/llama-server`, native]) {
+    for (const file of [`bin/${target}/node`, `bin/${target}/stellan-run`, native]) {
       const { stdout } = await promisify(execFile)("ldd", [join(root, file)]);
       if (stdout.includes("not found")) { throw new Error(`Missing Linux runtime library: ${stdout}`); }
     }
   }
   await engine.start("stellan-1-lite", signal);
+  if (!engine.nativeRuntime) throw new Error("The release must use Stellan-Run");
   const client = new Ollama("stellan-1-lite", engine.baseUrl, false, ramStatus(), { apiKey: engine.key, maxTokens: 256 });
   const result = await client.complete([{ role: "system", content: 'You are Stellan-1 Lite. This is a startup check. Reply with exactly <done>Ready</done>. Do not call tools or write code.' }, { role: "user", content: "Are you ready?" }], signal, () => {});
   const parsed = parseStep(result.content);
@@ -74,9 +75,9 @@ try {
     } },
     emit: (text, thinking) => { if (!thinking) { summary += text; } }, log: console.log, save: async () => {}
   });
-  await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", gpu: engine.gpuFailed ? "fell back to CPU" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac)" : "CPU") : "Metal", response: result.content, agent: { outcome, read, summary, messages } }, null, 2));
+  await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", runtime: "Stellan-Run", gpu: engine.nativeRuntime ? "CPU (Stellan-Run)" : engine.gpuFailed ? "fell back to CPU" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac)" : "CPU") : "Metal", response: result.content, agent: { outcome, read, summary, messages } }, null, 2));
   if (outcome !== "finished" || !read || !summary.includes(expected)) { throw new Error("Lite did not complete a real read_file/tool_result/done exchange; do not ship this package"); }
   if (target === "linux-x64") await extensionSmoke({client,temporary,project,signal});
-  console.log(`${target} Lite compute: ${engine.gpuFailed ? "Metal GPU failed to start; CPU fallback used" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac, paravirtual Metal skipped)" : "CPU") : "Metal GPU"}.`);
+  console.log(`${target} Lite compute: ${engine.nativeRuntime ? "Stellan-Run CPU" : engine.gpuFailed ? "Metal GPU failed to start; CPU fallback used" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac, paravirtual Metal skipped)" : "CPU") : "Metal GPU"}.`);
   console.log(`${target} Lite passed native execution, portable library checks, authenticated readiness, streaming and a real read_file/tool_result/done exchange.`);
 } finally { clearInterval(heartbeat); engine.disposing = true; await engine.stop(); closeSync(fd); await rm(temporary, { recursive: true, force: true }); }

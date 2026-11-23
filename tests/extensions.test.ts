@@ -60,3 +60,23 @@ it('says web search needs the internet when Actuent cannot be reached',async()=>
  const f=await fixture();vi.stubGlobal('fetch',vi.fn(async()=>{throw new TypeError('fetch failed');}));const mcp=new McpServers(f.root,f.project);
  try{await expect(mcp.call('actuent','actuent_search',{query:'x'},new AbortController().signal,async()=>true)).rejects.toThrow(/internet connection/);}finally{await mcp.close();vi.unstubAllGlobals();await f.close();}
 });
+it('bounds aggregate catalog memory and rejects nonconsecutive pagination cycles',async()=>{
+ for(const mode of ['cycle','oversize']){
+  const f=await fixture();let pages=0;
+  const text=mode==='oversize'?'x'.repeat(2200000):'';
+  vi.stubGlobal('fetch',vi.fn(async(_input:URL|RequestInfo,init?:RequestInit)=>{
+   if(init?.method!=='POST')return new Response(null,{status:405});
+   const message=JSON.parse(String(init.body));if(!('id'in message))return new Response(null,{status:202});
+   let result:unknown;
+   if(message.method==='initialize')result={protocolVersion:LATEST_PROTOCOL_VERSION,serverInfo:{name:'bounded',version:'1'},capabilities:{tools:{}}};
+   else{
+    if(++pages>3)throw Error('Fixture safety stop: catalog should already have been rejected');
+    result=mode==='cycle'?{tools:[],nextCursor:pages%2?'a':'b'}:{tools:[{name:'tool-'+pages,description:text,inputSchema:{type:'object'}}],...(pages===1?{nextCursor:'next'}:{})};
+   }
+   return new Response(JSON.stringify({jsonrpc:'2.0',id:message.id,result}),{headers:{'Content-Type':'application/json'}});
+  }));
+  const mcp=new McpServers(f.root,f.project);
+  try{await mcp.load();await expect(mcp.connect('actuent',new AbortController().signal)).rejects.toThrow();expect(pages).toBe(mode==='cycle'?3:2);expect(mcp.view()[0]?.status).not.toBe('connected');}
+  finally{await mcp.close();vi.unstubAllGlobals();await f.close();}
+ }
+});

@@ -1,0 +1,4 @@
+[
+  "<s>[INST] Fix the Python function below so it handles an empty input without raising an error, preserves floating point results, and does not modify the input list. Return only the corrected function.\n\ndef average(values):\n    total = 0.0\n    for value in values:\n        total += value\n    return total / len(values)\n\nFor an empty list return 0.0. Examples: average([]) == 0.0; average([2, 4]) == 3.0. [/INST]",
+  "<s>[INST] Review this small JavaScript module and return a corrected implementation only. Keep the public function name. It must ignore inherited properties, treat an absent quantity as zero, keep fractional prices, and return zero for an empty cart. Do not add network calls or dependencies.\n\nexport function cartTotal(cart) {\n  let result = 0;\n  for (const key in cart) {\n    const item = cart[key];\n    result += parseInt(item.price) * (item.quantity || 1);\n  }\n  return result;\n}\n\nReturn JavaScript code only. [/INST]"
+]

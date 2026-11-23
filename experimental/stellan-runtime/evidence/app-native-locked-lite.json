@@ -1,0 +1,8 @@
+{
+  "complete": true,
+  "runtime": "Stellan-Run",
+  "locked": true,
+  "verified": true,
+  "greeting": " <done>Ready</done>",
+  "scope": "Real activated split-model startup/greeting; no tool-task or benchmark score"
+}

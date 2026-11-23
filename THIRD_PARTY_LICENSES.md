@@ -93,7 +93,7 @@ https://github.com/tauri-apps/tauri . Copyright Tauri Programme within The Commo
 
 ## Native covered-source notices (MPL-2.0)
 
-The resolved native build graph includes MPL-2.0 packages such as selectors. The native notice generator includes their exact published source, file-level notices and licence text in LICENSES/desktop/sources and RUST_DEPENDENCIES.md. These third-party files retain their own licence; stick_ai's authored code remains MIT. The complete pinned llama.cpp source archive accompanies native notices to preserve vendored notices as well.
+The resolved native build graph includes MPL-2.0 packages such as selectors. The native notice generator includes their exact published source, file-level notices and licence text in LICENSES/desktop/sources and RUST_DEPENDENCIES.md. These third-party files retain their own licence; stick_ai's authored code remains MIT. Legacy/reference distributions must also retain their pinned llama.cpp source and vendored notices; new Stellan-Run packages do not bundle that engine.
 
 Mozilla Public License Version 2.0
 ==================================
@@ -470,13 +470,9 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
   defined by the Mozilla Public License, v. 2.0.
 
 
-## Portable Node.js 24.22.1
+## Optional/historical reference engine: llama.cpp v0.9.0 (MIT)
 
-Node.js is MIT with bundled third-party notices. The USB builder requires each supplied Node runtime's complete release LICENSE file and places it in LICENSES/Node-<platform>.txt. Any llama.cpp sidecar libraries require their corresponding redistribution notices. No runtime binaries are included in this source repository.
-
-## Portable inference: llama.cpp v0.9.0 (MIT)
-
-Portable binaries must be built from pinned upstream tag v0.9.0, https://github.com/ggml-org/llama.cpp/tree/v0.9.0 . Supplied binary provenance must be audited by the release builder; generated SHA256 checksums alone do not prove a source revision. Full upstream notice:
+New desktop packages build the original MIT-licensed Stellan-Run engine from this repository. Legacy/reference builds use pinned upstream tag v0.9.0, https://github.com/ggml-org/llama.cpp/tree/v0.9.0 . Supplied binary provenance must be audited by the release builder; generated SHA256 checksums alone do not prove a source revision. Full upstream notice:
 
 MIT License
 
@@ -500,6 +496,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+
+## Portable Node.js 24.22.1
+
+Node.js is MIT with bundled third-party notices. The USB builder requires each supplied Node runtime's complete release LICENSE file and places it in LICENSES/Node-<platform>.txt. Any optional legacy llama.cpp sidecar libraries require their corresponding redistribution notices. No runtime binaries are included in this source repository.
 
 ## accepts@2.0.0
 

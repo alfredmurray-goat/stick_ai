@@ -1,3 +1,5 @@
+> Desktop v0.2.0 builds Stellan-Run from `experimental/stellan-runtime` and selects it through the verified runtime manifest. See [the current engine integration](STELLAN_RUN.md). Commands below that name llama.cpp describe legacy/reference builders.
+
 # Desktop packages — Lite + Max
 
 The `Desktop builds — Lite + Max` workflow in `.github/workflows/desktop.yml` builds four independent, complete folders. Run it from GitHub Actions or push a source change to main. Documentation-only pushes do not rebuild the multi-gigabyte packages. The older Intel-only workflow remains available manually.

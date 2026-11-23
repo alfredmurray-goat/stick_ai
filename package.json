@@ -1,6 +1,6 @@
 {
   "name": "stick-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local coding assistant with optional GitHub workspaces",
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,10 @@
     "docs/UPDATES.md",
     "docs/GITHUB_WORKSPACES.md",
     "docs/MCP_SKILLS.md",
-    "docs/HOOKS.md"
+    "docs/HOOKS.md",
+    "experimental/stellan-runtime/session.mjs",
+    "experimental/stellan-runtime/plan.mjs",
+    "experimental/stellan-runtime/tokenizer.mjs"
   ],
   "scripts": {
     "build": "tsc",

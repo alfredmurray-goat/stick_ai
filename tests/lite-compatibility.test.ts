@@ -34,6 +34,9 @@ it("builds a Lite-only Intel package with its own template and complete target-s
     const notices = join(root, "native-notices"); await mkdir(notices); await writeFile(join(notices, "NOTICE.txt"), "Fixture notices");
     const output = join(root, "release");
     const manifest = await buildIntel(resolve("."), output, { app, node: fixture.nodes["macos-x64"], server: fixture.servers["macos-x64"], lite: fixture.lite, nodeLicense: fixture.nodeLicenses["macos-x64"], serverLicense: fixture.nodeLicenses["macos-x64"], desktopLicenses: notices });
+    expect(manifest.runtime).toBe("stellan-run");
+    expect(manifest.files.find(file => file.path === "bin/macos-x64/stellan-run")?.sha256).toBe(manifest.files.find(file => file.path === "bin/macos-x64/llama-server")?.sha256);
+    expect(manifest.files.some(file => file.path === "app/stick-engine.cjs")).toBe(true);
     expect(manifest.targets).toEqual(["macos-x64"]); await expect(verifyStick(output)).resolves.toHaveProperty("format", 1);
     expect(JSON.parse(await readFile(join(output, "app/model-templates.json"), "utf8"))).toEqual({ "stellan-1-lite": "mistral-v1" });
     await writeFile(join(output, "app/model-templates.json"), "{}"); await expect(verifyStick(output)).rejects.toThrow("damaged");

@@ -25,13 +25,13 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 
 ## Features
 
-- **Fully local.** Stellan runs on your own computer through a bundled llama.cpp server. No account, no cloud, no telemetry.
+- **Fully local.** Stellan runs on your own computer through our bundled Stellan-Run engine. No account, no cloud, no telemetry.
 - **Two models, one flow.** Stellan-1 **Lite** explores your project and runs tools; Stellan-1 **Max** writes larger pieces of code. Lite + Max work together automatically with 24 GB of memory or more; on 16 GB you can still choose Max, with a warning that it may be very slow. Use them together, Lite on its own, or Max directly.
 - **You stay in control.** Every file change waits for your approval, shown as a red and green before-and-after diff. GitHub publishing waits for your review.
 - **Watch it think.** Stellan's thinking, file reads, searches and Lite → Max handoffs stream live in the conversation, then fold into a short "Thought for 12 s · 2 steps" line you can open again. The Activity panel shows the same in more detail.
 - **Readable answers.** Replies render with headings, lists, tables and code blocks with syntax colours (JavaScript/TypeScript and other C-style languages, Python, shell, JSON, CSS, HTML, YAML/TOML and SQL) and a Copy button.
-- **Fast follow-ups.** Stellan remembers the conversation between steps instead of re-reading it, so a follow-up step on a 4-core computer took about 5 seconds instead of about 95 in testing.
-- **Apple Silicon GPU.** On M-series Macs, Lite runs on the GPU through Metal, and falls back to the CPU automatically if the GPU can't load it.
+- **Prompt reuse.** Stellan-Run reuses exact evaluated prefixes between steps. Changed prefixes are reread; speed depends on the conversation and computer.
+- **Our own runtime.** New desktop packages use Stellan-Run on the CPU. It is our independent C++ model engine, with bounded prefill buffers and lazy Max cache allocation.
 - **Bring your own models.** The model-free download is the same app with no model files inside. Point it at your own Lite and Max GGUFs and nothing is copied.
 - **GitHub workspaces.** Connect a repository, ask for changes, review the diff and open a draft pull request, without touching your default branch. Sign in with GitHub with a short code (no tokens to create), and choose exactly which repositories Stick AI may use.
 - **Web search, built in.** Lite can look things up on the live web with [Actuent](https://actuent.ai): docs, versions, error messages, prices, events and news. It's free, needs no account, and every search shows you the exact words before anything goes online. Turn it off in Settings → MCP.
@@ -64,7 +64,6 @@ Measured with the release GGUFs and the llama.cpp benchmark harness: Lite on a 4
   | Model | HumanEval pass@1 | Primary metric evidence |
   | --- | --- | --- |
   | GPT-4 Turbo (`gpt-4-1106-preview`, Nov 2023) | **83.7%** | [OpenAI results](https://github.com/openai/simple-evals#results), [scoring code](https://github.com/openai/simple-evals/blob/main/humaneval_eval.py): mean per-completion correctness, plus separate pass@k metrics |
-  | Llama 3 70B Instruct (Apr 2024) | **81.7%** | [Model card](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct), [evaluation details: HumanEval pass@1](https://github.com/meta-llama/llama3/blob/main/eval_details.md#humaneval) |
   | **Stellan-1 Max** | **80.5% (132/164)** | One greedy attempt per problem; [raw results](docs/benchmark/results/humaneval-max.json) |
   | **Stellan-1 Lite** | **73.2% (120/164)** | One greedy attempt per problem |
   | Claude 2 (Jul 2023) | **71.2%** | [Anthropic model card, §4.3, p.10](https://assets.claude.com/bd2a28d2535bfb0494cc8e2a3bf135d2e7523226.pdf): “Codex P@1 (0-shot)”, temperature 1 |
@@ -155,22 +154,23 @@ flowchart LR
     G -.->|"Lite reviews and applies"| C
 ```
 
-- **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags, constrained by a grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
+- **Tagged protocol.** Lite replies in plain text with `<tool_call>{...}</tool_call>`, `<think>…</think>` and `<done>…</done>` tags. Stellan-Run currently validates the completed response rather than enforcing a token grammar. The app runs one validated tool call per step and replies with `<tool_result>…</tool_result>`. Allowed tools: `list_dir`, `read_file`, `write_file`, `edit_file`, `search_files`, `run_shell`, `delegate_code`.
 - **Lite and Max take turns.** In paired mode, only one model is loaded at a time. When Lite delegates, Max is started, writes the code, and Lite is restarted to review and apply it.
-- **Prompt cache.** Lite keeps its conversation cache with one context checkpoint (about 0.3 GB), and old tool output is trimmed in large steps so the start of the conversation stays identical. Each step processes only new text.
-- **Instructions read once.** The system message is the same for the whole session; the project file list, named files and skill guidance travel with each task instead. Right after Lite starts, it reads that system message in the background while you type, and saves the result so **New conversation** reloads it in a fraction of a second. On 4 CPU cores the first reply read 75 new tokens instead of 1,721, and took 60 s instead of 116 s.
+- **Stable history.** Old tool output is trimmed in large steps to preserve unchanged prefixes. Stellan-Run reuses only the prefix it has actually evaluated; it does not claim rollback snapshots.
+- **Stable instructions.** The system message remains unchanged within a session; project files and skill guidance travel with the task. Stellan-Run can pre-read a prefix, but saved rollback snapshots are not available.
 - **Nothing runs when idle.** The window waits for the app to report a change instead of asking twice a second, and the model rests after 10 quiet minutes (`STICK_REST_MINUTES` changes this; `0` turns it off).
 - **Context controls in the sidebar.** Normal keeps Lite at 65,536 tokens and Max at 8,192 to favor RAM headroom. Long raises Lite to 262,144 and Max to 16,384 / 32,768 / 65,536 according to available RAM, with potentially slower replies. Lite uses fixed-size recurrent state; Max's attention cache grows with context. See [context and chat memory](docs/CONTEXT_MEMORY.md).
-- **Long context mode.** Settings → Models → Memory: Lite 262,144 tokens, Max up to 65,536, and about 100k tokens of conversation kept word for word. A clear warning says it can be much slower on an ordinary laptop when a long conversation has to be read again; switching restarts the model.
+- **Long context mode.** Sidebar → Long context: Lite 262,144 tokens, Max up to 65,536, and about 100k tokens of conversation kept word for word. A clear warning says it can be much slower on an ordinary laptop when a long conversation has to be read again; switching restarts the model.
 - **Smart compaction.** When a new task starts and the conversation is over its budget, older tasks become a short summary (what you asked, which files and tools were used, what Stellan answered) and the newest stay word for word. It is built from the conversation itself, so it takes no time and invents nothing.
-- **Faster code from Max.** Max uses n-gram speculative decoding: when it rewrites code it has already seen, it drafts the copied text in chunks. A 25-function rewrite on 4 CPU cores went from 4.3 to 12.4 tokens/s with identical output; normal answers are unaffected. If a computer's llama.cpp refuses these settings, Max starts once more without them.
-- **GPU.** Apple Silicon builds include llama.cpp's Metal backend. Lite uses the GPU there; Max uses it only with 24 GB or more, because macOS limits GPU memory to about two thirds of RAM. Macs running as virtual machines stay on the CPU, because their virtual GPU is far slower. Set `STICK_GPU=0` to force the CPU.
+- **Stellan-Run.** New desktop packages execute our C++ runtime. The authenticated streaming adapter shares the existing app backend process, avoiding another Node process. The binary reads verified model splits directly.
+- **Prompt reuse.** Exact evaluated prefixes are reused. Changed prefixes and model swaps are re-read; on-disk slot snapshots are currently unavailable.
+- **CPU and memory.** Inference uses two CPU workers, mapped quantized weights, bounded 32-token Lite prefill and lazily allocated Q8 Max caches. GPU offload, speculative decoding and token-level grammar constraints are currently unavailable. Tool responses still pass the strict parser and every changing action still needs approval.
 
 ## Configuration
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `STICK_GPU` | on (Apple Silicon) | `0` keeps every model on the CPU. |
+| `STICK_GPU` | legacy packages only | Stellan-Run currently uses the CPU. |
 | `STICK_CONTEXT_MAX_BYTES` | `16384` | How much tool output and named-file context is sent per request (256 to 1048576). |
 | `STICK_MODEL` | `stellan-1-lite` | Terminal model: `stellan-1-lite` or `stellan-1-max`. |
 | `STICK_BASE_URL` | `http://localhost:11434` | Terminal model endpoint (`/v1/chat/completions`). Local addresses only unless `--allow-remote`. |
@@ -268,7 +268,7 @@ The app's logs are in `~/Library/Logs/build.localilabs.stickai/`.
 <details>
 <summary><b>The first answer takes a long time</b></summary>
 
-The first message in a conversation has to be read in full, which can take a minute or more on a laptop CPU. Follow-up steps reuse that work and are much faster. Apple Silicon Macs use the GPU and are faster still. The activity panel shows live progress, and Stop cancels.
+The first message in a conversation has to be read in full, which can take a minute or more on a laptop CPU. Follow-up steps reuse that work and are much faster. Stellan-Run currently uses the CPU on every platform. The activity panel shows live progress, and Stop cancels.
 
 </details>
 
@@ -331,7 +331,7 @@ Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how the p
 - [LICENSE](LICENSE): MIT, copyright localilabs, for the Stick AI source.
 - [NOTICE](NOTICE): the retained gpt-engineer MIT notice and Mistral AI base-model attribution. Stick AI is a TypeScript rewrite inspired by [gpt-engineer](https://github.com/gpt-engineer-org/gpt-engineer), with no reused Python code.
 - [MODEL_LICENSE.md](MODEL_LICENSE.md): Stellan base model, LoRA provenance, dataset licences and outstanding provider-terms review.
-- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md): generated runtime dependency notices. Each package also includes llama.cpp, Node.js and desktop runtime notices.
+- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md): generated runtime dependency notices. Packages include Stellan-Run, Node.js and desktop runtime notices; historical/optional components retain their credits.
 
 ### File inputs
 
@@ -341,8 +341,12 @@ The sidebar context wheel shows the local server's last reported usage, with a *
 
 The shared [project plan](docs/PROJECT_PLAN.md) records Stellan-Run, the unified unnamed benchmark/learning project, our own core-component direction, and the low-RAM/sidebar context defaults.
 
-Stellan-Run development now avoids whole-cache copies during Max cache growth and correctly forwards the persistent-session cache mode. [Isolated cache measurements](experimental/stellan-runtime/EVIDENCE.md#cache-growth-follow-up--23-november-2026) show lower temporary RAM and allocation time; full-model superiority has not been established, and the production engine remains llama.cpp.
+Stellan-Run development now avoids whole-cache copies during Max cache growth and correctly forwards the persistent-session cache mode. [Isolated cache measurements](experimental/stellan-runtime/EVIDENCE.md#cache-growth-follow-up--23-november-2026) show lower temporary RAM and allocation time; full-model superiority has not been established. By the owner’s choice, new desktop releases now use Stellan-Run even while qualification continues. Older installed packages keep their previous engine until updated.
 
 See the [own-component roadmap](docs/OWN_COMPONENTS.md) for proposed replacements beyond inference, ranked by useful product gains and compatibility work.
 
-The separate [original MCP client work](docs/MCP_CLIENT.md) starts with bounded protocol-envelope validation in our existing request/transport code. SDK transports and operation schemas remain until compatibility is complete.
+### Stellan-Run release transition
+
+Desktop v0.2.0 packages use Stellan-Run by default, including activated locked models. Lite completed a real read-file/tool-result/done exchange through the authenticated app API. Full Max-weight execution and physical GPU/device qualification remain outstanding; CPU tests still favor llama.cpp on the recorded longer prompts. Historical HumanEval scores were measured with the earlier llama.cpp harness and have not been remeasured on Stellan-Run. See [runtime integration and limits](docs/STELLAN_RUN.md). The legacy filename alias and `llamaRelease` manifest field exist only so older installed updaters can accept the migration; the new release builds its engine from our source.
+
+The separate [original MCP client work](docs/MCP_CLIENT.md) includes bounded protocol-envelope and tool-client initialization validation in our existing request/transport code. Its stdio reader avoids repeated partial-message copies and releases large buffers; pending requests have count and payload budgets. The RPC core bundles independently of SDK/schema runtimes; whole-app SDK removal is still in progress. SDK transports and operation schemas remain until compatibility is complete.

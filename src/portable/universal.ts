@@ -128,7 +128,8 @@ export async function assembleUniversalStick(output: string, inputs: UniversalIn
     await writeFile(join(staging, "Start.bat"), windowsStart(hashes["windows-x64"], appHash));
     await writeFile(join(staging, "README.txt"), universalReadme);
     for (const path of ["Start.command", "start.sh"]) { await chmod(join(staging, path), 0o755); executable.set(path, true); }
-    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, targets: [...targets], files: [] };
+    if (targets.some(target => manifests[target].runtime !== manifests["linux-x64"].runtime)) throw new Error("Do not mix runtime generations in one stick");
+    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, ...(manifests["linux-x64"].runtime ? {runtime: manifests["linux-x64"].runtime} : {}), targets: [...targets], files: [] };
     for (const path of await staticFiles(staging)) {
       const models = path === lite || path === bundledMax.path;
       manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: executable.get(path) ?? false, ...(models ? { optional: true } : {}) });

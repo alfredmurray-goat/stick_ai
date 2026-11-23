@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'src-tauri/**'
       - 'portable/**'
+      - 'experimental/stellan-runtime/**'
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/package-platform.ts'
@@ -30,7 +31,7 @@ jobs:
       node: darwin-x64
       archive: tar.gz
       app: bundle/macos/Stick AI.app
-      server: bin/llama-server
+      server: stellan-run
       executable: bin/node
   macos-arm64:
     uses: ./.github/workflows/desktop-platform.yml
@@ -41,7 +42,7 @@ jobs:
       node: darwin-arm64
       archive: tar.gz
       app: bundle/macos/Stick AI.app
-      server: bin/llama-server
+      server: stellan-run
       executable: bin/node
   windows-x64:
     uses: ./.github/workflows/desktop-platform.yml
@@ -52,7 +53,7 @@ jobs:
       node: win-x64
       archive: zip
       app: stick-ai.exe
-      server: bin/Release/llama-server.exe
+      server: Release/stellan-run.exe
       executable: node.exe
   linux-x64:
     uses: ./.github/workflows/desktop-platform.yml
@@ -63,7 +64,7 @@ jobs:
       node: linux-x64
       archive: tar.gz
       app: stick-ai
-      server: bin/llama-server
+      server: stellan-run
       executable: bin/node
   # The all-devices stick has one Mac app, so merge the Intel and Apple Silicon executables into a
   # universal binary and ad-hoc sign the bundle again (the stick is unsigned like the platform builds).

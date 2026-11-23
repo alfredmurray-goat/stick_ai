@@ -198,7 +198,8 @@ STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::s
 }
 STELLAN_AVX2 void q4_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     std::size_t first = 0;
-    for (; first + 4 <= input.size(); first += 4) { q4_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); }
+    for (; first + 8 <= input.size(); first += 8) { q4_tile<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q4_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
     switch (input.size() - first) {
         case 3: q4_tile<3>(row, input.subspan(first), output.subspan(first)); break;
         case 2: q4_tile<2>(row, input.subspan(first), output.subspan(first)); break;
@@ -208,7 +209,8 @@ STELLAN_AVX2 void q4_batch(std::span<const std::byte> row, std::span<const std::
 }
 STELLAN_AVX2 void q6_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     std::size_t first = 0;
-    for (; first + 4 <= input.size(); first += 4) { q6_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); }
+    for (; first + 8 <= input.size(); first += 8) { q6_tile<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q6_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
     switch (input.size() - first) {
         case 3: q6_tile<3>(row, input.subspan(first), output.subspan(first)); break;
         case 2: q6_tile<2>(row, input.subspan(first), output.subspan(first)); break;

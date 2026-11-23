@@ -1,0 +1,235 @@
+{
+  "date": "2026-11-23T07:53:09.504Z",
+  "node": "v24.22.1",
+  "platform": "linux",
+  "arch": "x64",
+  "complete": true,
+  "purpose": "Fresh-process isolated NDJSON fragmentation diagnostic",
+  "limitations": [
+    "Synthetic 256 KiB lines; 64-byte fragments stress incremental copying",
+    "No JSON parsing, SDK, model, tool execution or whole-app measurement",
+    "Peak RSS includes Node and allocator behavior; shared host timing can vary"
+  ],
+  "runs": [
+    {
+      "round": 0,
+      "arm": "previous",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 380.13569700000005,
+      "cpuMs": 683.284,
+      "peakRssBytes": 173596672,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 0,
+      "arm": "candidate",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 14.427636999999997,
+      "cpuMs": 24.727,
+      "peakRssBytes": 70664192,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 1,
+      "arm": "candidate",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 8.769503,
+      "cpuMs": 21.523,
+      "peakRssBytes": 71614464,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 1,
+      "arm": "previous",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 686.6096279999999,
+      "cpuMs": 1082.121,
+      "peakRssBytes": 161624064,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 2,
+      "arm": "previous",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 428.153332,
+      "cpuMs": 899.818,
+      "peakRssBytes": 154877952,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 2,
+      "arm": "candidate",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 10.432567999999996,
+      "cpuMs": 24.973,
+      "peakRssBytes": 71614464,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 3,
+      "arm": "candidate",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 8.703544999999998,
+      "cpuMs": 21.67,
+      "peakRssBytes": 70950912,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 3,
+      "arm": "previous",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 433.429753,
+      "cpuMs": 898.702,
+      "peakRssBytes": 159428608,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 4,
+      "arm": "previous",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 372.164629,
+      "cpuMs": 707.645,
+      "peakRssBytes": 159072256,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 4,
+      "arm": "candidate",
+      "fragmentBytes": 64,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 8.164785000000002,
+      "cpuMs": 21.01,
+      "peakRssBytes": 71553024,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 0,
+      "arm": "previous",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 18.279505999999998,
+      "cpuMs": 20.084,
+      "peakRssBytes": 130457600,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 0,
+      "arm": "candidate",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 1.9623139999999992,
+      "cpuMs": 2.904,
+      "peakRssBytes": 63619072,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 1,
+      "arm": "candidate",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 1.9960529999999963,
+      "cpuMs": 2.797,
+      "peakRssBytes": 63746048,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 1,
+      "arm": "previous",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 17.208800999999998,
+      "cpuMs": 18.743,
+      "peakRssBytes": 130465792,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 2,
+      "arm": "previous",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 17.747107999999997,
+      "cpuMs": 21.159,
+      "peakRssBytes": 130457600,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 2,
+      "arm": "candidate",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 5.6532689999999945,
+      "cpuMs": 8.534,
+      "peakRssBytes": 63746048,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 3,
+      "arm": "candidate",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 4.071457000000009,
+      "cpuMs": 5.241,
+      "peakRssBytes": 63741952,
+      "retainedFramingCapacityBytes": 0
+    },
+    {
+      "round": 3,
+      "arm": "previous",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 38.468937999999994,
+      "cpuMs": 42.123,
+      "peakRssBytes": 130330624,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 4,
+      "arm": "previous",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 17.703342,
+      "cpuMs": 20.363,
+      "peakRssBytes": 130195456,
+      "retainedFramingCapacityBytes": 262145
+    },
+    {
+      "round": 4,
+      "arm": "candidate",
+      "fragmentBytes": 4096,
+      "messages": 8,
+      "payloadBytes": 262144,
+      "wallMs": 1.8103750000000005,
+      "cpuMs": 2.708,
+      "peakRssBytes": 63549440,
+      "retainedFramingCapacityBytes": 0
+    }
+  ]
+}

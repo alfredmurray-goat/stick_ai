@@ -61,6 +61,11 @@ export function validateUpdateManifest(value: unknown, target: UpdateTarget): Ma
     required.add(platform.startsWith("macos-") ? "Start.command" : windows ? "Start.bat" : "start.sh");
     required.add(`bin/${platform}/node${windows ? ".exe" : ""}`); required.add(`bin/${platform}/llama-server${windows ? ".exe" : ""}`);
   }
+  if (manifest.runtime !== undefined && manifest.runtime !== "stellan-run") throw new Error("Unknown update runtime");
+  if (manifest.runtime === "stellan-run") {
+    required.add("app/stick-engine.cjs");
+    for (const platform of platforms) required.add(`bin/${platform}/stellan-run${platform === "windows-x64" ? ".exe" : ""}`);
+  }
   for (const path of required) {
     if (!seen.has(path.toLowerCase())) { throw new Error("Incomplete update"); }
   }

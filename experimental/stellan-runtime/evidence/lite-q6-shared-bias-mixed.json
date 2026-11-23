@@ -1,0 +1,1025 @@
+{
+  "format": 1,
+  "date": "2026-11-23T07:58:59.931Z",
+  "complete": true,
+  "purpose": "Rotating-order CPU diagnostic, not production replacement qualification",
+  "baselineIsShippingConfiguration": false,
+  "physicalHardwareValidated": false,
+  "hardware": {
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 9V45 96-Core Processor",
+    "ramBytes": 10451427328
+  },
+  "modelSha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "expectedReferenceCommit": "cd959bae99ff4bed22bef2604f45241c09bbb8c8",
+  "referenceCommitVerified": false,
+  "threads": 2,
+  "context": 8192,
+  "maxTokens": 12,
+  "cache": "recurrent",
+  "repetitions": 3,
+  "arms": [
+    {
+      "name": "llama.cpp",
+      "path": "/tmp/stellan-reference-build/bin/llama-server",
+      "reference": true,
+      "sha256": "fdf5e0de9c2afda22011f5a7090a4a999ab3e0b00fb0f563eb983e5f827ed35d"
+    },
+    {
+      "name": "previous-stellan",
+      "path": "/tmp/stellan-batch32/stellan-runtime",
+      "sha256": "778d116354b67d584289b25c7293aaa7f0fa0e9a2ae6e38cdc71ffe6a5058927"
+    },
+    {
+      "name": "candidate-stellan",
+      "path": "/tmp/stellan-q6-byte/stellan-runtime",
+      "sha256": "216d9b4404d432e65544c6c7f6aa59e01b941dd7e818994a6b57ab513a501491"
+    }
+  ],
+  "prompts": [
+    "<s>[INST] Fix the Python function below so it handles an empty input without raising an error, preserves floating point results, and does not modify the input list. Return only the corrected function.\n\ndef average(values):\n    total = 0.0\n    for value in values:\n        total += value\n    return total / len(values)\n\nFor an empty list return 0.0. Examples: average([]) == 0.0; average([2, 4]) == 3.0. [/INST]",
+    "<s>[INST] Review this small JavaScript module and return a corrected implementation only. Keep the public function name. It must ignore inherited properties, treat an absent quantity as zero, keep fractional prices, and return zero for an empty cart. Do not add network calls or dependencies.\n\nexport function cartTotal(cart) {\n  let result = 0;\n  for (const key in cart) {\n    const item = cart[key];\n    result += parseInt(item.price) * (item.quantity || 1);\n  }\n  return result;\n}\n\nReturn JavaScript code only. [/INST]"
+  ],
+  "warmup": true,
+  "warmups": [
+    {
+      "arm": "llama.cpp",
+      "repeat": 0,
+      "startupMs": 834.1111159999996,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 9,
+        "prompt_ms": 1378.572,
+        "prompt_per_token_ms": 153.17466666666667,
+        "prompt_per_second": 6.528494703214632,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0,
+        "predicted_per_second": 0
+      },
+      "wallMs": 1392.2939909999996,
+      "cpuMs": 2280
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 0,
+      "startupMs": 2297.851021000002,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 788.503,
+        "decode_ms": 0.061873,
+        "generated": 1,
+        "cpu_ms": 1454.14,
+        "peak_rss_bytes": 4448550912
+      },
+      "wallMs": 798.4032110000007,
+      "cpuMs": 1454.14
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 0,
+      "startupMs": 2263.9461770000053,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 783.716,
+        "decode_ms": 0.06672,
+        "generated": 1,
+        "cpu_ms": 1456.41,
+        "peak_rss_bytes": 4448546816
+      },
+      "wallMs": 792.4567049999969,
+      "cpuMs": 1456.41
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 1,
+      "startupMs": 2293.513770999998,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 971.929,
+        "decode_ms": 0.057636,
+        "generated": 1,
+        "cpu_ms": 1810.53,
+        "peak_rss_bytes": 4448432128
+      },
+      "wallMs": 981.3949839999987,
+      "cpuMs": 1810.53
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 1,
+      "startupMs": 2276.884275999997,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 789.895,
+        "decode_ms": 0.063044,
+        "generated": 1,
+        "cpu_ms": 1474.05,
+        "peak_rss_bytes": 4448448512
+      },
+      "wallMs": 799.2650339999964,
+      "cpuMs": 1474.05
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 1,
+      "startupMs": 415.67299099999946,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 9,
+        "prompt_ms": 1394.741,
+        "prompt_per_token_ms": 154.97122222222222,
+        "prompt_per_second": 6.452810951997539,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0,
+        "predicted_per_second": 0
+      },
+      "wallMs": 1397.9105699999927,
+      "cpuMs": 2310
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 2,
+      "startupMs": 2225.379648000002,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 936.751,
+        "decode_ms": 0.056885,
+        "generated": 1,
+        "cpu_ms": 1720.33,
+        "peak_rss_bytes": 4448477184
+      },
+      "wallMs": 945.7685230000061,
+      "cpuMs": 1720.33
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 2,
+      "startupMs": 664.4680850000004,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 9,
+        "prompt_ms": 1350.226,
+        "prompt_per_token_ms": 150.02511111111113,
+        "prompt_per_second": 6.665550804087612,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0,
+        "predicted_per_second": 0
+      },
+      "wallMs": 1353.0477420000243,
+      "cpuMs": 2310
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 2,
+      "startupMs": 2174.418279000005,
+      "tokens": [
+        1183
+      ],
+      "timings": {
+        "event": "finished",
+        "request_id": 1,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 9,
+        "prompt_ms": 754.351,
+        "decode_ms": 0.054242,
+        "generated": 1,
+        "cpu_ms": 1400.8,
+        "peak_rss_bytes": 4448337920
+      },
+      "wallMs": 763.447583000001,
+      "cpuMs": 1400.8
+    }
+  ],
+  "runs": [
+    {
+      "arm": "llama.cpp",
+      "repeat": 0,
+      "prompt": 0,
+      "startupMs": 834.1111159999996,
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 112,
+        "prompt_ms": 5269.009,
+        "prompt_per_token_ms": 47.04472321428572,
+        "prompt_per_second": 21.256369081927932,
+        "predicted_n": 12,
+        "predicted_ms": 1324.386,
+        "predicted_per_token_ms": 120.39872727272727,
+        "predicted_per_second": 8.305735639005547
+      },
+      "wallMs": 6597.477357999999,
+      "cpuMs": 13150,
+      "peakRssBytes": 4763275264
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 0,
+      "prompt": 1,
+      "startupMs": 834.1111159999996,
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 130,
+        "prompt_ms": 6298.46,
+        "prompt_per_token_ms": 48.44969230769231,
+        "prompt_per_second": 20.63996595993306,
+        "predicted_n": 12,
+        "predicted_ms": 1680.255,
+        "predicted_per_token_ms": 152.75045454545455,
+        "predicted_per_second": 6.546625363412101
+      },
+      "wallMs": 7982.866873999999,
+      "cpuMs": 15870,
+      "peakRssBytes": 4767399936
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 0,
+      "prompt": 0,
+      "startupMs": 2297.851021000002,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2091.9,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 9704.87,
+        "decode_ms": 1584.29,
+        "generated": 12,
+        "cpu_ms": 20882.4,
+        "peak_rss_bytes": 4453654528
+      },
+      "wallMs": 11298.574104000003,
+      "cpuMs": 20882.4,
+      "peakRssBytes": 4453654528
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 0,
+      "prompt": 1,
+      "startupMs": 2297.851021000002,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2091.9,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 10435.7,
+        "decode_ms": 1391.41,
+        "generated": 12,
+        "cpu_ms": 22007,
+        "peak_rss_bytes": 4453654528
+      },
+      "wallMs": 11836.798162,
+      "cpuMs": 22007,
+      "peakRssBytes": 4453654528
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 0,
+      "prompt": 0,
+      "startupMs": 2263.9461770000053,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1995.58,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 9471.32,
+        "decode_ms": 1612.44,
+        "generated": 12,
+        "cpu_ms": 20516.9,
+        "peak_rss_bytes": 4453650432
+      },
+      "wallMs": 11093.629709,
+      "cpuMs": 20516.9,
+      "peakRssBytes": 4453650432
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 0,
+      "prompt": 1,
+      "startupMs": 2263.9461770000053,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 1995.58,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 10652.7,
+        "decode_ms": 1603.7,
+        "generated": 12,
+        "cpu_ms": 22815.6,
+        "peak_rss_bytes": 4453650432
+      },
+      "wallMs": 12266.111043000004,
+      "cpuMs": 22815.6,
+      "peakRssBytes": 4453650432
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 1,
+      "prompt": 0,
+      "startupMs": 2293.513770999998,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2065.48,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 10533.9,
+        "decode_ms": 1591.74,
+        "generated": 12,
+        "cpu_ms": 22402.6,
+        "peak_rss_bytes": 4453535744
+      },
+      "wallMs": 12138.614176000003,
+      "cpuMs": 22402.6,
+      "peakRssBytes": 4453535744
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 1,
+      "prompt": 1,
+      "startupMs": 2293.513770999998,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2065.48,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 11219.6,
+        "decode_ms": 1447.62,
+        "generated": 12,
+        "cpu_ms": 23536.2,
+        "peak_rss_bytes": 4453535744
+      },
+      "wallMs": 12678.918152999991,
+      "cpuMs": 23536.2,
+      "peakRssBytes": 4453535744
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 1,
+      "prompt": 0,
+      "startupMs": 2276.884275999997,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2043.44,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 9548.65,
+        "decode_ms": 1692.14,
+        "generated": 12,
+        "cpu_ms": 20882.3,
+        "peak_rss_bytes": 4453552128
+      },
+      "wallMs": 11251.384082999997,
+      "cpuMs": 20882.3,
+      "peakRssBytes": 4453552128
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 1,
+      "prompt": 1,
+      "startupMs": 2276.884275999997,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2043.44,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 11030.3,
+        "decode_ms": 1736.92,
+        "generated": 12,
+        "cpu_ms": 23734.2,
+        "peak_rss_bytes": 4453552128
+      },
+      "wallMs": 12778.378213000004,
+      "cpuMs": 23734.2,
+      "peakRssBytes": 4453552128
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 1,
+      "prompt": 0,
+      "startupMs": 415.67299099999946,
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 112,
+        "prompt_ms": 5395.821,
+        "prompt_per_token_ms": 48.17697321428572,
+        "prompt_per_second": 20.756804200880644,
+        "predicted_n": 12,
+        "predicted_ms": 1438.469,
+        "predicted_per_token_ms": 130.7699090909091,
+        "predicted_per_second": 7.647019157173356
+      },
+      "wallMs": 6838.487884999995,
+      "cpuMs": 13570,
+      "peakRssBytes": 4763291648
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 1,
+      "prompt": 1,
+      "startupMs": 415.67299099999946,
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 130,
+        "prompt_ms": 7425.056,
+        "prompt_per_token_ms": 57.11581538461538,
+        "prompt_per_second": 17.50828545939586,
+        "predicted_n": 12,
+        "predicted_ms": 1413.802,
+        "predicted_per_token_ms": 128.52745454545453,
+        "predicted_per_second": 7.780438845043365
+      },
+      "wallMs": 8844.609713000013,
+      "cpuMs": 17450,
+      "peakRssBytes": 4767440896
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 2,
+      "prompt": 0,
+      "startupMs": 2225.379648000002,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2016.45,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 9332.69,
+        "decode_ms": 1617.74,
+        "generated": 12,
+        "cpu_ms": 20315.2,
+        "peak_rss_bytes": 4453580800
+      },
+      "wallMs": 10959.955346000002,
+      "cpuMs": 20315.2,
+      "peakRssBytes": 4453580800
+    },
+    {
+      "arm": "candidate-stellan",
+      "repeat": 2,
+      "prompt": 1,
+      "startupMs": 2225.379648000002,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2016.45,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 10964.6,
+        "decode_ms": 1437.14,
+        "generated": 12,
+        "cpu_ms": 23065,
+        "peak_rss_bytes": 4453580800
+      },
+      "wallMs": 12411.61652499999,
+      "cpuMs": 23065,
+      "peakRssBytes": 4453580800
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 2,
+      "prompt": 0,
+      "startupMs": 664.4680850000004,
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 112,
+        "prompt_ms": 5618.401,
+        "prompt_per_token_ms": 50.16429464285714,
+        "prompt_per_second": 19.934497377456683,
+        "predicted_n": 12,
+        "predicted_ms": 1371.615,
+        "predicted_per_token_ms": 124.69227272727272,
+        "predicted_per_second": 8.019743149498948
+      },
+      "wallMs": 6993.5577930000145,
+      "cpuMs": 13710,
+      "peakRssBytes": 4763267072
+    },
+    {
+      "arm": "llama.cpp",
+      "repeat": 2,
+      "prompt": 1,
+      "startupMs": 664.4680850000004,
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 130,
+        "prompt_ms": 6391.205,
+        "prompt_per_token_ms": 49.16311538461538,
+        "prompt_per_second": 20.340452230839098,
+        "predicted_n": 12,
+        "predicted_ms": 1586.355,
+        "predicted_per_token_ms": 144.2140909090909,
+        "predicted_per_second": 6.93413517150953
+      },
+      "wallMs": 7982.9596179999935,
+      "cpuMs": 15840,
+      "peakRssBytes": 4767416320
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 2,
+      "prompt": 0,
+      "startupMs": 2174.418279000005,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2007.77,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        1569,
+        5919,
+        29500,
+        6435,
+        2097,
+        781,
+        3055,
+        1281,
+        1227,
+        3837,
+        29515,
+        781
+      ],
+      "text": " def average(values):\n    if not values:\n",
+      "timings": {
+        "event": "finished",
+        "request_id": 2,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 112,
+        "prompt_ms": 9250.44,
+        "decode_ms": 1444.91,
+        "generated": 12,
+        "cpu_ms": 19745.7,
+        "peak_rss_bytes": 4453441536
+      },
+      "wallMs": 10704.437879000005,
+      "cpuMs": 19745.7,
+      "peakRssBytes": 4453441536
+    },
+    {
+      "arm": "previous-stellan",
+      "repeat": 2,
+      "prompt": 1,
+      "startupMs": 2174.418279000005,
+      "startup": {
+        "event": "ready",
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "verify_ms": 2007.77,
+        "state_bytes": 276299776,
+        "state_capacity_bytes": 276299776,
+        "cache_type": "recurrent-f32"
+      },
+      "tokens": [
+        4771,
+        1117,
+        1040,
+        28608,
+        10554,
+        1070,
+        1040,
+        2320,
+        14808,
+        11008,
+        29600,
+        1676
+      ],
+      "text": " Here is the corrected implementation of the `cartTotal` function",
+      "timings": {
+        "event": "finished",
+        "request_id": 3,
+        "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+        "reused_tokens": 0,
+        "evaluated_prompt_tokens": 130,
+        "prompt_ms": 11006.2,
+        "decode_ms": 1595.31,
+        "generated": 12,
+        "cpu_ms": 23284.1,
+        "peak_rss_bytes": 4453441536
+      },
+      "wallMs": 12611.012706999987,
+      "cpuMs": 23284.1,
+      "peakRssBytes": 4453441536
+    }
+  ],
+  "limitations": [
+    "A supplied prompt suite with greedy twelve-token output is not an agent quality test",
+    "Engines run sequentially with rotating order; shared host and warm OS page cache can affect timings",
+    "CPU only, 8192 context, no speculative decoding; differs from the complete shipped app configuration",
+    "Reference startup excludes app verification; native startup includes full integrity checks",
+    "Max is not tested unless its full weights fit the explicit RAM gate; physical devices/GPU/agent tasks still required"
+  ],
+  "referenceArgs": [
+    "--model",
+    "<pinned-model.gguf>",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "34753",
+    "--ctx-size",
+    "8192",
+    "--threads",
+    "2",
+    "--threads-batch",
+    "2",
+    "--gpu-layers",
+    "0",
+    "--no-repack",
+    "--api-key-file",
+    "<private-key-file>",
+    "--parallel",
+    "1",
+    "--batch-size",
+    "512",
+    "--ubatch-size",
+    "256",
+    "--cache-ram",
+    "0",
+    "--ctx-checkpoints",
+    "1",
+    "--no-jinja",
+    "--skip-chat-parsing",
+    "--chat-template",
+    "mistral-v1",
+    "--no-webui",
+    "--no-warmup"
+  ],
+  "identicalGeneratedIds": true
+}

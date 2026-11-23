@@ -1,0 +1,118 @@
+{
+  "purpose": "Isolated RPC-module imports in fresh pinned Node processes, not whole-app memory or latency",
+  "node": "24.22.1",
+  "repetitions": 5,
+  "arms": [
+    {
+      "name": "previous",
+      "path": "/tmp/mcp-import-previous.mjs",
+      "bytes": 115293
+    },
+    {
+      "name": "original-core",
+      "path": "/tmp/mcp-import-original-core.mjs",
+      "bytes": 5204
+    }
+  ],
+  "runs": [
+    {
+      "repeat": 0,
+      "arm": "previous",
+      "importMs": 13.675660999999998,
+      "cpuMs": 17.123,
+      "rssBytes": 63692800,
+      "heapUsedBytes": 11769136
+    },
+    {
+      "repeat": 0,
+      "arm": "original-core",
+      "importMs": 0.4717880000000001,
+      "cpuMs": 0.592,
+      "rssBytes": 58568704,
+      "heapUsedBytes": 8005120
+    },
+    {
+      "repeat": 1,
+      "arm": "original-core",
+      "importMs": 0.583165000000001,
+      "cpuMs": 0.659,
+      "rssBytes": 58372096,
+      "heapUsedBytes": 8006816
+    },
+    {
+      "repeat": 1,
+      "arm": "previous",
+      "importMs": 15.660908,
+      "cpuMs": 20.034,
+      "rssBytes": 63627264,
+      "heapUsedBytes": 11745096
+    },
+    {
+      "repeat": 2,
+      "arm": "previous",
+      "importMs": 13.534679999999998,
+      "cpuMs": 18.089,
+      "rssBytes": 63750144,
+      "heapUsedBytes": 11751320
+    },
+    {
+      "repeat": 2,
+      "arm": "original-core",
+      "importMs": 0.5004509999999982,
+      "cpuMs": 0.587,
+      "rssBytes": 58241024,
+      "heapUsedBytes": 8007840
+    },
+    {
+      "repeat": 3,
+      "arm": "original-core",
+      "importMs": 0.4941209999999998,
+      "cpuMs": 0.595,
+      "rssBytes": 58241024,
+      "heapUsedBytes": 8071128
+    },
+    {
+      "repeat": 3,
+      "arm": "previous",
+      "importMs": 14.081009000000002,
+      "cpuMs": 17.954,
+      "rssBytes": 63696896,
+      "heapUsedBytes": 11777960
+    },
+    {
+      "repeat": 4,
+      "arm": "previous",
+      "importMs": 27.91314,
+      "cpuMs": 32.809,
+      "rssBytes": 63631360,
+      "heapUsedBytes": 11740544
+    },
+    {
+      "repeat": 4,
+      "arm": "original-core",
+      "importMs": 0.5122280000000003,
+      "cpuMs": 0.652,
+      "rssBytes": 58241024,
+      "heapUsedBytes": 7995720
+    }
+  ],
+  "limitations": [
+    "SDK transports and tool-result schemas still load in the complete application",
+    "Shared virtual host; alternating order; warm file cache; no forced GC",
+    "Do not extrapolate module-level retained heap/RSS to the entire app or model"
+  ],
+  "summary": {
+    "previous": {
+      "importMs": 14.081009000000002,
+      "cpuMs": 18.089,
+      "rssBytes": 63692800,
+      "heapUsedBytes": 11751320
+    },
+    "original-core": {
+      "importMs": 0.5004509999999982,
+      "cpuMs": 0.595,
+      "rssBytes": 58241024,
+      "heapUsedBytes": 8006816
+    }
+  }
+}
