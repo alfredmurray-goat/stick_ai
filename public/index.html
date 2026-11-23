@@ -26,7 +26,7 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="bar">
     <a class="mark" href="#top" aria-label="stick_ai home">
-      <picture><source srcset="/img/brand/icon-light.png" media="(prefers-color-scheme: light)"><img src="/img/brand/icon-dark.png" alt="" width="34" height="35"></picture>
+      <img class="mode-logo-dark" src="/img/brand/icon-dark.png" alt="" width="34" height="35"><img class="mode-logo-light" src="/img/brand/icon-light.png" alt="" width="34" height="35">
       <span>stick_ai</span>
     </a>
     <nav aria-label="Main">
@@ -38,7 +38,7 @@
       <a href="#faq"><span class="tech-only">./faq</span><span class="plain-only">Questions</span></a>
     </nav>
     <span class="status"><i aria-hidden="true"></i>not on sale yet</span>
-    <label class="mode" title="Explains everything in everyday words"><input type="checkbox" id="plain" role="switch"><span>non-tech mode</span></label>
+    <label class="mode" title="Non-tech mode uses a light theme; technical mode uses a dark theme"><input type="checkbox" id="plain" role="switch"><span>non-tech mode</span></label>
   </header>
 
   <main id="main">
@@ -113,10 +113,10 @@
       <h2 id="features-title">Small stick, <em>grown-up tools.</em></h2>
       <div class="feature-grid">
         <article><span class="feature-tag">thinking</span><h3>Watch it think.</h3><p class="tech-only">Stellan's reasoning and every file it reads stream into the chat as it works, then fold into one tidy line: <i>Thought for 12 s · 2 steps</i>.</p><p class="plain-only">You can see what it's thinking and which files it's looking at while it works, so it never feels like a black box.</p></article>
-        <article><span class="feature-tag">memory</span><h3>Rests when you do.</h3><p>After 10 quiet minutes it gives your computer its memory back. Your next message wakes it in seconds, conversation intact.</p></article>
+        <article><span class="feature-tag">memory</span><h3>Rests when you do.</h3><p>After 10 quiet minutes it gives your computer its memory back. Your next message reloads the model and continues the conversation.</p></article>
         <article><span class="feature-tag">hooks</span><h3><span class="tech-only">Hooks, like Claude Code.</span><span class="plain-only">It can tell you when it’s done.</span></h3><p class="tech-only">Run your own command, or tell another app, when Stellan finishes or needs you. A hook can stop a step. It can never approve one.</p><p class="plain-only">It can let another app (or your phone) know when it has finished or needs your answer, so you don't have to sit and watch.</p></article>
         <article><span class="feature-tag">github</span><h3>Works with your GitHub.</h3><p class="tech-only">Connect the app to your GitHub account with a short code, no tokens to set up. Stellan works on the repositories you pick and opens a pull request for you to review.</p><p class="plain-only">If your code is kept on GitHub (where most developers store their projects), it can work on it there too, and hands its changes back for you to check before anything is final.</p></article>
-        <article><span class="feature-tag">speed</span><h3>Answers start sooner.</h3><p>Stellan reads its instructions while you're still typing, so your first reply begins about twice as fast, even on an ordinary laptop.</p></article>
+        <article><span class="feature-tag">memory</span><h3>More room when you need it.</h3><p>Keep memory use modest by default. Turn on a longer conversation window in the sidebar for larger tasks, and keep private notes for each chat.</p></article>
         <article><span class="feature-tag">web</span><h3>Web search, if you say so.</h3><p class="tech-only">It can look up docs and error messages with Actuent. It asks first every time, and only the search words leave. Your code never does.</p><p class="plain-only">If it needs to look something up online, it asks you first, every time. Only the search words go out; your files never do. You can switch the internet off completely.</p></article>
       </div>
     </section>
@@ -125,20 +125,24 @@
       <div class="stack-intro">
         <p class="kicker"><span class="tech-only">// built by Locali Labs</span><span class="plain-only">Made by the people behind the stick</span></p>
         <h2 id="runtime-title">Our software.<br><em>Your computer.</em></h2>
-        <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. Now we're building Stellan-Run: an independent, MIT-licensed inference engine designed around our models and local-first app.</p>
-        <p class="lede narrow plain-only">We build the software that helps Stellan plan, ask your permission and work on your files. And we're building its own engine, so we can keep improving how it runs on your computer.</p>
+        <p class="lede narrow tech-only">We write the agent system, approval flow and context controls ourselves. Our next app release runs Stellan-Run: our independent, MIT-licensed C++ model engine. Own kernels, own model loading, own context controls.</p>
+        <p class="lede narrow plain-only">We build the software that helps Stellan plan, ask your permission and work on your files. Its next release uses our own engine, Stellan-Run, so we can improve the way it runs on your computer.</p>
       </div>
       <div class="stack-grid">
         <article><span class="stack-state">Original software</span><h3>The agent, built by us.</h3><p>Our own planning, tool approvals and project workflow. You choose the project and review changes before they happen.</p></article>
-        <article><span class="stack-state">In development</span><h3>Stellan-Run.</h3><p class="tech-only">Our C++ engine has its own model executor, CPU kernels and cache. The experimental runtime is independent of llama.cpp and ggml.</p><p class="plain-only">The engine is the part that runs the AI. We're making our own, with quicker replies and lower memory use as the goals.</p></article>
-        <article><span class="stack-state">Built in the open</span><h3>Show the work.</h3><p>Code, tests and measured results. Foundation models and third-party tools keep their credits. We publish what works and what still needs improving.</p></article>
+        <article><span class="stack-state">New app runtime</span><h3>Stellan-Run.</h3><p class="tech-only">Our C++ model executor, CPU kernels and lazy cache. Independent of llama.cpp and ggml. Verified split models, with a streaming adapter inside the existing app process.</p><p class="plain-only">Our own engine runs the AI on your computer. It reads the models directly and keeps temporary memory bounded.</p></article>
+        <article><span class="stack-state">Native prototype</span><h3>A smaller service host.</h3><p class="tech-only">Direct C++ inference, private pipes and idle unloading. Files, approvals and other app services are still being migrated.</p><p class="plain-only">We're moving background work into a smaller native program, one part at a time. The first inference service is working.</p></article>
+        <article><span class="stack-state">Original client</span><h3>Our tool connections.</h3><p class="tech-only">Our bounded MCP wire layer, initialization, stdio framing and cancellation. SDK HTTP/SSE transports and result schemas remain during the migration.</p><p class="plain-only">Our own connection layer handles tool messages, limits waiting work and clears large buffers when they're finished.</p></article>
+        <article><span class="stack-state">Private by design</span><h3>Memory that stays here.</h3><p>Our context controls and per-chat notes keep useful information close. Choose a larger window when the task needs it; your notes stay local.</p></article>
+        <article><span class="stack-state">Built in the open</span><h3>Show the work.</h3><p>Code, tests and measured results. Foundation models and third-party tools keep their credits. We publish useful gains and rejected experiments.</p></article>
       </div>
-      <p class="stack-note"><b>What's ready today?</b> The app currently runs with llama.cpp. Stellan-Run is experimental and has not yet beaten it overall. Our native backend is the next development step. <a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">See the code and evidence</a>.</p>
+      <p class="stack-note"><b>The release transition.</b> Stellan-Run is selected for the next desktop release while platform builds and real tool checks run. It currently uses the CPU; it has not beaten llama.cpp overall. The native host and MCP client continue on separate branches. <a href="https://github.com/alfredmurray-goat/stick_ai/pull/70">See the code and evidence</a>.</p>
     </section>
 
     <section class="bench" id="bench" aria-labelledby="bench-title">
       <p class="kicker">// benchmarks</p>
       <h2 id="bench-title">80.5% on HumanEval pass@1. <em>On your own computer.</em></h2>
+      <p class="bench-method">These model scores were measured with the earlier llama.cpp harness. Full HumanEval results have not yet been measured on Stellan-Run.</p>
       <p class="lede narrow plain-only"><b>In plain words:</b> we tested the two AIs on the stick with 164 short Python programming puzzles. Lite solved 120 (73.2% pass@1); Max solved 132 (80.5% pass@1). These tests measure small coding tasks, not the ability to finish a whole project.</p>
       <p class="lede narrow tech-only">Full HumanEval runs, one attempt per problem: Stellan-1 Lite scored 120/164 (73.2% pass@1) on CPU; Stellan-1 Max scored 132/164 (80.5% pass@1) with GPU offload on Kaggle. Our results are pass@1. Historical scores use different prompts and setups; their metrics are labeled separately. A repository-level SWE-bench evaluation is next.</p>
       <p class="lede narrow">Selected historical comparisons below Max’s 80.5%, not a complete ranking. Models with higher scores are omitted. Each row shows its reported metric; results with an unspecified pass@k are not directly comparable to pass@1.</p>
@@ -193,7 +197,7 @@
       <div class="numbers">
         <div><b>73.2%</b><span>Lite’s HumanEval pass@1: 120 of all 164 problems</span></div>
         <div><b>80.5%</b><span>Max’s completed HumanEval pass@1 score: 132 of 164 problems</span></div>
-        <div><b>~5 s</b><span>for a follow-up step, down from ~95 s, because it remembers the conversation</span></div>
+        <div><b>CPU</b><span>Stellan-Run uses your processor. GPU offload is not part of this release.</span></div>
         <div><b>4.1 GB</b><span>Lite's whole model. Runs on an ordinary computer with 8 GB of memory</span></div>
       </div>
       <details class="fine">
