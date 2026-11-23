@@ -86,7 +86,21 @@ export class McpServers {
  /** The built-in server connects on first use; others must be connected in settings. */
  private async ready(id:string,signal:AbortSignal){this.get(id);const c=this.connections.get(id);if(id===actuent.id&&this.webSearch&&(!c?.rpc.ready||c.rpc.closed))await this.connect(id,signal);return this.connected(id);}
  private connected(id:string){const c=this.connections.get(id);if(!c?.rpc.ready||c.rpc.closed)throw new McpError('Connect this MCP server in settings first.');return c;}
- private async refresh(id:string,signal:AbortSignal){const c=this.connected(id),tools:Tool[]=[];let cursor:string|undefined;const seen=new Set<string>();do{const page=ListToolsResultSchema.parse(await c.rpc.request('tools/list',cursor?{cursor}:{},signal));for(const tool of page.tools){if(seen.has(tool.name)||tool.name.length>128||tools.length>=1000)throw new McpError('Invalid or excessive MCP tool catalog.');seen.add(tool.name);tools.push(tool);}if(page.nextCursor===cursor&&cursor)throw new McpError('MCP tool pagination did not advance.');cursor=page.nextCursor;}while(cursor);c.tools=tools;c.stale=false;}
+ private async refresh(id:string,signal:AbortSignal){
+  const c=this.connected(id),tools:Tool[]=[],seen=new Set<string>(),cursors=new Set<string>();let cursor:string|undefined,pages=0,bytes=0;
+  do{
+   if(++pages>1000)throw new McpError('MCP tool catalog exceeds 1,000 pages.');
+   const page=ListToolsResultSchema.parse(await c.rpc.request('tools/list',cursor?{cursor}:{},signal));
+   for(const tool of page.tools){
+    if(seen.has(tool.name)||tool.name.length>128||tools.length>=1000)throw new McpError('Invalid or excessive MCP tool catalog.');
+    bytes+=Buffer.byteLength(JSON.stringify(tool));if(bytes>4*1024**2)throw new McpError('MCP tool catalog exceeds 4 MiB.');
+    seen.add(tool.name);tools.push(tool);
+   }
+   if(page.nextCursor){bytes+=Buffer.byteLength(page.nextCursor);if(bytes>4*1024**2)throw new McpError('MCP tool catalog exceeds 4 MiB.');if(cursors.has(page.nextCursor))throw new McpError('MCP tool pagination did not advance.');cursors.add(page.nextCursor);}
+   cursor=page.nextCursor;
+  }while(cursor);
+  c.tools=tools;c.stale=false;
+ }
  catalog(){return this.view().filter(c=>c.status==='connected'||c.id===actuent.id).map(c=>({id:c.id,name:c.name,tools:c.tools}));}
  async tools(id:string,query:string,signal:AbortSignal){const c=await this.ready(id,signal);if(c.stale)await this.refresh(id,signal);return this.redact(id,JSON.stringify(c.tools.filter(t=>!query||t.name.toLowerCase().includes(query.toLowerCase())||(t.description??'').toLowerCase().includes(query.toLowerCase())).slice(0,60).map(t=>({name:t.name,description:t.description??'',inputSchema:t.inputSchema}))).slice(0,30000));}
  async call(id:string,name:string,args:unknown,signal:AbortSignal,approve:(label:string,data:unknown,signal:AbortSignal)=>Promise<boolean>){
