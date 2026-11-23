@@ -13,6 +13,8 @@ void interrupt(int) { cancelled.store(true, std::memory_order_relaxed); }
 int entry(int argc, char **argv) {
     std::signal(SIGINT, interrupt); std::signal(SIGTERM, interrupt);
     try {
+        // A disconnected owner must not leave inference running with nowhere to send it.
+        std::cout.exceptions(std::ios::badbit | std::ios::failbit);
         if (argc < 5 || argc > 10) throw std::runtime_error("Usage: stellan-host MODEL SHA256 THREADS CONTEXT [--token-ids] [--force-max] [--split PATH SHA256]");
         bool text = true, force = false;
         std::vector<std::string> split;
