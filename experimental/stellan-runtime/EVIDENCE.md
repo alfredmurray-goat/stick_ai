@@ -135,3 +135,42 @@ The original `bench-sessions.mjs` is a historical grouped-order probe. Prefer th
 ## Prefill view reuse follow-up
 
 Immutable quantized activation views are now built once per batch rather than rebuilt for every output row, and each worker reuses its small result buffer. Five more rotating-order rounds retained all 30 matched token streams. [Raw receipt](evidence/lite-prefill-view-hoist.json): previous/candidate median prompt 2,270.00/2,249.43 ms, request CPU 6,887.41/6,734.97 ms. The sub-1% prompt difference is small relative to shared-host noise; this is removal of repeated setup, not proof of a broad speedup. llama.cpp still leads. No arithmetic, precision, context or production-engine choice changes.
+
+## Bounded 32-token prefill and eight-vector tiles
+
+Lite now uses a bounded 32-token microbatch and Q4_K/Q6_K kernels that share weight decoding across eight activation vectors, retaining smaller tails. The shared batch limit and scratch arrays are bounded; context and weight/activation precision are unchanged. No expanded copy of the model is retained. Independent Q4/Q6 fixtures cover batch sizes through 32, and the causal Mamba2 reference covers 15/16/17/31/32/33/63/64/65 tokens.
+
+Two receipts retain all runs and executable hashes: [five short-prompt rounds](evidence/lite-batch32-short.json), and [three longer-prompt rounds with matched warmup](evidence/lite-batch32-warm-long.json). All 48 twelve-token responses match their comparison token IDs. The warmup is an identical one-token request per engine session, retained separately; it reduces the confound where native full-file hashing has already touched its mapping while the reference can fault pages on its first request. Neither probe is an agent-quality or pass@1 benchmark.
+
+The longer public Python/JavaScript prompts are supplied in [the prompt file](bench/prompts-prefill.json). Warm inference medians:
+
+| Engine | Prompt time | Request CPU time | Peak process RSS |
+| --- | ---: | ---: | ---: |
+| Pinned llama.cpp | 5,903.86 ms | 14,470.00 ms | 4,765,360,128 bytes |
+| Previous Stellan-Run | 12,517.85 ms | 26,250.90 ms | 4,450,557,952 bytes |
+| New Stellan-Run | 10,041.70 ms | 21,276.80 ms | 4,453,498,880 bytes |
+
+Against our previous runtime, this is about **19.8% less prompt time and 18.9% less request CPU time**, with about **2.8 MiB** more bounded working scratch in the measured peak. The short probe reduced request CPU by about 10% with about 1.3 MiB extra RSS, but its unmatched startup warming prevents treating the short prompt-time advantage over the reference as a general win. Decode arithmetic is unchanged; decode timing differences can reflect state warmth/noise.
+
+llama.cpp remains substantially faster and uses less CPU on the longer prompts. Its checkpoint/features differ, so the RSS difference is not feature-parity qualification. Shared virtual hardware, a small public suite, CPU-only execution, unmatched startup verification and no full Max-weight execution still prevent production replacement qualification. Keep normal context budgets low; these gains do not justify silently increasing the context window or claiming global superiority.
+
+The comparison script accepts an optional prompt JSON file after the previous native binary (`-` omits that binary). Set `STELLAN_BENCH_WARMUP=1` for a recorded identical warmup; the default historical short probe remains available. Reports save warmup costs separately and retain partial results on interruption.
+
+
+## Packed Q6 prefill follow-up
+
+The tested batched Q6 candidate shifts quantized activations into unsigned bytes and shares the corresponding weighted bias across the activation tile. Weights remain signed -32..31; the largest paired product magnitude is 2*255*32=16,320, within int16. Accumulation and the bias correction use int32 before the original floating-point scales. This preserves quantization and handles even an explicit activation value of -128. No expanded weight copy or larger context is used. Independent two-block fixtures cover extreme weights, signed scales, activations -128/-127/127 and batch/tail sizes through 32, including the scalar fallback.
+
+Two earlier layouts remain recorded. The [per-activation correction variant](evidence/lite-q6-input-correction-rejected.json) matched all 18 generated streams but increased median prompt time 9,828.27 → 10,248.08 ms and CPU 20,895.20 → 21,940.20 ms. It was rejected. The [shared-bias prefill-and-decode variant](evidence/lite-q6-shared-bias-mixed.json) reduced prompt time 10,484.80 → 10,100.68 ms, but decode rose 1,515.96 → 1,615.09 ms. It was also rejected as a combined change.
+
+The final trial confined this packed calculation to batched prefill and restored the single-token quantized-dot function exactly from the previous checkpoint. Its results are below. None of these small CPU diagnostics is a model-quality, pass@1, GPU or complete-Max benchmark.
+
+[Final prefill-only trial](evidence/lite-q6-prefill-only-rejected.json), three rotating-order rounds with matched warmup:
+
+| Engine | Median prompt time | Median decode time | Median request CPU | Median peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Pinned llama.cpp | 6,149.41 ms | 1,377.04 ms | 15,005.00 ms | 4,765,329,408 bytes |
+| Previous Stellan-Run | 10,143.81 ms | 1,553.11 ms | 21,676.15 ms | 4,453,550,080 bytes |
+| Prefill-only candidate | 10,054.86 ms | 1,512.82 ms | 21,658.75 ms | 4,453,580,800 bytes |
+
+The 0.88% prompt difference and 0.08% CPU difference are small relative to shared-host noise; peak RSS is essentially unchanged. Even the byte-identical decode function differed by about 2.6% in timing, illustrating that noise. The packed Q6 change is **not retained**: all prototype kernels are restored to the previous checkpoint. Keep the stronger independent extreme-value fixtures and all three receipts instead of claiming a speedup. All 54 twelve-token responses across these trials matched comparison IDs. llama.cpp still leads; these results do not qualify a production replacement.

@@ -205,13 +205,13 @@ class ExecutionTests(unittest.TestCase):
                     self.assertEqual(metrics['reused_tokens'], 2 + max(0, len(first) - 1) if index == 2 else 0)
 
     def test_batched_prefill_preserves_logits_across_chunk_boundaries(self):
-        for size in (15, 16, 17, 33):
+        for size in (15, 16, 17, 31, 32, 33, 63, 64, 65):
             fixture = Fixture("mamba2")
             data = fixture.bytes(); self.file.write_bytes(data)
             tokens = [1] + [68 + i % 8 for i in range(size - 1)]
             for token in tokens: logits = fixture.step(token)
             digest = hashlib.sha256(data).hexdigest()
-            result = subprocess.run([EXECUTABLE, "decode", str(self.file), digest, ','.join(map(str, tokens)), "1", "2", "64"], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+            result = subprocess.run([EXECUTABLE, "decode", str(self.file), digest, ','.join(map(str, tokens)), "1", "2", "128"], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
             event = next(json.loads(line) for line in result.stdout.splitlines() if json.loads(line)['event'] == 'token')
             self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
             for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)

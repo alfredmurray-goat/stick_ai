@@ -49,12 +49,22 @@ float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::spa
     return sum;
 }
 void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
-    if ((type != 12 && type != 14) || input.empty() || input.size() > 16 || input.size() != output.size() || input.front().empty() ||
+    if ((type != 12 && type != 14) || input.empty() || input.size() > prefill_batch_limit || input.size() != output.size() || input.front().empty() ||
         !std::all_of(input.begin(), input.end(), [&](const auto values) { return values.size() == input.front().size(); }) || row.size() != row_bytes(type, input.front().size() * 256)) {
         throw std::runtime_error("Invalid batched quantized matrix row");
     }
     if (accelerated_quantized_batch_dot(type, row, input, output)) { return; }
-    for (std::size_t t = 0; t < input.size(); ++t) { output[t] = quantized_dot(type, row, input[t]); }
+    std::fill(output.begin(), output.end(), 0.0f);
+    const auto stride = type == 12 ? 144U : 210U;
+    std::array<float, 256> expanded;
+    for (std::size_t b = 0; b < input.front().size(); ++b) {
+        decode_row(type, row.subspan(b * stride, stride), expanded);
+        for (std::size_t t = 0; t < input.size(); ++t) {
+            float partial = 0;
+            for (std::size_t i = 0; i < 256; ++i) partial += expanded[i] * input[t][b].values[i];
+            output[t] += partial * input[t][b].scale;
+        }
+    }
 }
 
 }

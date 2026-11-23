@@ -243,12 +243,12 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
 void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled) {
     const auto columns = static_cast<std::size_t>(matrix->dimensions[0]);
     const auto rows = static_cast<std::size_t>(matrix->dimensions[1]);
-    if (batch == 0 || batch > 16 || input.size() != batch * columns || output.size() != batch * rows) { throw std::runtime_error("Invalid prefill matrix dimensions"); }
+    if (batch == 0 || batch > prefill_batch_limit || input.size() != batch * columns || output.size() != batch * rows) { throw std::runtime_error("Invalid prefill matrix dimensions"); }
     const auto data = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, columns);
     const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
     std::vector<std::vector<QuantizedInput>> quantized(batch);
-    std::array<std::span<const QuantizedInput>, 16> views;
+    std::array<std::span<const QuantizedInput>, prefill_batch_limit> views;
     if (fast) {
         for (std::size_t t = 0; t < batch; ++t) {
             quantized[t] = quantize_input(input.subspan(t * columns, columns));
@@ -256,7 +256,7 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
         }
     }
     executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
-        std::array<float, 16> values;
+        std::array<float, prefill_batch_limit> values;
         for (auto row = first; row < last; ++row) {
             if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
             const auto weights = data.subspan(row * stride, stride);
@@ -276,8 +276,8 @@ const std::vector<float> &Lite::prefill(std::span<const std::int32_t> tokens, co
         if (token < 0 || static_cast<std::size_t>(token) >= logits_.size()) { throw std::runtime_error("Invalid input token"); }
     }
     const auto stride = row_bytes(embedding_->type, width_);
-    for (std::size_t offset = 0; offset < tokens.size(); offset += 16) {
-        const auto batch = std::min<std::size_t>(16, tokens.size() - offset);
+    for (std::size_t offset = 0; offset < tokens.size(); offset += prefill_batch_limit) {
+        const auto batch = std::min<std::size_t>(prefill_batch_limit, tokens.size() - offset);
         batch_hidden_.resize(batch * width_); batch_normalized_.resize(batch * width_);
         batch_projected_.resize(batch * projection_.size()); batch_mixed_.resize(batch * inner_); batch_update_.resize(batch * width_);
         for (std::size_t t = 0; t < batch; ++t) {

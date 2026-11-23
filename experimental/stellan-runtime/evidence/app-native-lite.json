@@ -1,0 +1,11 @@
+{
+  "complete": true,
+  "runtime": "Stellan-Run",
+  "compute": "CPU",
+  "greeting": " <done>Ready</done>",
+  "outcome": "finished",
+  "read": true,
+  "summary": "   The contents of the file \"note.txt\" are: \"Violet otter 9aead7\".",
+  "verified": true,
+  "scope": "Managed app bridge and real Lite read-only tool exchange; not a benchmark or full-Max/GPU qualification"
+}

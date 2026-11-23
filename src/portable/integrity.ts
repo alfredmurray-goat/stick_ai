@@ -8,7 +8,7 @@ import { UserError, llamaRelease, nodeRelease, targets, type Target } from "./pl
 
 /** `locked`: an encrypted model split; its size is checked here and its decrypted sha256 when it's unlocked. */
 export interface FileRecord { path: string; sha256: string; size: number; executable: boolean; optional?: boolean; locked?: boolean }
-export interface Manifest { format: 1; llamaRelease: string; nodeRelease: string; targets?: Target[]; files: FileRecord[] }
+export interface Manifest { format: 1; llamaRelease: string; nodeRelease: string; runtime?: "stellan-run"; targets?: Target[]; files: FileRecord[] }
 export async function hashFile(path: string, signal?: AbortSignal): Promise<{ sha256: string; size: number }> {
   const hash = createHash("sha256"); let size = 0;
   for await (const chunk of createReadStream(path, signal ? { signal } : {})) { size += chunk.length; hash.update(chunk); }
@@ -78,6 +78,10 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
     for (const path of await staticFiles(root)) { if (!expected.has(path)) { issues.push(`Unlisted or missing file: ${path}`); } }
     for (const path of [...launchers, "README.txt", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf", ...selected.flatMap((target) => [`bin/${target}/node${target === "windows-x64" ? ".exe" : ""}`, `bin/${target}/llama-server${target === "windows-x64" ? ".exe" : ""}`])]) {
       if (!expected.has(path)) { issues.push(`Unlisted or missing file: ${path}`); }
+    }
+    if (manifest.runtime !== undefined && manifest.runtime !== "stellan-run") issues.push("Unknown runtime");
+    if (manifest.runtime === "stellan-run") {
+      for (const path of ["app/stick-engine.cjs", ...selected.map(target => `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`)]) if (!expected.has(path)) issues.push(`Missing Stellan-Run file: ${path}`);
     }
     if (issues.length) { const error = new UserError("damaged"); error.message = `damaged: ${issues.join("; ")}`; throw error; }
     if (remember && JSON.stringify(nowVerified) !== JSON.stringify(verified)) {

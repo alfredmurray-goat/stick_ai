@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 
@@ -55,8 +57,19 @@ std::vector<std::int32_t> ids(std::string_view csv, std::size_t vocabulary, std:
 }
 
 int session(int argc, char **argv, const std::function<bool()> &cancelled) {
-    const bool force = argc == 7 && std::string_view(argv[6]) == "--force-max";
-    if (argc != 6 && !force) { throw std::runtime_error("Usage: serve MODEL SHA256 THREADS CONTEXT [--force-max]"); }
+    if (argc < 6) { throw std::runtime_error("Usage: serve MODEL SHA256 THREADS CONTEXT [--force-max] [--split PATH SHA256]"); }
+    bool force = false;
+    std::filesystem::path split_path;
+    std::string split_hash;
+    for (int i = 6; i < argc; ++i) {
+        const std::string_view option(argv[i]);
+        if (option == "--force-max" && !force) force = true;
+        else if (option == "--split" && split_path.empty() && i + 2 < argc) {
+            split_path = std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[++i])));
+            split_hash = argv[++i];
+            if (split_hash.size() != 64 || !std::all_of(split_hash.begin(), split_hash.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); })) throw std::runtime_error("Invalid split SHA256");
+        } else throw std::runtime_error("Unknown session option");
+    }
     const auto threads = number(argv[4], 64);
     const auto context = number(argv[5], 262144);
     const auto path = std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[2])));
@@ -67,18 +80,27 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     const auto initial_size = std::filesystem::file_size(path);
     const auto initial_time = std::filesystem::last_write_time(path);
     const Mapping mapping(path);
-    if (mapping.bytes().size() > 8ULL * 1024 * 1024 * 1024 && ram_bytes() < 16ULL * 1024 * 1024 * 1024 && !force) {
+    std::optional<Mapping> split_mapping;
+    std::uintmax_t split_size = 0;
+    std::filesystem::file_time_type split_time;
+    if (!split_path.empty()) { split_size = std::filesystem::file_size(split_path); split_time = std::filesystem::last_write_time(split_path); split_mapping.emplace(split_path); }
+    if (mapping.bytes().size() + split_size > 8ULL * 1024 * 1024 * 1024 && ram_bytes() < 16ULL * 1024 * 1024 * 1024 && !force) {
         throw std::runtime_error("Stellan-1 Max needs 16 GB RAM or more; explicit --force-max is required");
     }
     if (force) { std::cerr << "Max may be very slow or crash on this computer\n"; }
     const auto verify_start = Clock::now();
     if (sha256(mapping.bytes()) != expected) { throw std::runtime_error("Model hash mismatch; refusing session"); }
+    if (split_mapping && sha256(split_mapping->bytes()) != split_hash) throw std::runtime_error("Split hash mismatch; refusing session");
     const auto verify_ms = elapsed(verify_start);
     if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time) {
         throw std::runtime_error("Model changed during verification");
     }
-    const Model model(mapping.bytes());
-    const Tokenizer tokenizer(model);
+    Model model(mapping.bytes());
+    if (split_mapping) { const Model continuation(split_mapping->bytes(), true); model.attach(continuation); }
+    else if (model.has("split.count") && model.number("split.count") > 1) throw std::runtime_error("Supply the verified continuation split");
+    const auto boundary = model.number("tokenizer.ggml.eos_token_id");
+    if (boundary < 0 || boundary >= static_cast<double>(model.vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
+    const auto eos = static_cast<std::int32_t>(boundary);
     std::unique_ptr<Decoder> engine;
     if (model.architecture() == "mamba2") { engine = std::make_unique<Lite>(model, threads); }
     else if (model.architecture() == "llama") { engine = std::make_unique<Max>(model, threads, context); }
@@ -91,7 +113,8 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
     while (!cancelled() && read_line(line)) {
         unsigned request = 0;
         try {
-            if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time) {
+            if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time ||
+                (split_mapping && (std::filesystem::file_size(split_path) != split_size || std::filesystem::last_write_time(split_path) != split_time))) {
                 throw std::runtime_error("Model changed; restart and verify the session");
             }
             const auto first = line.find(' ');
@@ -120,7 +143,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled) {
                 const auto token = static_cast<std::int32_t>(std::max_element(logits->begin(), logits->end()) - logits->begin());
                 ++generated;
                 std::cout << "{\"event\":\"token\",\"request_id\":" << request << ",\"id\":" << token << "}\n" << std::flush;
-                if (token == tokenizer.eos() || generated == limit) { break; }
+                if (token == eos || generated == limit) { break; }
                 logits = &engine->step(token, cancelled);
                 processed.push_back(token);
             }
