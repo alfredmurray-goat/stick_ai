@@ -147,3 +147,5 @@ node experimental/stellan-runtime/bench-paired.mjs \
 ```
 
 The previous native binary is optional. Each engine runs alone with rotating order, two CPU threads, 8,192 context and twelve greedy tokens over two prompts; independent prompts use no prefix reuse. Max compares explicitly selected Q8 caches and is refused below 24 GiB reported RAM. The script records hashes, partial results, CPU/RSS where available, exact output and timings. Source-commit provenance must still be verified separately. It neither downloads weights nor rents hardware, and a larger physical-device/agent test suite remains necessary.
+
+Prefill now constructs immutable activation views once per batch and reuses each worker's result buffer instead of rebuilding them per matrix row. [Five further rotating-order rounds](evidence/lite-prefill-view-hoist.json) preserved all token IDs; the measured prompt difference was under 1%, so it is not a general speed claim.

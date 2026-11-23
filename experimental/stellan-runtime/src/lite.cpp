@@ -248,17 +248,19 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
     const auto stride = row_bytes(matrix->type, columns);
     const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
     std::vector<std::vector<QuantizedInput>> quantized(batch);
+    std::array<std::span<const QuantizedInput>, 16> views;
     if (fast) {
-        for (std::size_t t = 0; t < batch; ++t) { quantized[t] = quantize_input(input.subspan(t * columns, columns)); }
+        for (std::size_t t = 0; t < batch; ++t) {
+            quantized[t] = quantize_input(input.subspan(t * columns, columns));
+            views[t] = quantized[t];
+        }
     }
     executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
+        std::array<float, 16> values;
         for (auto row = first; row < last; ++row) {
             if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
             const auto weights = data.subspan(row * stride, stride);
             if (fast) {
-                std::array<std::span<const QuantizedInput>, 16> views;
-                std::array<float, 16> values;
-                for (std::size_t t = 0; t < batch; ++t) { views[t] = quantized[t]; }
                 quantized_batch_dot(matrix->type, weights, std::span(views).first(batch), std::span(values).first(batch));
                 for (std::size_t t = 0; t < batch; ++t) { output[t * rows + row] = values[t]; }
             } else {
