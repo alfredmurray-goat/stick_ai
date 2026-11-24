@@ -110,3 +110,6 @@ Public MCP configuration, app-created skill packs and skill preferences live und
 `logs/extensions/` on the stick. App updates preserve this directory along with
 models, linked Max paths and project files. MCP credentials must be re-entered
 after quitting even when configuration is preserved.
+
+
+The protocol client bounds both outstanding requests and unfinished transport writes to 64. A response arriving before its write finishes does not release that write's reservation in the shared 4 MiB outgoing budget. This keeps slow transports bounded even when responses arrive early.

@@ -56,8 +56,26 @@ try {
   }
   await engine.start("stellan-1-lite", signal);
   if (!engine.nativeRuntime) throw new Error("The release must use Stellan-Run");
-  const client = new Ollama("stellan-1-lite", engine.baseUrl, false, ramStatus(), { apiKey: engine.key, maxTokens: 256 });
-  const result = await client.complete([{ role: "system", content: 'You are Stellan-1 Lite. This is a startup check. Reply with exactly <done>Ready</done>. Do not call tools or write code.' }, { role: "user", content: "Are you ready?" }], signal, () => {});
+  const client = new Ollama("stellan-1-lite", engine.baseUrl, false, ramStatus(), { apiKey: engine.key, maxTokens: 2048 });
+  // Use the app's normal output allowance; preserve partial responses even on timeout.
+  const attempts = [];
+  const measured = { complete: async (messages, stepSignal, emit) => {
+    const attempt = { step: attempts.length + 1, elapsed_ms: 0, content: "", thinking: "" };
+    attempts.push(attempt); const began = Date.now();
+    try {
+      const reply = await client.complete(messages, stepSignal, (text, thinking) => {
+        const field = thinking ? "thinking" : "content";
+        attempt[field] = (attempt[field] + text).slice(-65536); emit(text, thinking);
+      });
+      attempt.content = reply.content; return reply;
+    } catch (error) { attempt.error = String(error); throw error; }
+    finally {
+      attempt.elapsed_ms = Date.now() - began;
+      await writeFile("release-assets/model-smoke.json", JSON.stringify({ runtime: "Stellan-Run", attempts }, null, 2));
+      console.log(`Model check step ${attempt.step}: ${attempt.elapsed_ms} ms, ${attempt.content.length} response characters${attempt.error ? ", failed" : ""}.`);
+    }
+  } };
+  const result = await measured.complete([{ role: "system", content: 'You are Stellan-1 Lite. This is a startup check. Reply with exactly <done>Ready</done>. Do not call tools or write code.' }, { role: "user", content: "Are you ready?" }], signal, () => {});
   const parsed = parseStep(result.content);
   await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", response: result.content, protocol: parsed.step.kind }, null, 2));
   if (parsed.step.kind !== "done") { throw new Error("Lite loaded, but did not follow its required tagged protocol; inspect model-smoke.json before shipping"); }
@@ -67,7 +85,7 @@ try {
   const messages = []; let read = false; let summary = "";
   const outcome = await runAgent({
     task: "Use read_file to read note.txt, then quote the entire file contents exactly in your done summary; use the returned content, without guessing. Do not change files or run programs.",
-    messages, model: client, maxSteps: 4, signal,
+    messages, model: measured, maxSteps: 4, signal,
     tools: { execute: async (call, stepSignal) => {
       if (!["read_file", "list_dir", "search_files"].includes(call.function.name)) { return "Only reading tools are allowed in this startup check."; }
       if (call.function.name === "read_file") { read = true; }
@@ -75,7 +93,7 @@ try {
     } },
     emit: (text, thinking) => { if (!thinking) { summary += text; } }, log: console.log, save: async () => {}
   });
-  await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", runtime: "Stellan-Run", gpu: engine.nativeRuntime ? "CPU (Stellan-Run)" : engine.gpuFailed ? "fell back to CPU" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac)" : "CPU") : "Metal", response: result.content, agent: { outcome, read, summary, messages } }, null, 2));
+  await writeFile("release-assets/model-smoke.json", JSON.stringify({ architecture: "mamba2", runtime: "Stellan-Run", gpu: engine.nativeRuntime ? "CPU (Stellan-Run)" : engine.gpuFailed ? "fell back to CPU" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac)" : "CPU") : "Metal", response: result.content, attempts, agent: { outcome, read, summary, messages } }, null, 2));
   if (outcome !== "finished" || !read || !summary.includes(expected)) { throw new Error("Lite did not complete a real read_file/tool_result/done exchange; do not ship this package"); }
   if (target === "linux-x64") await extensionSmoke({client,temporary,project,signal});
   console.log(`${target} Lite compute: ${engine.nativeRuntime ? "Stellan-Run CPU" : engine.gpuFailed ? "Metal GPU failed to start; CPU fallback used" : gpuLayerArgs(target, "stellan-1-lite", totalmem(), process.env, isVirtualMac())[1] === "0" ? (isVirtualMac() ? "CPU (virtual Mac, paravirtual Metal skipped)" : "CPU") : "Metal GPU"}.`);
