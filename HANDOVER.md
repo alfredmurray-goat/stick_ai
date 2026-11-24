@@ -16,6 +16,38 @@ Read this first; older sections below may describe the earlier llama.cpp app.
 - **Website:** shows Max 80.5% only against models it beats with metric-verified pass@1 rows, showcases Stellan-Run/Host/Link, non-tech mode paired with light mode.
 - **Still not done:** activation (`activationPublicKey` is empty; owner must set `ACTIVATION_ADMIN_TOKEN` in Vercel, run setup on /admin and send the public key), Hugging Face repos private, locking a stick's models, signing the apps.
 
+### Owner decisions, 24 November 2026
+
+- **No customers yet.** Stellan-Run stays the default engine; keep improving it before sticks are sold. Rebuild and publish releases as normal.
+- **Keep working on Run, Link, Host and Forge** (next steps below).
+- **Add a hidden third model for images (planned, not started).** Users can attach images; a small vision model, never shown as a choice in the app, turns each image into text that Lite and Max then use.
+
+### Planned: hidden vision model
+
+Today both models are text-only and the app rejects images (`docs/INPUTS.md`). Plan:
+
+- **How it fits.** When a message has an image, the app loads the vision model on demand, asks it for a faithful description plus any visible text (OCR, code, error messages, UI labels), unloads it, and passes that text to Lite as a clearly marked, untrusted attachment, the same way PDF text is passed now. Lite can ask for a closer look with a tool (for example `look_at_image` with a question), so Max never needs vision. Users see one assistant; the model picker still shows only Lite and Max.
+- **Candidates to evaluate** (check each official model card and licence before choosing): Qwen3-VL-2B/4B (listed as Apache-2.0; strong document/screenshot OCR), IBM Granite Vision 4.1 (4B, Apache-2.0, publishes a GGUF with a vision projector), SmolVLM2-2.2B (Apache-2.0, about 1.6 GB at Q4), Gemma 4 E2B (reported Apache-2.0, about 1.5 GB at Q4). Avoid Moondream 3 (BSL/own licence) and Gemma-terms models unless the licence is reviewed.
+- **Engine work.** Stellan-Run has no image encoder. Needed: the chosen model's vision encoder (ViT) and projector in Stellan-Run, image decoding/resizing in a bounded worker (PNG/JPEG only, size and pixel limits, no EXIF/scripts), then the text decoder already shared with our transformer path. Until then, llama.cpp's multimodal tool could be used for evaluation only.
+- **Budget.** About 1.5–3 GB extra on the stick; loaded only while an image is read, so normal RAM use is unchanged. 64 GB sticks have room.
+- **Checks before shipping.** Screenshot, photo-of-text, diagram and code-image test set; no hallucinated text in OCR checks; works offline; integrity-checked and lockable like the other models; images never leave the computer.
+
+### What Forge is, in plain words
+
+Forge is the workshop for teaching the models later. It does three things and nothing else yet:
+1. **Records attempts**: a coding task, every step Stellan took, the tests and whether they passed (`forge.py record`).
+2. **Has a person review them** before anything can be used (`forge.py review`), then **exports** approved, passing attempts as a training file while keeping benchmark/test tasks out (`forge.py export`).
+3. **Runs a task once in a locked-down Docker box** and grades it with a separate checker it can't tamper with (`runner.py plan/run/summary`).
+
+It does **not** train the models, and it isn't connected to Stellan yet: the only "model" it runs today is a synthetic test fixture. Next: a real Stellan adapter (Lite + Max through Stellan-Run inside the Docker image), then a small private task suite, then reviewed experience.
+
+### Next steps per component
+
+- **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.
+- **Link:** the MCP SDK is now only a test dependency. Remaining: replace `cross-spawn` (Windows `.cmd`/PATHEXT handling and escaping must be exactly right; security-sensitive) and update `docs/MCP_CLIENT.md`, which still describes the SDK transports as in use.
+- **Host:** next gate is chat memory on the native state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
+- **Forge:** real Stellan adapter and first private task suite (above).
+
 ## Where things stand (earlier)
 
 Stick AI is a private, offline coding assistant: a Tauri desktop app around a local web workspace, an agent loop, and a bundled llama.cpp server running Stellan-1 Lite (Mamba2, about 4.1 GB) and Stellan-1 Max (about 14.3 GB). It ships for Apple Silicon Mac, Intel Mac, Windows x64 and Linux x64.
