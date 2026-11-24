@@ -267,3 +267,22 @@ The plan was to store Lite's weights pre-arranged ("repacked") for our kernels w
 **Conclusion:** Q4_K needs two multiply-type instructions per 32 products whether rows are interleaved or not (`maddubs` then a scale multiply), and llama.cpp's repacked AVX2 kernel needs the same two. So a repacked layout can only remove overhead (loads, nibble unpacking, scale decoding), worth perhaps 10–15% of the multiply time on x86. It is not the large win it first looked like. It is more promising on ARM, where the `i8mm` matrix instructions need rows interleaved in pairs (Apple M2 and later, recent Snapdragon), and for a future model trained for a simpler 4-bit format (docs/TRAINING.md, Rule 1).
 
 **Next targets, by size:** the Mamba2 mixing step (2.0 s, partly single-threaded), Q6_K for Max's mixed layers, and only then the repacked layout. Every step is measured against the pinned llama.cpp in a same-time paired run, because this shared VM's speed drifts during the day (the same build measured 16.0 s and 18.1 s hours apart).
+
+## Q4_K scale unpacking for word-by-word speed — 25 November 2026
+
+Decode (writing one word at a time) is limited by how fast weights stream from memory, not by arithmetic. Stellan-Run read about 7 GB/s against llama.cpp's 9.6 GB/s. The difference was per-block bookkeeping: unpacking the eight 6-bit scales and minima of each Q4_K block one value at a time. They are now unpacked as four 32-bit words with masks and shifts (`unpack_q4k`), and the minima go straight into a vector. Same integers, so generated IDs are unchanged.
+
+Same paired setup (3 rotating rounds, 2 threads, real Lite, AVX-VNNI VM), with the previous Stellan-Run build alongside:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Process CPU ms |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 9,507 | 4,734 | 28,290 |
+| 112 tokens | previous Stellan-Run | 10,603 | 6,571 | 30,900 |
+| 112 tokens | this change | 10,231 | 4,809 | 27,268 |
+| 130 tokens | llama.cpp | 10,746 | 4,660 | 30,510 |
+| 130 tokens | previous Stellan-Run | 13,039 | 6,208 | 33,568 |
+| 130 tokens | this change | 11,468 | 5,066 | 30,520 |
+
+Decode is about 25% faster than before and now within 2–9% of llama.cpp; prompt reading is within 7–8%. On the 112-token prompt the whole run used less CPU time than llama.cpp. Peak memory is about 300 MB lower than llama.cpp (see the previous section). Generated IDs were identical across all three engines. Raw receipt: [lite-paired-q4k-unpack.json](evidence/lite-paired-q4k-unpack.json).
+
+**A loss, recorded:** a Q6_K kernel that feeds unsigned 6-bit weights through `maddubs` (32 products per instruction instead of 16) and corrects the offset once per block was exact (same checksums), but **slower** for batches on this Xeon: 32-token batch 2.9–3.4 ms against 2.1 ms (`stellan-batch-bench`, 4096-wide rows), with no change for single rows on Max's 137 MB `ffn_down` (memory-bound, 64 ms either way). Both versions use the same two multiply-port instructions per 32 values, and the old one's widening loads run on a different port for free. It was not merged. Q6_K speed-ups should come from fewer bytes moved, not fewer instructions.

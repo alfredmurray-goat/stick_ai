@@ -94,6 +94,16 @@ Still to build, in order:
 
 Risks: maintainers are tired of low-quality AI PRs, so one bad PR can get the account banned and hurt the brand; GitHub allows one free machine account per person; maintainers' review comments are their own words, so check licences before training on them.
 
+### Overnight 24–25 November 2026 (owner asleep; goals: Host the full replacement, Run faster than llama.cpp, Link solid)
+
+- **Run:** the multiplies already run near the chip's limit, so the gains came from elsewhere (EVIDENCE.md has every number):
+  - AVX-VNNI/AVX512-VNNI kernels chosen at start-up, and vector lane totals;
+  - the Mamba2 convolution split across cores, and the scan keeping its state in registers;
+  - Q4_K scales unpacked with word operations instead of a store-then-reload scratch array.
+  - Outputs are identical at every step. Word-by-word decoding went from about 6.2 s to 5.0–5.4 s for 12 tokens, roughly level with llama.cpp; prompt reading is within about 10% on the 112-token prompt.
+- **Link:** `cross-spawn` replaced by `spawn-command.ts`, which escapes batch arguments twice (closing an injection path through `npx.cmd`), never searches the project folder, and is tested with a real `.cmd` on Windows CI. No third-party MCP code ships now.
+- **Host:** chat memory now lives in Host's native state store for packages that ship Host (gate 2, first piece), with a hash-checked client, carry-over of old notes and tests on every platform.
+
 ### Next steps per component
 
 - **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.

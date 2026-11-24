@@ -1,4 +1,4 @@
-import { nativeFileBackend } from "./native-files.js";
+import { nativeFileBackend, nativeHostExecutable } from "./native-files.js";
 import { createServer, type ServerResponse } from "node:http";
 import { readFile, mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -67,9 +67,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   await mkdir(join(root, "app", "project"), { recursive: true });
   let box = await Sandbox.create(join(root, "app", "project"));
   let chatMemory: ChatMemory | undefined;
+  // Packages that ship Stellan-Host keep chat memory in Host's native state store (verified against the
+  // manifest's SHA-256); others keep the file-based store. Only one store is open at a time.
   const openChatMemory = async (): Promise<void> => {
-    chatMemory = undefined;
-    try { chatMemory = await ChatMemory.open(root, box.root); } catch (error) { log(error); }
+    const previous = chatMemory; chatMemory = undefined; await previous?.close().catch(log);
+    try { chatMemory = await ChatMemory.open(root, box.root, nativeHostExecutable(root)); } catch (error) { log(error); }
   };
   await openChatMemory();
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
@@ -488,5 +490,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

@@ -5,6 +5,21 @@ import {targetFor} from './platform.js';
 import type {FileBackend} from '../tools/index.js';
 import type {Manifest} from './integrity.js';
 
+/** The package's trusted Host executable, or undefined for packages that don't ship Host. */
+export function nativeHostExecutable(root:string):{executable:string;sha256:string}|undefined {
+ let manifest:Manifest;
+ try{
+  const path=join(root,'manifest.json'),info=lstatSync(path);
+  if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1||info.size>4000000)throw Error('Unsafe package manifest');
+  manifest=JSON.parse(readFileSync(path,'utf8')) as Manifest;
+ }catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return;throw error;}
+ if(manifest.nativeHost===undefined)return;
+ if(manifest.nativeHost!==true)throw Error('Unsupported native host package');
+ const target=targetFor(process.platform,process.arch),path=`bin/${target}/stellan-host${process.platform==='win32'?'.exe':''}`;
+ const record=manifest.files?.find(file=>file.path===path);
+ if(!record?.executable||!(/^[a-f0-9]{64}$/).test(record.sha256))throw Error('The package is missing its trusted native host');
+ return {executable:join(root,path),sha256:record.sha256};
+}
 /** A package opting into Host must have a trusted native executable; it never silently falls back. */
 export function nativeFileBackend(root:string,project:string):FileBackend|undefined {
  let manifest:Manifest;

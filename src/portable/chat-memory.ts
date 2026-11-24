@@ -68,7 +68,7 @@ export class ChatMemory {
   private constructor(private store: Store, private relativeFolder: string) {}
   get backend(): "files" | "host" { return this.store.kind; }
   close(): Promise<void> { return this.store.close(); }
-  static async open(root: string, project: string, host?: NativeStateHost): Promise<ChatMemory> {
+  static async open(root: string, project: string, host?: NativeStateHost, opener: typeof openNativeState = openNativeState): Promise<ChatMemory> {
     const key = createHash("sha256").update(await realpath(project)).digest("hex").slice(0, 24);
     let folder = await realpath(root);
     for (const part of ["logs", "chats", key]) {
@@ -78,7 +78,7 @@ export class ChatMemory {
     }
     let store: Store = new FileStore(folder);
     if (host) {
-      const state = await openNativeState({ executable: host.executable, executableSha256: host.sha256, root: folder });
+      const state = await opener({ executable: host.executable, executableSha256: host.sha256, root: folder });
       const native = new HostStore(state);
       try {
         // First start with Host on a stick that has older file-based notes: carry them over once.
