@@ -48,3 +48,12 @@ A partial input command must also finish within the configured input timeout (de
 Text input honors the configured context limit up to 262,144 tokens, rather than an unrelated 32,768-token tokenizer cap. This does not raise the app default or make long prompts free. Special-token matching uses a precomputed longest-first index rather than scanning the full vocabulary for every code bracket; byte fallback decode reads its already-validated byte directly. Full app services still require the Node backend.
 
 A five-pair alternating-order local Linux tokenizer diagnostic on the full Lite vocabulary retained identical token IDs. For8,000 opening brackets, fresh-process median wall time fell746.02ms to25.41ms (about29.4x). The ordinary-text control was7.46ms versus7.26ms; treat that small difference as noise. These timings include metadata parsing and process startup, not inference, full app work, or a comparison against Node. [Raw receipt](evidence/native-host-tokenizer-index.json).
+
+
+## Low-memory service lifecycle
+
+`stellan-host MODEL SHA256 THREADS CONTEXT --lazy` starts its control loop without opening/mapping/hashing the model or allocating a decoder. Its ready/status events explicitly report `model_loaded:false`, `model_verified:false` and zero owned decoder-state bytes. The first inference request performs the complete trusted-hash, RAM, metadata and architecture checks before generating. The loading cost is deferred, not eliminated. Existing eager startup remains the default for compatibility.
+
+The `unload` command releases the decoder, tokenizer, model mappings and cached tokens while keeping the native service alive. A later request reloads and re-verifies the same trusted model hashes; reset/status do not reload it. Idle expiry still exits the process. These controls are native inference-service building blocks; the app's Node services have not yet migrated.
+
+A three-pair alternating-order Linux startup/status/shutdown diagnostic used the full pinned Lite path. Eager median process peak RSS was4,446,609,408bytes versus11,796,480bytes with `--lazy`; owned decoder state276,299,776bytes versus0. Startup/status wall time2,519ms versus2ms. No inference ran: the model cost moves to first inference, so these figures do not describe active generation or the desktop app. [Raw receipt](evidence/native-host-lazy-idle.json).

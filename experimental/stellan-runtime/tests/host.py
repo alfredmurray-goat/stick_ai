@@ -30,6 +30,46 @@ class HostTests(unittest.TestCase):
         result.stderr = result.stderr.decode('utf-8')
         return result, [json.loads(line) for line in result.stdout.splitlines()]
 
+    def test_lazy_status_does_not_load_and_unload_releases_state(self):
+        text='A B'.encode().hex()
+        result, events=self.invoke(f'status\nreset\nstatus\n1 2 {text}\nstatus\nunload\nstatus\n2 2 {text}\nstatus\nshutdown\n','--lazy')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertFalse(events[0]['model_loaded']);self.assertFalse(events[0]['model_verified'])
+        self.assertEqual(events[0]['state_bytes'],0);self.assertEqual(events[0]['state_capacity_bytes'],0)
+        states=[e for e in events if e['event']=='status']
+        self.assertEqual([e['model_loaded'] for e in states],[False,False,True,False,True])
+        self.assertEqual(states[3]['state_bytes'],0);self.assertEqual(states[3]['cached_tokens'],0)
+        ids=lambda request:[e['id'] for e in events if e['event']=='token' and e['request_id']==request]
+        self.assertEqual(ids(1),ids(2));self.assertEqual(len(ids(1)),2)
+
+    def test_lazy_host_verifies_only_when_inference_is_requested(self):
+        result, events=self.invoke('status\n1 1 41\nstatus\nshutdown\n','--lazy',digest='0'*64)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertFalse(any(e['event']=='token' for e in events))
+        self.assertIn('hash mismatch',next(e['message'] for e in events if e['event']=='error'))
+        self.assertTrue(all(not e['model_verified'] for e in events if e['event']=='status'))
+        self.model.unlink()
+        result, events=self.invoke('status\nshutdown\n','--lazy')
+        self.assertEqual(result.returncode,0,result.stderr);self.assertFalse(events[0]['model_loaded'])
+
+    def test_unload_rechecks_hash_after_model_changes(self):
+        process=subprocess.Popen([HOST,str(self.model),self.digest,'2','128','--lazy'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
+        try:
+            self.assertFalse(json.loads(process.stdout.readline())['model_loaded'])
+            process.stdin.write('1 1 41\n');process.stdin.flush()
+            while json.loads(process.stdout.readline())['event']!='finished': pass
+            process.stdin.write('unload\n');process.stdin.flush()
+            self.assertEqual(json.loads(process.stdout.readline())['event'],'unloaded')
+            self.model.write_bytes(self.data+b'tampered')
+            process.stdin.write('2 1 41\nshutdown\n');process.stdin.flush()
+            remaining=[json.loads(line) for line in process.stdout]
+            process.wait(timeout=5)
+            self.assertFalse(any(e['event']=='token' for e in remaining))
+            self.assertIn('hash mismatch',next(e['message'] for e in remaining if e['event']=='error'))
+        finally:
+            if process.poll() is None: process.kill();process.wait(timeout=5)
+            process.stdin.close();process.stdout.close();process.stderr.close()
+
     def test_text_matches_token_ids_and_reset_discards_state(self):
         # SentencePiece fixture uses byte fallback; native text adds BOS and the space marker.
         text = 'A B'

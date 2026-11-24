@@ -1,0 +1,69 @@
+{
+  "scope": "Linux fresh native-host startup/status/shutdown with full Lite path; no inference. Lazy mode defers all model work to first inference; not an app memory or generation speed claim",
+  "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+  "runs": [
+    {
+      "repeat": 0,
+      "lazy": true,
+      "wall_ms": 2.005961000008938,
+      "peak_rss_bytes": 11796480,
+      "cpu_ms": 1.795,
+      "state_bytes": 0
+    },
+    {
+      "repeat": 0,
+      "lazy": false,
+      "wall_ms": 7439.867599999957,
+      "peak_rss_bytes": 4446609408,
+      "cpu_ms": 4805.0,
+      "state_bytes": 276299776
+    },
+    {
+      "repeat": 1,
+      "lazy": false,
+      "wall_ms": 2519.039064000026,
+      "peak_rss_bytes": 4446511104,
+      "cpu_ms": 2513.3189999999995,
+      "state_bytes": 276299776
+    },
+    {
+      "repeat": 1,
+      "lazy": true,
+      "wall_ms": 2.3801959999900646,
+      "peak_rss_bytes": 11796480,
+      "cpu_ms": 2.139,
+      "state_bytes": 0
+    },
+    {
+      "repeat": 2,
+      "lazy": true,
+      "wall_ms": 1.5733479999653355,
+      "peak_rss_bytes": 11796480,
+      "cpu_ms": 1.44,
+      "state_bytes": 0
+    },
+    {
+      "repeat": 2,
+      "lazy": false,
+      "wall_ms": 2268.526808000047,
+      "peak_rss_bytes": 4446613504,
+      "cpu_ms": 2264.253,
+      "state_bytes": 276299776
+    }
+  ],
+  "medians": {
+    "False": {
+      "wall_ms": 2519.039064000026,
+      "peak_rss_bytes": 4446609408,
+      "cpu_ms": 2513.3189999999995,
+      "state_bytes": 276299776
+    },
+    "True": {
+      "wall_ms": 2.005961000008938,
+      "peak_rss_bytes": 11796480,
+      "cpu_ms": 1.795,
+      "state_bytes": 0
+    }
+  },
+  "native_sha256": "1e742bd77b182d614ce4c6797fd8499934148c3a2c2ee135644e8344472ea48a"
+}
