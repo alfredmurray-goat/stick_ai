@@ -9,17 +9,17 @@ import { hashFile, staticFiles, verifyStick, type Manifest } from "./integrity.j
 import { llamaRelease, nodeRelease, executableName, type Target } from "./platform.js";
 import { defaultUpdateFeed } from "./update-format.js";
 
-export interface PlatformInputs { app: string; node: string; server: string; lite: string; nodeLicense: string; serverLicense: string; desktopLicenses: string; max?: string; maxRelease?: boolean }
+export interface PlatformInputs { host?: string; app: string; node: string; server: string; lite: string; nodeLicense: string; serverLicense: string; desktopLicenses: string; max?: string; maxRelease?: boolean }
 export async function buildPlatform(project: string, output: string, target: Target, input: PlatformInputs): Promise<Manifest> {
   const mac = target.startsWith("macos-");
   const native = mac ? join(input.app, "Contents/MacOS/stick-ai") : input.app;
   const desktop = mac ? "Stick AI.app" : target === "windows-x64" ? "Stick AI.exe" : "stick-ai";
   const node = `bin/${target}/${executableName(target, true)}`;
   const server = `bin/${target}/${executableName(target)}`;
-  for (const path of [...(input.max ? [input.max] : []), input.node, input.server, input.lite, input.nodeLicense, input.serverLicense, native]) {
+  for (const path of [...(input.host ? [input.host] : []), ...(input.max ? [input.max] : []), input.node, input.server, input.lite, input.nodeLicense, input.serverLicense, native]) {
     const info = await lstat(path); if (!info.isFile() || info.isSymbolicLink()) { throw new Error(`Required release input is unsafe: ${path}`); }
   }
-  for (const path of [input.node, input.server, native]) { await binaryTarget(path, target); }
+  for (const path of [...(input.host ? [input.host] : []), input.node, input.server, native]) { await binaryTarget(path, target); }
   const handle = await open(input.lite, "r"); const header = Buffer.alloc(8);
   try { await handle.read(header); } finally { await handle.close(); }
   if (header.toString("ascii", 0, 4) !== "GGUF" || ![2, 3].includes(header.readUInt32LE(4))) { throw new Error("Lite input is not GGUF"); }
@@ -36,6 +36,10 @@ export async function buildPlatform(project: string, output: string, target: Tar
     await build({ entryPoints: [join(project, "portable/stellan-server.mjs")], outfile: join(staging, "app/stick-engine.cjs"), bundle: true, platform: "node", format: "cjs", target: "node24", legalComments: "none", minify: true });
     await cp(input.server, join(staging, `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`));
     await chmod(join(staging, `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`), 0o755);
+    if (input.host) {
+      const host = join(staging, `bin/${target}/stellan-host${target === "windows-x64" ? ".exe" : ""}`);
+      await cp(input.host, host); await chmod(host, 0o755);
+    }
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await cp(input.app, join(staging, desktop), { recursive: true, preserveTimestamps: true });
     await cp(input.node, join(staging, node)); await cp(input.server, join(staging, server));
@@ -58,10 +62,10 @@ export async function buildPlatform(project: string, output: string, target: Tar
     await writeFile(join(staging, fallback), target === "windows-x64" ? windowsStart(runtime, launcher) : posixStart(mac, hashes, launcher), { mode: 0o755 });
     const requirement = mac ? "macOS 13.5 or newer" : target === "windows-x64" ? "Windows 10 or newer with Microsoft Edge WebView2 already available" : "Linux x64 with glibc 2.35 or newer, GTK 3 and WebKitGTK 4.1 already available";
     await writeFile(join(staging, "README.txt"), `YOUR PRIVATE ASSISTANT\n\nKeep this folder together and open ${desktop}, then click Start. Your computer needs ${requirement} and at least 8 GB of memory.\n\n${input.max || input.maxRelease ? "Lite and Max are included in the complete release. Lite + Max is the default on computers with at least 16 GiB RAM. Below that, use Lite." : "Lite is included. Choose your existing Stellan-1 Max GGUF to enable Max; at least 16 GiB RAM is required."} You can also link an existing Max GGUF on your stick without copying it. Your questions and project files stay on this computer. Keep the stick connected. Close the app before safely ejecting it.\n\nThis is an unsigned test build. If your computer blocks it, ask the person who supplied it for a signed copy. Do not turn off security settings.\n\n${fallback} is a fallback for technical users that opens a terminal and a browser. If the desktop cannot open, ask the person who supplied this copy for help.\nIf macOS blocks this, right-click Start and choose Open, once.\nIf Windows blocks the fallback, choose More info and Run anyway only if you trust this stick.\n`);
-    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, runtime: "stellan-run", targets: [target], files: [] };
+    const manifest: Manifest = { format: 1, llamaRelease, nodeRelease, runtime: "stellan-run", ...(input.host ? { nativeHost: true as const } : {}), targets: [target], files: [] };
     for (const path of await staticFiles(staging)) {
       const info = await lstat(join(staging, path));
-      manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111), ...(path === bundledMax.path || path === "models/stellan-1-lite-q4_k_m.gguf" ? { optional: true } : {}) });
+      manifest.files.push({ path, ...await hashFile(join(staging, path)), executable: Boolean(info.mode & 0o111) || Boolean(input.host && path === `bin/${target}/stellan-host${target === "windows-x64" ? ".exe" : ""}`), ...(path === bundledMax.path || path === "models/stellan-1-lite-q4_k_m.gguf" ? { optional: true } : {}) });
     }
     if (input.maxRelease && !input.max) { manifest.files.push({ ...bundledMax }); }
     if (input.maxRelease) { manifest.files.push(...Object.values(lockedModels).flatMap(lockedRecords)); }

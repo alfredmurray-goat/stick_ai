@@ -13,8 +13,13 @@ export function replaceUnique(content: string, old: string, replacement: string)
   if (!old || index < 0 || content.indexOf(old, index + 1) >= 0) { throw new Error("edit_file requires exactly one nonempty match"); }
   return content.slice(0, index) + replacement + content.slice(index + old.length);
 }
+export interface FileBackend {
+  execute(name: string, args: Record<string, unknown>, signal: AbortSignal, approve: (signal: AbortSignal) => Promise<boolean>): Promise<string>;
+  close(): Promise<void>;
+}
 export class Tools {
-  constructor(private box: Sandbox, private approve: (description: string, signal: AbortSignal) => Promise<boolean>, private backend?: Backend, private warn: (message: string) => void = console.error) {}
+  constructor(private box: Sandbox, private approve: (description: string, signal: AbortSignal) => Promise<boolean>, private backend?: Backend, private warn: (message: string) => void = console.error, private files?: FileBackend) {}
+  async close(): Promise<void> { await this.files?.close(); }
   private async read(path: string): Promise<string> {
     const file = await open(await this.box.path(path), constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
@@ -34,6 +39,9 @@ export class Tools {
       return args[key];
     };
     const name = call.function.name;
+    if (this.files && ["read_file", "list_dir", "search_files", "write_file", "edit_file"].includes(name)) {
+      return this.files.execute(name, args, signal, approvalSignal => this.approve(`${name} ${JSON.stringify(args)}`, approvalSignal));
+    }
     if (name === "run_shell") {
       const backend = this.backend ?? await detectBackend(this.box);
       const command = get("command");

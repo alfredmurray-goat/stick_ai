@@ -1,0 +1,35 @@
+name: Stellan-Host app integration
+on:
+  pull_request:
+    paths:
+      - 'src/portable/native-files.ts'
+      - 'src/tools/**'
+      - 'experimental/stellan-runtime/**'
+      - 'tests/native-files.test.ts'
+      - '.github/workflows/native-host-app.yml'
+permissions:
+  contents: read
+jobs:
+  file-tools:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+      - run: cmake -S experimental/stellan-runtime -B native-host-app -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build native-host-app --config Release --target stellan-host --parallel 2
+      - name: Exercise agent file tools against the real native host
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/native-files.test.ts

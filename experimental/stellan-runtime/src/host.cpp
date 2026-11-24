@@ -16,9 +16,10 @@ int entry(int argc, char **argv) {
     try {
         // A disconnected owner must not leave inference running with nowhere to send it.
         std::cout.exceptions(std::ios::badbit | std::ios::failbit);
-        if (argc == 3 && std::string_view(argv[1]) == "--workspace") {
+        if (argc == 3 && (std::string_view(argv[1]) == "--workspace" || std::string_view(argv[1]) == "--state-store")) {
             const std::string root(argv[2]);
-            return stellan::workspace_service(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(root.data()), root.size())), [] { return cancelled.load(std::memory_order_relaxed); });
+            const auto service = std::string_view(argv[1]) == "--state-store" ? stellan::state_store_service : stellan::workspace_service;
+            return service(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(root.data()), root.size())), [] { return cancelled.load(std::memory_order_relaxed); });
         }
         if (argc < 5 || argc > 11) throw std::runtime_error("Usage: stellan-host MODEL SHA256 THREADS CONTEXT [--lazy] [--token-ids] [--force-max] [--split PATH SHA256]");
         bool text = true, force = false, lazy = false;

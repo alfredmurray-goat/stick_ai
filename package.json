@@ -38,7 +38,9 @@
     "docs/HOOKS.md",
     "experimental/stellan-runtime/session.mjs",
     "experimental/stellan-runtime/plan.mjs",
-    "experimental/stellan-runtime/tokenizer.mjs"
+    "experimental/stellan-runtime/tokenizer.mjs",
+    "experimental/stellan-runtime/workspace.mjs",
+    "experimental/stellan-runtime/workspace.d.mts"
   ],
   "scripts": {
     "build": "tsc",

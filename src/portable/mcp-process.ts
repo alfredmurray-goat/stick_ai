@@ -8,6 +8,7 @@ import {killProcessTree} from '../sandbox/process.js';
 /** NDJSON MCP transport with an isolated, supervised process group. */
 export class McpProcessTransport implements Transport {
  onclose:(()=>void)|undefined;onerror:((error:Error)=>void)|undefined;onmessage:((message:JSONRPCMessage)=>void)|undefined;
+ private decoder=new TextDecoder('utf-8',{fatal:true});
  private child:ChildProcess|undefined;private exited:Promise<void>=Promise.resolve();private lines=new McpLines();private closing:Promise<void>|undefined;private notified=false;
  constructor(private executable:string,private args:string[],private env:Record<string,string>,private diagnostic:(bytes:Buffer)=>void){}
  private closed(){this.lines.clear();if(this.notified)return;this.notified=true;this.onclose?.();}
@@ -18,7 +19,7 @@ export class McpProcessTransport implements Transport {
    child.once('spawn',resolve);child.once('error',error=>{reject(error);this.onerror?.(error);this.closed();});child.once('close',()=>this.closed());
    child.stdin?.on('error',error=>this.onerror?.(error));child.stderr?.on('data',this.diagnostic);
    child.stdout?.on('data',(chunk:Buffer)=>{if(this.closing||this.notified)return;try{
-    this.lines.push(chunk,line=>this.onmessage?.(parseMcpMessage(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(line)))));
+    this.lines.push(chunk,line=>this.onmessage?.(parseMcpMessage(JSON.parse(this.decoder.decode(line)))));
    }catch(error){this.onerror?.(error instanceof Error?error:new Error('Invalid MCP response'));void this.close();}});
   });
  }

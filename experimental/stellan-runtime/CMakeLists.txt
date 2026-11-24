@@ -51,3 +51,9 @@ endif()
 add_test(NAME native-host COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/host.py $<TARGET_FILE:stellan-runtime> $<TARGET_FILE:stellan-host>)
 
 add_test(NAME native-workspace COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace.py $<TARGET_FILE:stellan-host>)
+
+if(STELLAN_NODE)
+  add_test(NAME native-workspace-client COMMAND ${CMAKE_COMMAND} -E env "STELLAN_TEST_HOST=$<TARGET_FILE:stellan-host>" ${STELLAN_NODE} --test ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace.test.mjs)
+endif()
+
+add_test(NAME native-state-store COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/state.py $<TARGET_FILE:stellan-host>)

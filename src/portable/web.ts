@@ -1,3 +1,4 @@
+import { nativeFileBackend } from "./native-files.js";
 import { createServer, type ServerResponse } from "node:http";
 import { readFile, mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -88,7 +89,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     const space = description.indexOf(" "); const args = JSON.parse(description.slice(space + 1)) as Record<string, string>;
     publish("approval", undefined, { id, file: basename(args.path ?? "your file"), path: args.path ?? "", before: args.old ?? "", after: args.new ?? args.content ?? "" });
     notifyHooks("Notification", { notification_type: "permission_prompt", message: `Stellan wants to change ${basename(args.path ?? "a file")}. Approve or keep your file in the app.`, path: args.path ?? "" });
-  }));
+  }), undefined, undefined, nativeFileBackend(root, box.root));
   let tools = makeTools();
   let extensionStatus = ""; let extensionProblem = "";
   const mcp = new McpServers(root, box.root, (name, text) => { extensionStatus = `MCP · ${name}: ${text}`; publish("status", extensionStatus); });
@@ -167,7 +168,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     await engine.stop(); resting = model; report("Resting to free memory. Your next message wakes the model.");
     for (const wake of waiters) { wake(); }
   };
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
     tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
@@ -418,5 +419,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

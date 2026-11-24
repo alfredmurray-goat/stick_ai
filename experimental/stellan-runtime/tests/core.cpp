@@ -344,7 +344,15 @@ void additional_kernels() {
             require(std::all_of(values.begin(), values.end(), [&](unsigned value) { return value == iteration; }));
         }
         rejects([&] { executor.parallel(values.size(), [](auto, auto) { throw std::runtime_error("worker failure"); }); });
-        executor.parallel(0, [](auto first, auto last) { if (first != last) { throw std::runtime_error("range"); } });
+        unsigned callbacks = 0;
+        executor.parallel(0, [&](auto first, auto last) { require(first == 0 && last == 0); ++callbacks; });
+        require(callbacks == 1);
+        callbacks = 0;
+        executor.parallel(1, [&](auto first, auto last) { require(first == 0 && last == 1); ++callbacks; });
+        require(callbacks == 1);
+        rejects([&] { executor.parallel(1, [](auto, auto) { throw std::runtime_error("inline failure"); }); });
+        executor.parallel(values.size(), [&](auto first, auto last) { for (auto i = first; i < last; ++i) values[i] = 123; });
+        require(std::all_of(values.begin(), values.end(), [](auto value) { return value == 123; }));
     }
     rejects([] { stellan::Executor executor(0); });
     rejects([] { stellan::Executor executor(65); });
