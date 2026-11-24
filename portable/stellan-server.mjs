@@ -11,7 +11,7 @@ export function chatPrompt(messages, model) {
  for(let i=0;i<turns.length;i++){
   const m=turns[i];
   if(m.role==='user')prompt+=`[INST] ${i===0&&model!=='stellan-1-max'&&system?system+'\n\n':''}${m.content} [/INST]`;
-  else prompt+=' '+m.content+'</s>';
+  else prompt+=(/^\s/.test(m.content)?m.content:' '+m.content)+'</s>';
  }
  if(Buffer.byteLength(prompt)>1048576)throw Error('Shorten this conversation before continuing');
  return prompt;
@@ -20,7 +20,7 @@ async function body(req){let size=0;const parts=[];for await(const chunk of req)
 export async function startStellanServer(config,openSession=openNativeSession){
  const key=Buffer.from(config.key);if(key.length<32)throw Error('A private server key is required');
  let session,opening,busy=false,active,metrics={};
- async function ready(){if(session?.active)return session;if(!opening)opening=openSession(config).then(value=>{session=value;config.onProcess?.(value.process);return value;}).finally(()=>{opening=undefined;});return opening;}
+ async function ready(){if(session?.active)return session;if(!opening)opening=openSession({...config,tagged:config.modelName==='stellan-1-lite'}).then(value=>{session=value;config.onProcess?.(value.process);return value;}).finally(()=>{opening=undefined;});return opening;}
  await ready();
  const server=createServer(async(req,res)=>{
   const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
@@ -50,14 +50,18 @@ export async function startStellanServer(config,openSession=openNativeSession){
     res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});res.flushHeaders();
     event({choices:[{delta:{role:'assistant'}}],stellan_runtime:{name:'Stellan-Run',compute:'cpu',sampling:'greedy',grammar_enforced:false}});
    }
+   let lastText='';
    const result=await native.generate(prompt,{maxTokens:Math.max(1,max),signal:control.signal,onEvent:e=>{
     if(path!=='/v1/chat/completions')return;
-    if(e.event==='token'&&e.text)event({choices:[{delta:{content:e.text}}]});
+    if(e.event==='token'&&e.text){if(config.modelName==='stellan-1-lite'){if(lastText)event({choices:[{delta:{content:lastText}}]});lastText=e.text;}else event({choices:[{delta:{content:e.text}}]});}
     if(e.event==='prompt_progress')event({choices:[],prompt_progress:{processed:e.completed,total:e.total}});
    }});
    metrics={prompt_tokens:result.metrics.reused_tokens+result.metrics.evaluated_prompt_tokens,completion_tokens:max===0?0:result.tokens.length};
    if(path==='/completion'){json(200,{content:max===0?'':result.text,tokens:max===0?[]:result.tokens,timings:result.metrics});return;}
-   event({choices:[{delta:{},finish_reason:result.tokens.length>=max?'length':'stop'}],usage:metrics});res.end('data: [DONE]\n\n');
+   // Flush the closing token only after the native request has settled. A client stopping at
+   // its first complete block must not abort a completed worker and discard its exact prefix.
+   if(lastText)event({choices:[{delta:{content:lastText}}]});
+   event({choices:[{delta:{},finish_reason:result.metrics.stop_reason==='length'?'length':result.metrics.stop_reason?'stop':result.tokens.length>=max?'length':'stop'}],usage:metrics});res.end('data: [DONE]\n\n');
   }catch(error){control.abort();if(!res.headersSent)json(400,{error:error.message});else if(!res.destroyed){if(res.writableLength>1048576)res.destroy();else res.end('data: '+JSON.stringify({error:{message:error.message}})+'\n\n');}}
   finally{res.removeListener('close',cancel);active=undefined;busy=false;}
  });

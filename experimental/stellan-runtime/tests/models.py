@@ -239,6 +239,26 @@ class ExecutionTests(unittest.TestCase):
         result = subprocess.run([EXECUTABLE, "serve", str(self.file), "0" * 64, "2", "16"], input='1 1 1\n', capture_output=True, text=True, encoding="utf-8", timeout=15)
         self.assertNotEqual(result.returncode, 0); self.assertNotIn('ready', result.stdout)
 
+    def test_tagged_session_stops_naturally_and_keeps_its_prompt_state(self):
+        fixture = Fixture('mamba2')
+        with __import__('tempfile').TemporaryDirectory() as root:
+            path = __import__('pathlib').Path(root) / 'tagged.gguf'
+            original = fixture.bytes(); path.write_bytes(original)
+            digest = hashlib.sha256(original).hexdigest()
+            base = subprocess.run([EXECUTABLE, 'serve', str(path), digest, '2', '128'], input='1 1 1,68\n', capture_output=True, text=True, check=True)
+            token = next(e['id'] for e in map(json.loads, base.stdout.splitlines()) if e['event']=='token')
+            tokens = ['<unk>', '<s>', '</s>'] + [f'<0x{i:02X}>' for i in range(256)]
+            types = [2,3,3]+[6]*256
+            tokens[token]='<done>Ready</done>'; types[token]=1
+            fixture.metadata=[(key,kind,struct.pack('<IQ',8,len(tokens))+b''.join(string(t) for t in tokens) if key=='tokenizer.ggml.tokens' else struct.pack('<IQ',5,len(types))+struct.pack('<'+'i'*len(types),*types) if key=='tokenizer.ggml.token_type' else data) for key,kind,data in fixture.metadata]
+            data=fixture.bytes();path.write_bytes(data);digest=hashlib.sha256(data).hexdigest()
+            result=subprocess.run([EXECUTABLE,'serve',str(path),digest,'2','128','--tagged'],input='1 16 1,68\n2 16 1,68\n',capture_output=True,text=True,check=True)
+            events=list(map(json.loads,result.stdout.splitlines()))
+            finished=[e for e in events if e['event']=='finished']
+            self.assertEqual([e['generated'] for e in finished],[1,1])
+            self.assertEqual([e['stop_reason'] for e in finished],['tagged','tagged'])
+            self.assertEqual(finished[1]['reused_tokens'],2)
+
     def test_parallel_recurrent_groups_match_independent_reference(self):
         for groups in (1, 2, 4):
             for threads in (1, 2, 3, 8):

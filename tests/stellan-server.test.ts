@@ -24,3 +24,25 @@ it('serves authenticated native streaming, reports capabilities and bounds concu
  }finally{finish();await running.close();}
  expect(native.close).toHaveBeenCalledOnce();
 });
+
+
+it('preserves a generated leading space when formatting the next exact prefix',()=>{
+ const prompt=chatPrompt([{role:'user',content:'Task'}],'stellan-1-lite');
+ const answer=' <tool_call>{}</tool_call>';
+ expect(chatPrompt([{role:'user',content:'Task'},{role:'assistant',content:answer},{role:'user',content:'Result'}],'stellan-1-lite')).toSatisfy((value:string)=>value.startsWith(prompt+answer+'</s>'));
+});
+it('settles tagged generation before flushing its final streaming fragment',async()=>{
+ let settled=false;let aborted=false;
+ const native={active:true,close:async()=>{},generate:async(_prompt:string,options:any)=>{
+  options.signal.addEventListener('abort',()=>{aborted=true;});
+  options.onEvent({event:'token',text:'<done>Ready'});options.onEvent({event:'token',text:'</done>'});
+  await new Promise(resolve=>setTimeout(resolve,20));settled=true;
+  return {text:'<done>Ready</done>',tokens:[10,11],metrics:{reused_tokens:0,evaluated_prompt_tokens:2,stop_reason:'tagged'}};
+ }};
+ const open=vi.fn(async()=>native);const running=await startStellanServer({key:'x'.repeat(64),port:0,context:128,modelName:'stellan-1-lite'},open);
+ try{
+  const {Ollama}=await import('../src/model/ollama.js');const client=new Ollama('stellan-1-lite','http://127.0.0.1:'+running.server.address().port,false,undefined,{apiKey:'x'.repeat(64)});
+  expect((await client.complete([{role:'user',content:'Ready?'}],new AbortController().signal,()=>{})).content).toBe('<done>Ready</done>');
+  expect(settled).toBe(true);expect(aborted).toBe(false);expect(open.mock.calls[0]?.[0]).toMatchObject({tagged:true});
+ }finally{await running.close();}
+});

@@ -1,0 +1,43 @@
+{
+  "runtime": "Stellan-Run",
+  "scope": "Local Linux real Lite read-only functional check; not benchmark or cross-platform qualification",
+  "outcome": "finished",
+  "read": true,
+  "summary": "  The file \"note.txt\" contains the following text:\n\n```\nViolet otter 8522\n```\n\nI have successfully read the file and provided the entire contents as evidence.",
+  "opens": 1,
+  "metrics": [
+    {
+      "event": "finished",
+      "request_id": 1,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 0,
+      "evaluated_prompt_tokens": 891,
+      "prompt_ms": 98442.8,
+      "decode_ms": 4888.38,
+      "stop_reason": "tagged",
+      "generated": 30,
+      "cpu_ms": 157709,
+      "peak_rss_bytes": 4373458944
+    },
+    {
+      "event": "finished",
+      "request_id": 2,
+      "model_sha256": "84328c452ddef6122b35702f754935ebd7c8bf95a8a9f2b718392cc68968453e",
+      "reused_tokens": 920,
+      "evaluated_prompt_tokens": 24,
+      "prompt_ms": 1995.95,
+      "decode_ms": 7651.83,
+      "stop_reason": "tagged",
+      "generated": 50,
+      "cpu_ms": 17434.4,
+      "peak_rss_bytes": 4374245376
+    }
+  ],
+  "verified": true,
+  "elapsed_ms": 113039,
+  "candidateExecutableSha256": "b39a2bcad0238c2d69019cf3a94a2f0bafed94366fb05fb0f4557863ade9b651",
+  "limitations": [
+    "One local Linux functional exchange; not a paired speed benchmark or proof against llama.cpp",
+    "Full Max and physical Windows/Apple Silicon qualification remain outstanding"
+  ]
+}

@@ -1,6 +1,7 @@
 #include "runtime.hpp"
 #include "executor.hpp"
 #include "kv_cache.hpp"
+#include "tagged_stop.hpp"
 
 #include <array>
 #include <algorithm>
@@ -29,6 +30,19 @@ template<class F> void rejects(F action) {
 void set_half(std::span<std::byte> bytes, std::size_t offset, std::uint16_t bits) {
     bytes[offset] = static_cast<std::byte>(bits & 255);
     bytes[offset + 1] = static_cast<std::byte>(bits >> 8);
+}
+
+void tagged_boundaries() {
+    for (const std::string text : {"<done>answer</done>", "<think></done></think><done>answer<think></done></think></done>", "<tool_call>{}</tool_call>"}) {
+        for (std::size_t split = 0; split < text.size(); ++split) {
+            stellan::TaggedStop stop;
+            require(!stop.push(std::string_view(text).substr(0, split)));
+            require(stop.push(std::string_view(text).substr(split)));
+        }
+    }
+    stellan::TaggedStop stop;
+    require(!stop.push("Plain answer </done><think></tool_call></think>"));
+    require(stop.push("<done>actual</done>"));
 }
 
 void halves() {
@@ -373,7 +387,7 @@ void additional_kernels() {
 
 int main() {
     try {
-        halves();
+        tagged_boundaries(); halves();
         quantized();
         recurrence();
         additional_kernels();

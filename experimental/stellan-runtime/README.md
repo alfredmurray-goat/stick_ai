@@ -173,3 +173,6 @@ ARM prefill batches now route each quantized input through the existing NEON Q4/
 
 
 Release reliability follow-up: ARM kernels now read the process-fixed scalar override once per kernel path, avoiding repeated environment lookups in inner inference loops. No new whole-model speedup is claimed. Windows diagnostics showed an accurate read followed by untagged plain-text summaries, not established token truncation. Protocol recovery now explicitly requests both final-summary tags and continues to reject untagged output. The full desktop check uses the application's 2,048-token output allowance rather than a separate 256-token cap and saves each attempt, partial output and elapsed time on failure. It still requires an actual file read and a final summary containing the returned nonce; the 45-minute deadline is unchanged.
+
+
+Lite tagged sessions now end naturally at a completed tool or done block, with thought-block handling and byte fallback. The bridge holds one final text fragment until native completion settles, preserving its worker rather than treating successful block completion as cancellation. Existing leading whitespace is preserved when the next prompt is formatted. Only exact evaluated prefixes are reused; user cancellation still retires partial state. This is completion detection, not grammar enforcement or automatic approval.

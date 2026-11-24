@@ -2,6 +2,7 @@
 #include "lite.hpp"
 #include "max.hpp"
 #include "host_input.hpp"
+#include "tagged_stop.hpp"
 #include <optional>
 
 #include <algorithm>
@@ -93,12 +94,13 @@ std::vector<std::int32_t> ids(std::string_view csv, std::size_t vocabulary, std:
 
 int session(int argc, char **argv, const std::function<bool()> &cancelled, SessionOptions options) {
     if (argc < 6) { throw std::runtime_error("Usage: serve MODEL SHA256 THREADS CONTEXT [--force-max] [--split PATH SHA256]"); }
-    bool force = false;
+    bool force = false, tagged = false;
     std::filesystem::path split_path;
     std::string split_hash;
     for (int i = 6; i < argc; ++i) {
         const std::string_view option(argv[i]);
         if (option == "--force-max" && !force) force = true;
+        else if (option == "--tagged" && !tagged) tagged = true;
         else if (option == "--split" && split_path.empty() && i + 2 < argc) {
             split_path = std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[++i])));
             split_hash = argv[++i];
@@ -135,6 +137,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
     Model model(mapping.bytes());
     if (split_mapping) { const Model continuation(split_mapping->bytes(), true); model.attach(continuation); }
     else if (model.has("split.count") && model.number("split.count") > 1) throw std::runtime_error("Supply the verified continuation split");
+    if (tagged && model.architecture() != "mamba2") throw std::runtime_error("Tagged completion currently supports Lite only");
     const auto boundary = model.number("tokenizer.ggml.eos_token_id");
     if (boundary < 0 || boundary >= static_cast<double>(model.vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
     const auto eos = static_cast<std::int32_t>(boundary);
@@ -191,13 +194,27 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
             const auto prompt_ms = elapsed(start);
             const auto decode_start = Clock::now();
             unsigned generated = 0;
+            TaggedStop boundary_stop;
+            bool completed_tag = false;
             for (; generated < limit && !cancelled(); ) {
                 const auto token = static_cast<std::int32_t>(std::max_element(logits->begin(), logits->end()) - logits->begin());
                 ++generated;
                 std::cout << "{\"event\":\"token\",\"request_id\":" << request << ",\"id\":" << token;
                 if (options.host) std::cout << ",\"bytes_hex\":" << json_string(to_hex(tokenizer->decode(token)));
                 std::cout << "}\n" << std::flush;
-                if (token == eos || generated == limit) { break; }
+                if (tagged) {
+                    const auto index = static_cast<std::size_t>(token);
+                    const auto &piece = model.vocabulary()[index];
+                    if (model.token_types()[index] == 6) {
+                        unsigned byte = 0;
+                        if (piece.size() != 6 || piece.substr(0, 3) != "<0x" || piece[5] != '>') throw std::runtime_error("Invalid byte fallback token");
+                        const auto parsed = std::from_chars(piece.data() + 3, piece.data() + 5, byte, 16);
+                        if (parsed.ec != std::errc() || parsed.ptr != piece.data() + 5 || byte > 255) throw std::runtime_error("Invalid byte fallback token");
+                        const char value = static_cast<char>(byte);
+                        completed_tag = boundary_stop.push(std::string_view(&value, 1));
+                    } else if (model.token_types()[index] != 3) completed_tag = boundary_stop.push(piece);
+                }
+                if (token == eos || generated == limit || completed_tag) { break; }
                 logits = &engine->step(token, cancelled);
                 processed.push_back(token);
             }
@@ -205,6 +222,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
             std::cout << "{\"event\":\"finished\",\"request_id\":" << request << ",\"model_sha256\":" << json_string(expected)
                       << ",\"reused_tokens\":" << reused << ",\"evaluated_prompt_tokens\":" << tokens.size() - reused
                       << ",\"prompt_ms\":" << prompt_ms << ",\"decode_ms\":" << elapsed(decode_start)
+                      << ",\"stop_reason\":" << json_string(completed_tag ? "tagged" : generated == limit ? "length" : "eos")
                       << ",\"generated\":" << generated << ",\"cpu_ms\":" << usage().cpu_ms - cpu_start
                       << ",\"peak_rss_bytes\":" << usage().peak_rss_bytes << "}\n" << std::flush;
         } catch (const std::exception &error) {
