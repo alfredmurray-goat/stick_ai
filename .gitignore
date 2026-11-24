@@ -11,3 +11,6 @@ release-assets/
 experimental/stellan-runtime/build/
 experimental/stellan-runtime/tests/__pycache__/
 node_modules
+
+# Local Forge walkthrough/review artifacts
+forge-walkthrough/

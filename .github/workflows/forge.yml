@@ -1,0 +1,25 @@
+name: Stellan Forge
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['experimental/stellan-forge/**', '.github/workflows/forge.yml']
+  push:
+    branches: ['feat/stellan-forge-experience']
+    paths: ['experimental/stellan-forge/**', '.github/workflows/forge.yml']
+permissions:
+  contents: read
+jobs:
+  experience:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test review, leakage exclusions and bounded exports
+        run: python -m unittest discover -s experimental/stellan-forge/tests -v

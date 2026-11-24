@@ -1,0 +1,39 @@
+{
+  "format": 1,
+  "task": {
+    "id": "synthetic-forge-walkthrough",
+    "repository": "fixture/repo",
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "family": "synthetic-forge-walkthrough",
+    "source": "forge",
+    "purpose": "evaluation"
+  },
+  "runtime": {
+    "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "run": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "link": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "harness": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "synthetic-forge-walkthrough"
+    },
+    {
+      "role": "assistant",
+      "content": "<done>Verified fixture correction</done>"
+    }
+  ],
+  "events": [
+    {
+      "kind": "test",
+      "text": "trusted fixture report retained"
+    }
+  ],
+  "outcome": {
+    "status": "passed",
+    "report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "verifier": "test fixture; not a model benchmark"
+  }
+}
