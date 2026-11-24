@@ -14,3 +14,4 @@ node_modules
 
 # Local Forge walkthrough/review artifacts
 forge-walkthrough/
+experimental/stellan-forge/**/__pycache__/
