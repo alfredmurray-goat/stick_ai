@@ -176,3 +176,5 @@ Release reliability follow-up: ARM kernels now read the process-fixed scalar ove
 
 
 Lite tagged sessions now end naturally at a completed tool or done block, with thought-block handling and byte fallback. The bridge holds one final text fragment until native completion settles, preserving its worker rather than treating successful block completion as cancellation. Existing leading whitespace is preserved when the next prompt is formatted. Only exact evaluated prefixes are reused; user cancellation still retires partial state. This is completion detection, not grammar enforcement or automatic approval.
+
+Lite tagged sessions additionally constrain each response root (and the root after a thought block) to a model-generated think/tool_call/done opening tag, preventing untagged plain answers. EOS is unavailable before a completed block. Tool JSON remains separately validated; this is not full GBNF grammar support. This targeted format constraint addresses repeated untagged Windows summaries in desktop45335948206; cross-platform real-model verification is still required.

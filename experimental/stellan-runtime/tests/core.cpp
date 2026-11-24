@@ -33,6 +33,14 @@ void set_half(std::span<std::byte> bytes, std::size_t offset, std::uint16_t bits
 }
 
 void tagged_boundaries() {
+    stellan::TaggedStop root;
+    require(!root.allows("An untagged final answer"));
+    require(root.allows(" <done>Answer</done>"));
+    require(root.allows("<tool_call>{}"));
+    root.push(" <thi"); require(root.allows("nk>reasoning")); require(!root.allows("ngs"));
+    root.push("nk>reasoning</think>"); require(!root.allows("untagged")); require(root.allows("<done>"));
+    root.push("<done>"); require(root.allows("ordinary final text"));
+
     for (const std::string text : {"<done>answer</done>", "<think></done></think><done>answer<think></done></think></done>", "<tool_call>{}</tool_call>"}) {
         for (std::size_t split = 0; split < text.size(); ++split) {
             stellan::TaggedStop stop;

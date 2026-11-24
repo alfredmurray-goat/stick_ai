@@ -197,7 +197,26 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
             TaggedStop boundary_stop;
             bool completed_tag = false;
             for (; generated < limit && !cancelled(); ) {
-                const auto token = static_cast<std::int32_t>(std::max_element(logits->begin(), logits->end()) - logits->begin());
+                auto token = static_cast<std::int32_t>(std::max_element(logits->begin(), logits->end()) - logits->begin());
+                if (tagged) {
+                    float best = -std::numeric_limits<float>::infinity();
+                    token = -1;
+                    for (std::size_t candidate = 0; candidate < logits->size(); ++candidate) {
+                        if (static_cast<std::int32_t>(candidate) == eos || (*logits)[candidate] <= best || model.token_types()[candidate] == 3) continue;
+                        std::string piece = model.vocabulary()[candidate];
+                        if (model.token_types()[candidate] == 6) {
+                            unsigned byte = 0;
+                            if (piece.size() != 6) throw std::runtime_error("Invalid byte fallback token");
+                            const auto parsed = std::from_chars(piece.data() + 3, piece.data() + 5, byte, 16);
+                            if (parsed.ec != std::errc() || parsed.ptr != piece.data() + 5 || byte > 255) throw std::runtime_error("Invalid byte fallback token");
+                            piece.assign(1, static_cast<char>(byte));
+                        } else {
+                            for (std::size_t pos = 0; (pos = piece.find("▁", pos)) != std::string::npos; ++pos) piece.replace(pos, 3, " ");
+                        }
+                        if (!piece.empty() && boundary_stop.allows(piece)) { best = (*logits)[candidate]; token = static_cast<std::int32_t>(candidate); }
+                    }
+                    if (token < 0) throw std::runtime_error("No token satisfies the tagged response boundary");
+                }
                 ++generated;
                 std::cout << "{\"event\":\"token\",\"request_id\":" << request << ",\"id\":" << token;
                 if (options.host) std::cout << ",\"bytes_hex\":" << json_string(to_hex(tokenizer->decode(token)));
@@ -212,7 +231,11 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
                         if (parsed.ec != std::errc() || parsed.ptr != piece.data() + 5 || byte > 255) throw std::runtime_error("Invalid byte fallback token");
                         const char value = static_cast<char>(byte);
                         completed_tag = boundary_stop.push(std::string_view(&value, 1));
-                    } else if (model.token_types()[index] != 3) completed_tag = boundary_stop.push(piece);
+                    } else if (model.token_types()[index] != 3) {
+                        std::string decoded = piece;
+                        for (std::size_t pos = 0; (pos = decoded.find("▁", pos)) != std::string::npos; ++pos) decoded.replace(pos, 3, " ");
+                        completed_tag = boundary_stop.push(decoded);
+                    }
                 }
                 if (token == eos || generated == limit || completed_tag) { break; }
                 logits = &engine->step(token, cancelled);
