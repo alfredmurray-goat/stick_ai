@@ -75,7 +75,7 @@ it("starts Max once more without its speed settings if the llama.cpp build refus
   expect(lite.plainFallback).toBe(false);
 });
 
-it("remembers on the stick that the welcome tour was seen, and keeps Long context mode", async () => {
+it("remembers on the stick that the welcome tour was seen, Long context mode and About you", async () => {
   const { mkdtemp, cp, rm } = await import("node:fs/promises");
   const { join, resolve } = await import("node:path");
   const { tmpdir } = await import("node:os");
@@ -93,10 +93,12 @@ it("remembers on the stick that the welcome tour was seen, and keeps Long contex
     const first = await open();
     expect((await first.api("/api/state")).onboarded).toBe(false);
     await first.api("/api/onboarded", {}); await first.api("/api/long-context", { enabled: true });
+    expect((await first.api("/api/state")).personal).toEqual({ name: "", about: "", style: "balanced", preferences: "" });
+    expect((await first.api("/api/personal", { name: "Sam", about: "Runs a bakery", style: "beginner", preferences: "British spelling", admin: true })).personal).toEqual({ name: "Sam", about: "Runs a bakery", style: "beginner", preferences: "British spelling" });
     expect(await first.api("/api/state")).toMatchObject({ onboarded: true, longContext: true, contextTokens: { lite: 262144, max: 16384 } });
     await first.app.close();
     const second = await open();
-    expect(await second.api("/api/state")).toMatchObject({ onboarded: true, longContext: true });
+    expect(await second.api("/api/state")).toMatchObject({ onboarded: true, longContext: true, personal: { name: "Sam", style: "beginner", preferences: "British spelling" } });
     await second.app.close();
   } finally { await rm(root, { recursive: true, force: true }); }
 });

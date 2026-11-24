@@ -400,6 +400,9 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.
 .approval-head > .i { width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: var(--grad); color: #fff; stroke-width: 2; box-shadow: 0 6px 18px -6px var(--glow-a); }
 .approval-card h3 { font-size: 15px; font-weight: 650; margin: 0; }
 .approval-sub { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.approval-detail { margin: 0 16px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.approval-image { display: block; max-width: calc(100% - 32px); max-height: 180px; margin: 10px 16px 0; border-radius: 10px; border: 1px solid var(--border); background: var(--code-bg); object-fit: contain; }
+#settings-you textarea { width: 100%; resize: vertical; }
 .approval-card > pre { margin: 0 16px; padding: 12px 14px; max-height: 320px; overflow: auto; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font: 12.5px/1.65 var(--mono); }
 .diff { margin: 0 16px; max-height: 340px; overflow: auto; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font: 12.5px/1.65 var(--mono); padding: 6px 0; }
 .diff-line { display: flex; padding: 0 14px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

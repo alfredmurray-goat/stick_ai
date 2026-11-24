@@ -160,7 +160,7 @@
     <form id="question" class="composer">
       <label for="prompt" class="sr-only">What would you like to make?</label>
       <div id="attachments" class="attachments" aria-live="polite" hidden></div>
-      <input id="attachment-files" type="file" multiple hidden aria-label="Attach text or documents" accept=".txt,.md,.csv,.tsv,.json,.jsonl,.yaml,.yml,.toml,.xml,.html,.svg,.js,.jsx,.ts,.tsx,.py,.rs,.go,.java,.c,.h,.cpp,.cs,.rb,.php,.swift,.sh,.sql,.log,.pdf,.docx">
+      <input id="attachment-files" type="file" multiple hidden aria-label="Attach text, documents or images" accept=".png,.jpg,.jpeg,.gif,.webp,.ico,.bmp,.avif,.txt,.md,.csv,.tsv,.json,.jsonl,.yaml,.yml,.toml,.xml,.html,.svg,.js,.jsx,.ts,.tsx,.py,.rs,.go,.java,.c,.h,.cpp,.cs,.rb,.php,.swift,.sh,.sql,.log,.pdf,.docx">
       <textarea id="prompt" rows="2" placeholder="Ask Stellan to build, explain, or fix something…" spellcheck="false"></textarea>
       <div class="composer-toolbar">
         <button id="attach-files" class="chip-button" type="button" title="Text, code, PDF text and DOCX · up to 4 files"><svg class="i"><use href="#i-file"/></svg> Attach</button>
@@ -221,7 +221,7 @@
 </dialog>
 <dialog id="settings-dialog" class="settings-dialog">
   <div class="dialog-heading"><div class="app-tile" aria-hidden="true"><img class="tile logo-dark" src="brand/icon-dark.png" alt=""><img class="tile logo-light" src="brand/icon-light.png" alt=""></div><div><h2>Stick AI</h2><p>Your private coding assistant.</p></div><button id="close-settings" class="icon-button" aria-label="Close settings"><svg class="i"><use href="#i-x"/></svg></button></div>
-  <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="hooks">Hooks</button><button data-settings="updates">Updates</button></nav>
+  <nav class="settings-tabs" aria-label="Settings"><button data-settings="models" class="active">Models</button><button data-settings="you">About you</button><button data-settings="github">GitHub</button><button data-settings="mcp">MCP</button><button data-settings="skills">Skills</button><button data-settings="hooks">Hooks</button><button data-settings="updates">Updates</button></nav>
 
   <div id="settings-models" class="settings-page">
     <h3>Your local models</h3>
@@ -251,6 +251,24 @@
     </fieldset>
 
     <p id="running-model-note" class="status-box" hidden>Model files and the GGUF picker are managed from the launch screen. Close and reopen the app to change them. Your project files are kept.</p>
+  </div>
+
+  <div id="settings-you" class="settings-page" hidden>
+    <h3>About you</h3>
+    <p>Tell Stellan about yourself and how you like it to talk. It's saved on your stick and used from your next message. It shapes how Stellan explains things, never what it's allowed to do.</p>
+    <p id="personal-native" class="status-box" hidden>Open the workspace to change this.</p>
+    <div id="personal-fields" class="form-group">
+      <label for="personal-name">What should Stellan call you?</label>
+      <input id="personal-name" type="text" maxlength="60" placeholder="For example: Sam" autocomplete="off">
+      <label for="personal-about">What do you do?</label>
+      <textarea id="personal-about" rows="3" maxlength="1000" placeholder="For example: I run a small bakery and I'm learning to build our website."></textarea>
+      <label for="personal-style">How should Stellan talk to you?</label>
+      <select id="personal-style"><option value="balanced">Normal</option><option value="concise">Short and to the point</option><option value="explanatory">Explain what it did and why</option><option value="beginner">Beginner-friendly, no jargon</option></select>
+      <label for="personal-preferences">Anything else Stellan should keep in mind?</label>
+      <textarea id="personal-preferences" rows="4" maxlength="1500" placeholder="For example: Use British spelling. Explain with everyday comparisons. Our site uses Tailwind."></textarea>
+      <div class="button-row"><button id="personal-save" class="primary small" type="button">Save</button></div>
+      <p id="personal-message" class="muted" role="status"></p>
+    </div>
   </div>
 
   <div id="settings-github" class="settings-page" hidden>

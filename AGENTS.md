@@ -33,6 +33,13 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 | `docs/` | Guides and README images |
 | `ollama/` | Modelfiles for terminal use with Ollama |
 
+## Where the project is heading
+
+- **Long-term goal: a Rolling LM** (also "Rolling LLM"): our own model that keeps learning from its own work on a rolling schedule, overnight or even hourly, so it's always getting smarter. Forge supplies reviewed, verified experience; training produces small updates; Stellan-Run serves them; signed updates deliver them. Never train on unreviewed output, benchmark/holdout tasks or customer chats. See HANDOVER.md.
+- **Forge** (`experimental/stellan-forge`) is Stellan's public showcase and data loop: Lite and Max fix issues in open-source repositories that explicitly allow AI-assisted contributions and open pull requests as demos; we benchmark that work and train the next version on the reviewed data. Every PR is reviewed by a person first and discloses AI assistance; no bulk submissions.
+- **Vision: EU models only.** Lite and Max learn to see in the next training with Mistral Small 3.1's image encoder ("the eye", Apache-2.0) and a projector each; no non-EU vision models. Stellan-Run carries the eye now. Until then, images can be attached and copied into the project (`save_image`), but the models don't see them.
+- **About you** (Settings, `src/portable/personal.ts`) goes in the task message, never the system message (see the prompt-cache rule below).
+
 ## Rules that must not be broken
 
 - **Never commit model weights.** `.gguf` files are gitignored and downloaded with pinned SHA-256s by `scripts/fetch-platform-assets.mjs` and `scripts/assemble-full-release.mjs`.
@@ -45,7 +52,7 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 - **GitHub sign-in tokens stay in memory.** `GitHubSignIn` (`src/portable/github-auth.ts`) keeps the device-flow token in the Node process only: never saved, logged, sent to the window or put in model context. Never add a client secret or the GitHub App's private key to the app.
 - **Activation stays offline after the first start.** `Activation` (`src/portable/activation.ts`) checks a saved Ed25519 certificate against `activationPublicKey` at every start; only activating contacts the website. Never ship the private signing key (it lives in the website's database), and keep `activationPublicKey` empty in tests. See docs/ACTIVATION.md.
 - **Model keys never live in the repository or the app.** Locked models (`src/portable/model-lock.ts`) are unlocked with keys the website hands out at activation, sealed per stick. Never commit a model key or a plain model, and keep `scripts/llama-split-dir.patch` applied in every llama.cpp build (change the server cache key with it).
-- **Approvals stay mandatory.** Writes, edits, shell commands and MCP calls go through the approval callbacks. Don't add bypasses. Hooks (`src/portable/hooks.ts`, docs/HOOKS.md) can block or add notes but never approve, and are only read from the app's own settings, never from a project folder.
+- **Approvals stay mandatory.** Writes, edits, image copies (`save_image`), shell commands and MCP calls go through the approval callbacks. Don't add bypasses. Hooks (`src/portable/hooks.ts`, docs/HOOKS.md) can block or add notes but never approve, and are only read from the app's own settings, never from a project folder.
 
 ## Releases
 

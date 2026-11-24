@@ -31,6 +31,17 @@ bool available() {
     return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") && __builtin_cpu_supports("f16c");
 #endif
 }
+// Exact integer horizontal sum (wrapping int32 addition is associative, so the order doesn't matter).
+STELLAN_AVX2 inline int hsum32(__m256i value) {
+    auto sum = _mm_add_epi32(_mm256_castsi256_si128(value), _mm256_extracti128_si256(value, 1));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1));
+    return _mm_cvtsi128_si32(sum);
+}
+// minimum[g] * (sum of the activation's two 16-value sums in group g), for all eight groups at once.
+STELLAN_AVX2 inline int q4_minima(const QuantizedInput &x, __m256i minima) {
+    return hsum32(_mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima));
+}
 STELLAN_AVX2 float half_float(std::uint16_t bits) {
     return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(static_cast<int>(bits))));
 }
@@ -91,7 +102,7 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);
         auto accumulator = _mm256_setzero_si256();
-        int minima = 0;
+        alignas(32) std::int16_t mins[16] {};
         for (std::size_t g = 0; g < 8; ++g) {
             if (type == 12) {
                 const auto *s = p + 4;
@@ -103,9 +114,8 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
                 if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
                 q = _mm256_and_si256(q, _mm256_set1_epi8(15));
                 const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
-                const auto sums = _mm256_madd_epi16(_mm256_maddubs_epi16(q, x), _mm256_set1_epi16(1));
-                accumulator = _mm256_add_epi32(accumulator, _mm256_mullo_epi32(sums, _mm256_set1_epi32(static_cast<int>(scale))));
-                minima += static_cast<int>(offset) * (input[b].sums[g * 2] + input[b].sums[g * 2 + 1]);
+                accumulator = _mm256_add_epi32(accumulator, _mm256_madd_epi16(_mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale))));
+                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
             } else {
                 const auto quarter = g % 4;
                 for (std::size_t j = 0; j < 32; j += 16) {
@@ -115,15 +125,15 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
                     const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
                     const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[b].values.data() + g * 32 + j)));
                     const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
-                    accumulator = _mm256_add_epi32(accumulator, _mm256_mullo_epi32(_mm256_madd_epi16(q, x), _mm256_set1_epi32(raw < 128 ? raw : raw - 256)));
+                    accumulator = _mm256_add_epi32(accumulator, _mm256_madd_epi16(_mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256))), x));
                 }
             }
         }
-        alignas(32) std::int32_t lanes[8];
-        _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator);
-        int sum = 0;
-        for (const auto value : lanes) { sum += value; }
-        if (type == 12) { total += input[b].scale * (half_float(read_half(p)) * static_cast<float>(sum) - half_float(read_half(p + 2)) * static_cast<float>(minima)); }
+        const int sum = hsum32(accumulator);
+        if (type == 12) {
+            const int minima = q4_minima(input[b], _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            total += input[b].scale * (half_float(read_half(p)) * static_cast<float>(sum) - half_float(read_half(p + 2)) * static_cast<float>(minima));
+        }
         else { total += input[b].scale * half_float(read_half(p + 208)) * static_cast<float>(sum); }
     }
     return total;
@@ -134,7 +144,7 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 144;
         __m256i accumulator[Count];
-        int minima[Count] {};
+        alignas(32) std::int16_t mins[16];
         for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
         for (std::size_t g = 0; g < 8; ++g) {
             const auto *scales = p + 4;
@@ -145,23 +155,22 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
             auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
             if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
             q = _mm256_and_si256(q, _mm256_set1_epi8(15));
-            const auto multiplier = _mm256_set1_epi32(static_cast<int>(scale));
+            // scale <= 63 and |maddubs| <= 3810, so scale * pair sum fits int32 exactly: same integers, one instruction.
+            const auto multiplier = _mm256_set1_epi16(static_cast<short>(scale));
             for (std::size_t t = 0; t < Count; ++t) {
                 const auto &x = input[t][block];
                 const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
-                const auto sums = _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), _mm256_set1_epi16(1));
-                accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(sums, multiplier));
-                minima[t] += static_cast<int>(minimum) * (x.sums[g * 2] + x.sums[g * 2 + 1]);
+                accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), multiplier));
             }
+            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
         }
         const auto scale = half_float(read_half(p));
         const auto minimum = half_float(read_half(p + 2));
+        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
         for (std::size_t t = 0; t < Count; ++t) {
-            alignas(32) std::int32_t lanes[8];
-            _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator[t]);
-            int sum = 0;
-            for (const auto value : lanes) { sum += value; }
-            output[t] += input[t][block].scale * (scale * static_cast<float>(sum) - minimum * static_cast<float>(minima[t]));
+            const int sum = hsum32(accumulator[t]);
+            const int minima = q4_minima(input[t][block], minima_vector);
+            output[t] += input[t][block].scale * (scale * static_cast<float>(sum) - minimum * static_cast<float>(minima));
         }
     }
 }
@@ -180,19 +189,17 @@ STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::s
                 const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
                 const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
                 const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
-                const auto multiplier = _mm256_set1_epi32(raw < 128 ? raw : raw - 256);
+                // |q| <= 32 and |scale| <= 128, so q * scale fits int16; one multiply per group instead of one per token.
+                const auto scaled = _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256)));
                 for (std::size_t t = 0; t < Count; ++t) {
                     const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[t][block].values.data() + g * 32 + j)));
-                    accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(_mm256_madd_epi16(q, x), multiplier));
+                    accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_madd_epi16(scaled, x));
                 }
             }
         }
         const auto scale = half_float(read_half(p + 208));
         for (std::size_t t = 0; t < Count; ++t) {
-            alignas(32) std::int32_t lanes[8];
-            _mm256_store_si256(reinterpret_cast<__m256i *>(lanes), accumulator[t]);
-            int sum = 0;
-            for (const auto value : lanes) { sum += value; }
+            const int sum = hsum32(accumulator[t]);
             output[t] += input[t][block].scale * scale * static_cast<float>(sum);
         }
     }

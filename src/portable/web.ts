@@ -23,7 +23,8 @@ import { coderSystem } from "../agent/delegate.js";
 import { agentInstructions, runAgent } from "../agent/index.js";
 import { Ollama } from "../model/ollama.js";
 import { ChatMemory } from "./chat-memory.js";
-import { inputCapabilities, prepareAttachments, inputPrompt, InputError } from "../model/inputs.js";
+import { inputCapabilities, prepareAttachments, inputPrompt, imageLabel, InputError, type PreparedAttachment } from "../model/inputs.js";
+import { normalisePersonal, personalInstructions, personalStyles, personalLimits, emptyPersonal, type Personal } from "./personal.js";
 import { Tools } from "../tools/index.js";
 import { Sandbox } from "../sandbox/paths.js";
 import { ramStatus } from "../config/models.js";
@@ -86,11 +87,19 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       notifyHooks("Notification", { notification_type: "permission_prompt", message: `Stellan wants to run: ${command.slice(0, 200)}. Allow it in the app.` });
       return;
     }
+    if (description.startsWith("save_image ")) {
+      const image = JSON.parse(description.slice(11)) as { path: string; label: string; replaces: boolean }; const preview = attachedImages.get(image.label.split(" · ")[0]!);
+      publish("approval", undefined, { id, kind: "image", file: basename(image.path), path: image.path, title: image.label, replaces: image.replaces, ...(preview?.bytes && preview.image && preview.bytes.length <= 512 * 1024 && preview.image.mime !== "image/avif" ? { preview: `data:${preview.image.mime};base64,${preview.bytes.toString("base64")}` } : {}) });
+      notifyHooks("Notification", { notification_type: "permission_prompt", message: `Stellan wants to add ${basename(image.path)} to your project. Approve it in the app.`, path: image.path });
+      return;
+    }
     const space = description.indexOf(" "); const args = JSON.parse(description.slice(space + 1)) as Record<string, string>;
     publish("approval", undefined, { id, file: basename(args.path ?? "your file"), path: args.path ?? "", before: args.old ?? "", after: args.new ?? args.content ?? "" });
     notifyHooks("Notification", { notification_type: "permission_prompt", message: `Stellan wants to change ${basename(args.path ?? "a file")}. Approve or keep your file in the app.`, path: args.path ?? "" });
   }), undefined, undefined, nativeFileBackend(root, box.root));
   let tools = makeTools();
+  // Images attached in this conversation, by name, so save_image can copy one into the project after approval.
+  const attachedImages = new Map<string, PreparedAttachment>();
   let extensionStatus = ""; let extensionProblem = "";
   const mcp = new McpServers(root, box.root, (name, text) => { extensionStatus = `MCP · ${name}: ${text}`; publish("status", extensionStatus); });
   const skills = new Skills(root, box.root);
@@ -98,8 +107,8 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   for (const load of [() => mcp.load(), () => skills.load(), () => hooks.load()]) { try { await load(); } catch { extensionProblem = "Some extension settings could not be loaded. Review MCP, Skills and Hooks settings."; } }
   // Long context mode keeps far more of the conversation word for word and gives both models bigger
   // windows, at the cost of slower re-reads; it is saved with the app's settings on the stick.
-  let longContext = false, onboarded = false, internet = true;
-  try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; } catch {}
+  let longContext = false, onboarded = false, internet = true; let personal: Personal = { ...emptyPersonal };
+  try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; personal = normalisePersonal(saved?.personal); } catch {}
   // "Allow internet" (on by default) covers everything that reaches beyond this computer: web search,
   // GitHub, remote MCP servers and HTTP hooks. The models never need it. Activation is the one exception:
   // typing the printed code is an explicit request to go online once.
@@ -110,7 +119,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   let pendingModel: string | undefined;
   if (activation) { await activation.check().catch(log); }
   const needsActivation = (): boolean => Boolean(activation && !activation.active);
-  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet }).catch(log);
+  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet, personal }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
   // Free space on this computer, for the window's warning (see diskMinimum in engine.ts).
   // Rounded to 50 MB so the long-polled state doesn't change every minute for nothing.
@@ -168,7 +177,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     await engine.stop(); resting = model; report("Resting to free memory. Your next message wakes the model.");
     for (const wake of waiters) { wake(); }
   };
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
     tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
@@ -184,7 +193,8 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       const files = await prepareAttachments(attachments, active.signal);
       const remembered = !history.length && !maxHistory.length ? chatMemory?.recall() : "";
       const modelText = inputPrompt(text, files) + (remembered ? "\n\n<saved_chat_notes>\n" + JSON.stringify(remembered).replaceAll("<", "\\u003c") + "\n</saved_chat_notes>" : "");
-      if (files.length) { publish("attachments", undefined, files.map(({ name, kind, text: content }) => ({ name, kind, textBytes: Buffer.byteLength(content) }))); }
+      for (const file of files) { if (file.kind === "image") { attachedImages.set(file.name, file); } }
+      if (files.length) { publish("attachments", undefined, files.map((file) => ({ name: file.name, kind: file.kind, textBytes: file.kind === "image" ? 0 : Buffer.byteLength(file.text), ...(file.kind === "image" ? { label: imageLabel(file) } : {}) }))); }
       await restWork;
       if (resting) {
         const model = resting; progress.begin("loading"); report("Waking up the model..."); publish("status", "Waking up the model...");
@@ -201,9 +211,15 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         if (checked.blocked) { status = "blocked"; throw new HookError(`A hook stopped this message before Stellan saw it: ${checked.blocked}`); }
         if (checked.context) { notes += (notes ? "\n" : "") + checked.context; }
       }
-      const taskInstructions = [skill.instructions, notes ? `Notes from the user's hooks:\n${notes}` : ""].filter(Boolean).join("\n\n");
+      // "About you" goes with the first task of a conversation, again when it changes, and again if
+      // compaction summarised it away; resending it every task would make Lite re-read it each time.
+      const about = personalInstructions(personal);
+      const aboutForLite = about && !history.some((message) => message.content.includes(about)) ? about : "";
+      const extras = [skill.instructions, notes ? `Notes from the user's hooks:\n${notes}` : ""].filter(Boolean);
+      const taskInstructions = [aboutForLite, ...extras].filter(Boolean).join("\n\n");
+      const maxInstructions = [about, ...extras].filter(Boolean).join("\n\n");
       if (selected === "stellan-1-max") {
-        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (taskInstructions ? "\n" + taskInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
+        const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (maxInstructions ? "\n" + maxInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
         if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: modelText }, { role: "assistant", content: result.content }); return;
       }
       await runAgent({
@@ -214,6 +230,14 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         } : undefined,
         model: { complete: (...args) => { progress.begin("thinking"); return new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete(...args); } },
         tools: { execute: async (call, signal) => {
+          if (call.function.name === "save_image") {
+            let value: Record<string, unknown>; try { value = JSON.parse(call.function.arguments) as Record<string, unknown>; } catch { return "Error: save_image arguments must be a JSON object."; }
+            if (!value || typeof value !== "object" || typeof value.name !== "string" || typeof value.path !== "string") return "Error: give save_image the attached image's name and a project-relative path.";
+            const image = attachedImages.get(value.name);
+            if (!image?.bytes) return `Error: no attached image is called ${JSON.stringify(value.name)}. Attached images: ${JSON.stringify([...attachedImages.keys()])}.`;
+            try { const saved = await tools.saveImage(value.path, image.bytes, imageLabel(image), signal); if (saved.startsWith("Saved ")) { publish("file-saved", value.path); } return saved; }
+            catch (error) { if (signal.aborted) throw signal.reason; return `Error: ${error instanceof Error ? error.message : "the image could not be saved"}`; }
+          }
           if (["mcp_tools", "mcp_call", "use_skill", "web_search", "read_web_page"].includes(call.function.name)) {
             const args: unknown = JSON.parse(call.function.arguments); if (!args || typeof args !== "object" || Array.isArray(args)) return "Error: extension arguments must be a JSON object.";
             const value = args as Record<string,unknown>;
@@ -262,7 +286,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.method === "GET" && url.pathname === "/api/chat-memory") { send(response, 200, { ...(chatMemory?.view() ?? {}), notes: chatMemory?.notes() ?? "Chat memory is unavailable." }); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, personal, personalStyles, personalLimits, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -327,7 +351,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       }
       if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) {
         repositoryOperation = new AbortController();
-        try { await chatMemory?.newChat(); tokenCounts.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); }
+        try { await chatMemory?.newChat(); tokenCounts.clear(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); }
         finally { repositoryOperation = undefined; }
         return;
       }
@@ -393,6 +417,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         internet = data.enabled; await applyInternet(); if (!internet) { signIn.cancel(); }
         await savePreferences(); send(response, 200, {}); return;
       }
+      if (url.pathname === "/api/personal") { personal = normalisePersonal(data); await savePreferences(); publish("status", "Saved. Stellan will use this from your next message."); send(response, 200, { personal }); return; }
       if (url.pathname === "/api/onboarded") { onboarded = true; await savePreferences(); send(response, 200, {}); return; }
       if (url.pathname === "/api/long-context" && typeof data.enabled === "boolean" && !active && !loading && !repositoryOperation) {
         longContext = data.enabled; engine.plan = contextPlan(options.bytes, longContext);

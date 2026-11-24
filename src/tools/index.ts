@@ -28,6 +28,34 @@ export class Tools {
       return new TextDecoder("utf-8", { fatal: true }).decode(await file.readFile());
     } finally { await file.close(); }
   }
+  // Writes through a temporary file and a rename, so a cancelled or failed write never leaves half a file.
+  private async writeAtomic(path: string, data: Buffer, signal: AbortSignal): Promise<void> {
+    await mkdir(dirname(await this.box.path(path)), { recursive: true });
+    const target = await this.box.path(path);
+    let mode = 0o600;
+    try { mode = (await stat(target)).mode & 0o777; } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; }
+    }
+    const temporary = join(dirname(target), `.stick-${randomUUID()}.tmp`);
+    const file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+    try {
+      await file.writeFile(data); await file.sync();
+      signal.throwIfAborted();
+      await this.box.path(path);
+      await rename(temporary, target);
+    } finally { await file.close(); await rm(temporary, { force: true }); }
+  }
+  /** Copies an image the user attached into the project, after the user approves the exact path. */
+  async saveImage(path: string, bytes: Buffer, label: string, signal: AbortSignal): Promise<string> {
+    signal.throwIfAborted();
+    if (!path.trim() || bytes.length === 0 || bytes.length > 2 * 1024 ** 2) { throw new Error("save_image needs a project-relative path and an attached image up to 2 MB"); }
+    let replaces = false;
+    try { replaces = (await stat(await this.box.path(path))).isFile(); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; } }
+    if (!await this.approve(`save_image ${JSON.stringify({ path, label, replaces })}`, signal)) { return "Denied by user"; }
+    signal.throwIfAborted();
+    await this.writeAtomic(path, bytes, signal);
+    return `Saved ${label} to ${path}`;
+  }
   async execute(call: Call, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted();
     if (!toolNames.includes(call.function.name)) { throw new Error(`Unknown tool name: ${call.function.name}`); }
@@ -62,20 +90,7 @@ export class Tools {
       const path = get("path");
       const content = name === "edit_file" ? replaceUnique(await this.read(path), get("old"), get("new")) : get("content");
       if (Buffer.byteLength(content) > 1048576) { throw new Error("Write exceeds 1 MiB"); }
-      await mkdir(dirname(await this.box.path(path)), { recursive: true });
-      const target = await this.box.path(path);
-      let mode = 0o600;
-      try { mode = (await stat(target)).mode & 0o777; } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; }
-      }
-      const temporary = join(dirname(target), `.stick-${randomUUID()}.tmp`);
-      const file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
-      try {
-        await file.writeFile(content, "utf8"); await file.sync();
-        signal.throwIfAborted();
-        await this.box.path(path);
-        await rename(temporary, target);
-      } finally { await file.close(); await rm(temporary, { force: true }); }
+      await this.writeAtomic(path, Buffer.from(content, "utf8"), signal);
       return `Wrote ${Buffer.byteLength(content)} bytes to ${path}`;
     }
     if (name === "search_files") {
