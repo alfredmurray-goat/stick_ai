@@ -105,6 +105,12 @@ Risks: maintainers are tired of low-quality AI PRs, so one bad PR can get the ac
 - **Link:** `cross-spawn` replaced by `spawn-command.ts`, which escapes batch arguments twice (closing an injection path through `npx.cmd`), never searches the project folder, and is tested with a real `.cmd` on Windows CI. No third-party MCP code ships now.
 - **Host:** chat memory now lives in Host's native state store for packages that ship Host (gate 2, first piece), with a hash-checked client, carry-over of old notes and a real-binary test in CTest on every platform. After a restart the window now shows the current chat again from those notes ("Earlier in this chat").
 
+### Open issue found overnight: Lite on 8 GB Apple Silicon (memory, not code)
+
+The release smoke test failed on `macos-arm64` only (Linux, Windows and Intel Mac passed in 2–4 minutes). The Apple Silicon runner has 7.5 GB of RAM; when other processes hold a little more than usual, the file cache left over is smaller than Lite (4.15 GB). Every new word reads the whole model, so with a cache slightly too small *every* read misses and the model is re-read from disk again and again: about 270 GB of page-ins in one run, steps 15× slower than Linux. The last passing Apple Silicon run (72) had 0.45 GB in the memory compressor; the failing ones (74 on main, and tonight) had about 1.06 GB. Same cause, not a code change: Stellan-Run's Apple Silicon code did not change between them.
+
+Measured here by squeezing Stellan-Run into 3.7 GB: 2.15 s per word instead of 0.35 s (6× slower). `madvise` hints (sequential, random) changed nothing, and a quick pinning test was inconclusive in a Linux container. **This matters for customers with 8 GB Macs** with a browser open. Options, in order: (1) measure on a real 8 GB Apple Silicon Mac; (2) a smaller Lite file (training/packaging decision: e.g. a 3.5 GB quantisation, measured for quality first); (3) carefully pinning most of the model on low-memory machines, tested on real hardware. Until then the 8 GB Apple Silicon experience may be slow when other apps use memory.
+
 ### Next steps per component
 
 - **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.
