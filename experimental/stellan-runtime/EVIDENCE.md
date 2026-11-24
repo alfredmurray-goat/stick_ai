@@ -236,3 +236,22 @@ Stellan-Run is about 6% slower here and uses about 5% less memory. It started at
 **A finding about that file.** It was uploaded on 1 May 2025 with `clip.use_gelu = true`, copied from Mistral's original config. Mistral corrected the encoder's activation to SiLU on 9 May 2025 ("Updated `hidden_act` to `silu`", Hugging Face commit `73ce7c62b9`). llama.cpp follows the flag, so on the file as published its output differs substantially from the corrected model (cosine 0.66 against Stellan-Run). Stellan-Run always runs SiLU and reports `"file_says_gelu": true`. For the like-for-like numbers above, llama.cpp ran a copy with the key renamed to `clip.use_silu`.
 
 Not done yet: PNG/JPEG decoding inside Stellan-Run (`see` takes raw RGB), feeding image tokens into Lite or Max (that needs the trained projectors), and AVX-VNNI kernels for newer laptops. Raw receipt: [eye-mistral-small-3.1.json](evidence/eye-mistral-small-3.1.json).
+
+## VNNI kernels and vector lane totals — 24 November 2026
+
+Two changes, both giving bit-identical integer sums (generated IDs identical across all three engines):
+- **VNNI at start-up**: on CPUs with AVX-VNNI (Intel 12th gen+, AMD Zen 5) or AVX512-VNNI (Ice/Tiger Lake, AMD Zen 4), the Q4_K/Q6_K/Q8_0 kernels use `vpdpwssd`/`vpdpbusd` (multiply-and-add in one instruction). `STELLAN_RUNTIME_NO_VNNI=1` keeps AVX2; ctest `core-avx2` covers that path. Not compiled with MSVC yet.
+- **Lane totals**: per-block results stay in a float vector and are summed once per row, removing two horizontal sums per token per block (exact int32 to float, below 2^24).
+
+Same paired setup (3 rounds, 2 threads, real Lite, this VM has AVX-VNNI). This run was slower overall than the previous section's (shared VM), so compare within the table:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Peak RSS |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 12,177 | 5,319 | 4,545 MiB |
+| 112 tokens | previous Stellan-Run (main) | 18,068 | 7,236 | 4,247 MiB |
+| 112 tokens | this change | 17,073 | 6,885 | 4,247 MiB |
+| 130 tokens | llama.cpp | 13,870 | 5,354 | 4,549 MiB |
+| 130 tokens | previous Stellan-Run (main) | 20,888 | 7,093 | 4,247 MiB |
+| 130 tokens | this change | 17,698 | 6,767 | 4,247 MiB |
+
+About 5–15% faster prompts and 5% faster decode than main; llama.cpp still reads prompts about 1.3–1.4× as fast and decodes about 25% faster. The remaining gap is structural: llama.cpp's CPU path repacks Q4_K rows so one load serves eight rows. Next step (the M1 principle): store Lite's weights pre-interleaved for our kernels when the stick is made. Raw receipt: [lite-vnni-lane-totals.json](evidence/lite-vnni-lane-totals.json).

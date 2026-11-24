@@ -23,21 +23,42 @@ Read this first; older sections below may describe the earlier llama.cpp app.
 - **Images: no third model, EU models only (superseded the earlier "hidden third model" idea the same day).** Teach Lite and Max to see in the next training by giving both the same small image encoder ("the eye") plus a small adapter each. Every vision component must come from an EU company. Put the eye into Stellan-Run now, before training, so it's ready.
 - **Shipped now without vision:** attach an image (for example a logo) and Stellan adds it to the project with `save_image` after the user approves (`docs/INPUTS.md`). Settings → **About you** (name, what you do, how to talk, preferences) shapes replies, like Claude's personal preferences. New, clearer system prompts for Lite and Max.
 - **Forge is the open-source showcase and data loop** (owner's definition, below). It replaces the "unnamed initiative" of 22 November.
-- **Long-term goal: a Rolling LM** (below).
+- **RLM (Rolling Language Model) is a separate project** (below). Here: the **M1 principle**: engine, models and stick designed together. Also planned: Vibe Code Bench, and apps that Stellan builds and powers.
 
-### Long-term goal: the Rolling LM
+### Guiding principle: the M1 moment
 
-Build our own model that keeps learning from its own work on a rolling schedule (overnight, or even hourly), so it's always getting smarter. Call it a **Rolling LLM** or **Rolling LM**.
+Apple's M1 beat general-purpose chips because the hardware, operating system and apps were designed together. Our equivalent: **Stellan-Run, the Stellan models and the stick are designed together**. Stellan-Run doesn't need to run every model on Hugging Face; it needs to run Lite, Max and the eye faster and lighter than any general engine. Concretely:
+- **Pick the best instructions on each computer at start-up** (done for AVX2, AVX-VNNI and AVX512-VNNI; next: ARM dot-product/i8mm and Metal).
+- **Prepare the model for the engine when the stick is made**, not on the customer's computer: we control the stick, so weights can be stored in a Stellan-native layout (rows interleaved for our kernels, as llama.cpp's "repack" does at load time) that's checked like any other file.
+- **Specialise for our exact shapes**: Lite's width 4096 and Mamba2 state, Max's 5120 and 40 layers, and the eye's 1024; no generic code paths where a fixed shape is faster.
+- **Measure against the pinned llama.cpp every time** (EVIDENCE.md) and publish losses as well as wins.
 
-How the pieces line up: Forge produces reviewed, verified experience (real issues, real tests, maintainer feedback); training turns accepted experience into a new version; Stellan-Run serves it; signed updates deliver it to sticks. Things that must be solved first, honestly:
-- **Forgetting.** Training on new work erodes old skills. Each rolling update needs a fixed regression suite (HumanEval, a private agentic suite, a frozen SWE-bench slice) and is only shipped if nothing regresses.
-- **Quality of the data.** Only learn from attempts that a verifier passed and a person (or a maintainer's merge) accepted; never from unreviewed output, or it learns its own mistakes.
-- **Evaluation leakage.** Keep holdout and benchmark tasks out of training for good (Forge's export already enforces this).
-- **Cost and cadence.** A full fine-tune of a 24B model every hour isn't realistic yet; start with small LoRA updates on a schedule (weekly → nightly), measure, then shorten.
-- **Updates to sticks.** A new model is a multi-GB update; ship adapters (LoRA deltas) rather than whole models where possible, signed like app updates.
-- **Licences and consent.** Only train on code and conversations we have the right to use; customer chats never leave the stick unless a customer explicitly opts in.
+### Not this project: RLM (Rolling Language Model)
 
-Until then, **About you** in Settings gives the feel of a model that knows you, without training.
+The owner's **RLM (Rolling Language Model)** is a **separate project**: a new kind of model that keeps learning from what it does. It does not live in this repository; don't build it here. Ideas from 24 November 2026 that may help it: fast memory notes per task (no training), small nightly adapters trained only on verified and accepted work with a replay set against forgetting, a frozen regression gate before anything ships, monthly consolidation, and signed adapter updates. Stick AI can later ship RLM models through the normal update path. Inside Stick AI, **About you** gives the feel of a model that knows you.
+
+### Planned: Stellan builds apps that Stellan powers
+
+Customers should be able to ask "make me a game where the shopkeeper talks back" and get a game whose characters are run by Stellan, on the same stick, offline.
+- **Design (not built yet):** Settings → **Stellan for your apps**, off by default. When on, apps on this computer can call a local, OpenAI-compatible endpoint (`/v1/chat/completions` on 127.0.0.1 only, Host-header checked, CORS only for localhost origins) with a per-stick app key. The first request from each app shows an approval card; a busy model answers 503 "try again shortly" instead of interrupting the user's task; Lite's prompt cache is saved before and restored after each app request (`engine.saveLiteCache`/`restoreLiteCache`). Stellan gets the URL and key in the task message (never the system message). Plain chat only, no tools; replies capped at 1,024 tokens.
+- **After that:** a JavaScript/Python helper library the app can import, streaming replies, a small "game master" example project on the stick, and later letting a finished app ship with its own copy of Lite.
+
+### Planned: Vibe Code Bench (v1.1, now v1.1.1)
+
+[Vibe Code Bench](https://www.vals.ai/benchmarks/vibe-code) (Vals AI; paper [arXiv:2603.04601](https://arxiv.org/abs/2603.04601)) measures building whole web apps from a written spec: 100 specs (**50 private validation, 50 held-out test, none public**), 964 browser workflows with 10,131 substeps, checked by an autonomous browser agent against the deployed app, using the OpenHands harness. v1.1 (19 November 2026) has since been superseded by **v1.1.1** (stricter grader, every substep must pass). For reference on v1.1: Inkling 2 Mini 77.92%, Mistral Large 4 81.56%, Qwen 3.8 27B 64.85%, top 93.77% (checked 24 November 2026).
+- **We can't run it ourselves**: the specs are private, so Vals AI must run Stellan. Prepare an OpenAI-compatible endpoint for Max (and Lite + Max) on a hosted GPU, then ask Vals AI to evaluate on the current version.
+- **Our own practice suite first**: 20 internal web-app specs with Playwright browser checks, run through the app's own agent loop, so we can improve before an official run.
+- **Self-testing matters**: the paper found self-testing during generation strongly predicts success (r = 0.72). Give Stellan an approved, sandboxed browser check (open the app it built, click through, read errors) before claiming an app works.
+- Expect a low first score: a 24B dense model with a 7B orchestrator against frontier models. Publish it honestly with the date and version.
+
+### Lessons from Inkling 2 Mini (Thinking Machines, 20 November 2026)
+
+[Inkling 2 Mini](https://thinkingmachines.ai/news/inkling-2-mini/) is a 26.4B mixture-of-experts model with 3.4B active parameters per token. It loops its middle layers three times per token, is trained and run natively in 4-bit (NVFP4), takes about 20 GB, runs offline on a MacBook Pro, and scores 77.9% on Vibe Code Bench v1.1. It is a US model, so under the EU-only rule it's a source of ideas, not a base or teacher. What to borrow:
+- **Mixture of experts for Max's successor**: decode speed on a CPU is set by the parameters read per token, so a ~25B-total, ~3–5B-active EU model would answer several times faster than today's dense 24B Max at similar quality. Evaluate any EU open-weight MoE of that size when choosing the next base.
+- **Train for 4-bit**: quantisation-aware fine-tuning so the Q4 file on the stick loses nothing against the full-precision model.
+- **Looping**: more thinking per token without longer outputs. It needs training from the start, and on a CPU each loop re-reads those weights, so measure decode speed before adopting it.
+- **Tools instead of memorised facts**: they compensate for small-model knowledge with search; we already have Actuent web search. Train Stellan to use it well.
+- **The demo**: their headline was a laptop on a flight building a playable flight simulator offline. Ours should be the same idea on a stick: Stellan builds a game, offline, whose characters are powered by Stellan.
 
 ### Planned: vision for Lite and Max (EU only)
 

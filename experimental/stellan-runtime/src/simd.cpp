@@ -12,6 +12,10 @@
 #define STELLAN_AVX2
 #else
 #define STELLAN_AVX2 __attribute__((target("avx2,fma,f16c")))
+#include <cpuid.h>
+#define STELLAN_HAS_VNNI 1
+#define STELLAN_VNNI __attribute__((target("avx2,fma,f16c,avxvnni")))
+#define STELLAN_VNNI512 __attribute__((target("avx2,fma,f16c,avx512f,avx512vl,avx512vnni")))
 #endif
 
 namespace stellan {
@@ -32,22 +36,12 @@ bool available() {
     return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") && __builtin_cpu_supports("f16c");
 #endif
 }
-// Exact integer horizontal sum (wrapping int32 addition is associative, so the order doesn't matter).
-STELLAN_AVX2 inline int hsum32(__m256i value) {
-    auto sum = _mm_add_epi32(_mm256_castsi256_si128(value), _mm256_extracti128_si256(value, 1));
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E));
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1));
-    return _mm_cvtsi128_si32(sum);
-}
 // minimum[g] * (sum of the activation's two 16-value sums in group g), for all eight groups at once.
 STELLAN_AVX2 inline float hsum_ps(__m256 value) {
     auto sum = _mm_add_ps(_mm256_castps256_ps128(value), _mm256_extractf128_ps(value, 1));
     sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
     return _mm_cvtss_f32(sum);
-}
-STELLAN_AVX2 inline int q4_minima(const QuantizedInput &x, __m256i minima) {
-    return hsum32(_mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima));
 }
 STELLAN_AVX2 float half_float(std::uint16_t bits) {
     return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(static_cast<int>(bits))));
@@ -105,7 +99,7 @@ STELLAN_AVX2 float packed_dot(std::uint32_t type, std::span<const std::byte> row
 }
 
 STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input) {
-    float total = 0;
+    auto totals = _mm256_setzero_ps();
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);
         auto accumulator = _mm256_setzero_si256();
@@ -136,18 +130,20 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
                 }
             }
         }
-        const int sum = hsum32(accumulator);
+        // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
         if (type == 12) {
-            const int minima = q4_minima(input[b], _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
-            total += input[b].scale * (half_float(read_half(p)) * static_cast<float>(sum) - half_float(read_half(p + 2)) * static_cast<float>(minima));
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
+            totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
         }
-        else { total += input[b].scale * half_float(read_half(p + 208)) * static_cast<float>(sum); }
+        else { totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 208))), totals); }
     }
-    return total;
+    return hsum_ps(totals);
 }
 template<std::size_t Count>
 STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
-    std::fill(output.begin(), output.end(), 0.0f);
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 144;
         __m256i accumulator[Count];
@@ -174,16 +170,21 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
         const auto scale = half_float(read_half(p));
         const auto minimum = half_float(read_half(p + 2));
         const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
+        // the conversion is exact, and two horizontal sums per token per block disappear.
         for (std::size_t t = 0; t < Count; ++t) {
-            const int sum = hsum32(accumulator[t]);
-            const int minima = q4_minima(input[t][block], minima_vector);
-            output[t] += input[t][block].scale * (scale * static_cast<float>(sum) - minimum * static_cast<float>(minima));
+            const auto &x = input[t][block];
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima_vector);
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(x.scale * scale), totals[t]);
+            totals[t] = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(x.scale * minimum), totals[t]);
         }
     }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
 }
 template<std::size_t Count>
 STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
-    std::fill(output.begin(), output.end(), 0.0f);
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 210;
         __m256i accumulator[Count];
@@ -206,10 +207,10 @@ STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::s
         }
         const auto scale = half_float(read_half(p + 208));
         for (std::size_t t = 0; t < Count; ++t) {
-            const int sum = hsum32(accumulator[t]);
-            output[t] += input[t][block].scale * scale * static_cast<float>(sum);
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(input[t][block].scale * scale), totals[t]);
         }
     }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
 }
 // Q8_0 weights (32 int8 values and one f16 scale per block) against int8 activations. abs(weight) times
 // sign-adjusted activation keeps maddubs's unsigned-by-signed form; 128 * 127 * 2 still fits int16.
@@ -392,6 +393,365 @@ STELLAN_AVX2 void recurrent(std::size_t width, std::size_t states, std::span<con
 }
 }
 
+#ifdef STELLAN_HAS_VNNI
+// The same kernels with VNNI: vpdpwssd/vpdpbusd multiply pairs (or quads) and add to the running int32
+// sum in one instruction. Products and sums are identical to the AVX2 versions (no saturation is reached),
+// so results are bit-for-bit the same; only the instruction count drops.
+STELLAN_VNNI float q8_dot_vnni(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input) {
+    auto totals = _mm256_setzero_ps();
+    for (std::size_t b = 0; b < input.size(); ++b) {
+        const auto *p = row.data() + b * (type == 12 ? 144 : 210);
+        auto accumulator = _mm256_setzero_si256();
+        alignas(32) std::int16_t mins[16] {};
+        for (std::size_t g = 0; g < 8; ++g) {
+            if (type == 12) {
+                const auto *s = p + 4;
+                const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
+                    (std::to_integer<unsigned>(s[g + 4]) & 15U) | ((std::to_integer<unsigned>(s[g - 4]) >> 6) << 4);
+                const auto offset = g < 4 ? std::to_integer<unsigned>(s[g + 4]) & 63U :
+                    (std::to_integer<unsigned>(s[g + 4]) >> 4) | ((std::to_integer<unsigned>(s[g]) >> 6) << 4);
+                auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
+                if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
+                q = _mm256_and_si256(q, _mm256_set1_epi8(15));
+                const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
+                accumulator = _mm256_dpwssd_avx_epi32(accumulator, _mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale)));
+                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
+            } else {
+                const auto quarter = g % 4;
+                for (std::size_t j = 0; j < 32; j += 16) {
+                    auto low = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j)));
+                    if (quarter >= 2) { low = _mm256_srli_epi16(low, 4); }
+                    const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
+                    const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
+                    const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[b].values.data() + g * 32 + j)));
+                    const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                    accumulator = _mm256_dpwssd_avx_epi32(accumulator, _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256))), x);
+                }
+            }
+        }
+        // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
+        if (type == 12) {
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
+            totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
+        }
+        else { totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 208))), totals); }
+    }
+    return hsum_ps(totals);
+}
+template<std::size_t Count>
+STELLAN_VNNI void q4_tile_vnni(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 144;
+        __m256i accumulator[Count];
+        alignas(32) std::int16_t mins[16];
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto *scales = p + 4;
+            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
+            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
+            if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
+            q = _mm256_and_si256(q, _mm256_set1_epi8(15));
+            // scale <= 63 and |maddubs| <= 3810, so scale * pair sum fits int32 exactly: same integers, one instruction.
+            const auto multiplier = _mm256_set1_epi16(static_cast<short>(scale));
+            for (std::size_t t = 0; t < Count; ++t) {
+                const auto &x = input[t][block];
+                const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
+                accumulator[t] = _mm256_dpwssd_avx_epi32(accumulator[t], _mm256_maddubs_epi16(q, values), multiplier);
+            }
+            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
+        }
+        const auto scale = half_float(read_half(p));
+        const auto minimum = half_float(read_half(p + 2));
+        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
+        // the conversion is exact, and two horizontal sums per token per block disappear.
+        for (std::size_t t = 0; t < Count; ++t) {
+            const auto &x = input[t][block];
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima_vector);
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(x.scale * scale), totals[t]);
+            totals[t] = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(x.scale * minimum), totals[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
+}
+template<std::size_t Count>
+STELLAN_VNNI void q6_tile_vnni(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 210;
+        __m256i accumulator[Count];
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto quarter = g % 4;
+            for (std::size_t j = 0; j < 32; j += 16) {
+                auto low = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j)));
+                if (quarter >= 2) { low = _mm256_srli_epi16(low, 4); }
+                const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
+                const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
+                const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                // |q| <= 32 and |scale| <= 128, so q * scale fits int16; one multiply per group instead of one per token.
+                const auto scaled = _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256)));
+                for (std::size_t t = 0; t < Count; ++t) {
+                    const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[t][block].values.data() + g * 32 + j)));
+                    accumulator[t] = _mm256_dpwssd_avx_epi32(accumulator[t], scaled, x);
+                }
+            }
+        }
+        const auto scale = half_float(read_half(p + 208));
+        for (std::size_t t = 0; t < Count; ++t) {
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(input[t][block].scale * scale), totals[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
+}
+template<std::size_t Count>
+STELLAN_VNNI void fine_tile_vnni(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    __m256 sums[Count];
+    for (std::size_t t = 0; t < Count; ++t) { sums[t] = _mm256_setzero_ps(); }
+    for (std::size_t g = 0; g < input.front().size(); ++g) {
+        const auto *p = row.data() + g * 34;
+        const auto weights = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 2));
+        const auto magnitude = _mm256_sign_epi8(weights, weights);
+        const auto scale = half_float(read_half(p));
+        for (std::size_t t = 0; t < Count; ++t) {
+            const auto &x = input[t][g];
+            const auto values = _mm256_sign_epi8(_mm256_load_si256(reinterpret_cast<const __m256i *>(x.values.data())), weights);
+            const auto products = _mm256_dpbusd_avx_epi32(_mm256_setzero_si256(), magnitude, values);
+            sums[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(products), _mm256_set1_ps(scale * x.scale), sums[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(sums[t]); }
+}
+STELLAN_VNNI void q4_batch_vnni(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { q4_tile_vnni<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q4_tile_vnni<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: q4_tile_vnni<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q4_tile_vnni<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q4_tile_vnni<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_VNNI void q6_batch_vnni(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { q6_tile_vnni<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q6_tile_vnni<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: q6_tile_vnni<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q6_tile_vnni<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q6_tile_vnni<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_VNNI void fine_batch_vnni(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { fine_tile_vnni<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { fine_tile_vnni<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: fine_tile_vnni<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: fine_tile_vnni<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: fine_tile_vnni<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_VNNI512 float q8_dot_vnni512(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input) {
+    auto totals = _mm256_setzero_ps();
+    for (std::size_t b = 0; b < input.size(); ++b) {
+        const auto *p = row.data() + b * (type == 12 ? 144 : 210);
+        auto accumulator = _mm256_setzero_si256();
+        alignas(32) std::int16_t mins[16] {};
+        for (std::size_t g = 0; g < 8; ++g) {
+            if (type == 12) {
+                const auto *s = p + 4;
+                const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
+                    (std::to_integer<unsigned>(s[g + 4]) & 15U) | ((std::to_integer<unsigned>(s[g - 4]) >> 6) << 4);
+                const auto offset = g < 4 ? std::to_integer<unsigned>(s[g + 4]) & 63U :
+                    (std::to_integer<unsigned>(s[g + 4]) >> 4) | ((std::to_integer<unsigned>(s[g]) >> 6) << 4);
+                auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
+                if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
+                q = _mm256_and_si256(q, _mm256_set1_epi8(15));
+                const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
+                accumulator = _mm256_dpwssd_epi32(accumulator, _mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale)));
+                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
+            } else {
+                const auto quarter = g % 4;
+                for (std::size_t j = 0; j < 32; j += 16) {
+                    auto low = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j)));
+                    if (quarter >= 2) { low = _mm256_srli_epi16(low, 4); }
+                    const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
+                    const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
+                    const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[b].values.data() + g * 32 + j)));
+                    const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                    accumulator = _mm256_dpwssd_epi32(accumulator, _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256))), x);
+                }
+            }
+        }
+        // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
+        if (type == 12) {
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
+            totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
+        }
+        else { totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 208))), totals); }
+    }
+    return hsum_ps(totals);
+}
+template<std::size_t Count>
+STELLAN_VNNI512 void q4_tile_vnni512(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 144;
+        __m256i accumulator[Count];
+        alignas(32) std::int16_t mins[16];
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto *scales = p + 4;
+            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
+            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
+                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
+            if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
+            q = _mm256_and_si256(q, _mm256_set1_epi8(15));
+            // scale <= 63 and |maddubs| <= 3810, so scale * pair sum fits int32 exactly: same integers, one instruction.
+            const auto multiplier = _mm256_set1_epi16(static_cast<short>(scale));
+            for (std::size_t t = 0; t < Count; ++t) {
+                const auto &x = input[t][block];
+                const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
+                accumulator[t] = _mm256_dpwssd_epi32(accumulator[t], _mm256_maddubs_epi16(q, values), multiplier);
+            }
+            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
+        }
+        const auto scale = half_float(read_half(p));
+        const auto minimum = half_float(read_half(p + 2));
+        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
+        // the conversion is exact, and two horizontal sums per token per block disappear.
+        for (std::size_t t = 0; t < Count; ++t) {
+            const auto &x = input[t][block];
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima_vector);
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(x.scale * scale), totals[t]);
+            totals[t] = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(x.scale * minimum), totals[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
+}
+template<std::size_t Count>
+STELLAN_VNNI512 void q6_tile_vnni512(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    __m256 totals[Count];
+    for (std::size_t t = 0; t < Count; ++t) { totals[t] = _mm256_setzero_ps(); }
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * 210;
+        __m256i accumulator[Count];
+        for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto quarter = g % 4;
+            for (std::size_t j = 0; j < 32; j += 16) {
+                auto low = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j)));
+                if (quarter >= 2) { low = _mm256_srli_epi16(low, 4); }
+                const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
+                const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
+                const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                // |q| <= 32 and |scale| <= 128, so q * scale fits int16; one multiply per group instead of one per token.
+                const auto scaled = _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256)));
+                for (std::size_t t = 0; t < Count; ++t) {
+                    const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[t][block].values.data() + g * 32 + j)));
+                    accumulator[t] = _mm256_dpwssd_epi32(accumulator[t], scaled, x);
+                }
+            }
+        }
+        const auto scale = half_float(read_half(p + 208));
+        for (std::size_t t = 0; t < Count; ++t) {
+            totals[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator[t]), _mm256_set1_ps(input[t][block].scale * scale), totals[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(totals[t]); }
+}
+template<std::size_t Count>
+STELLAN_VNNI512 void fine_tile_vnni512(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    __m256 sums[Count];
+    for (std::size_t t = 0; t < Count; ++t) { sums[t] = _mm256_setzero_ps(); }
+    for (std::size_t g = 0; g < input.front().size(); ++g) {
+        const auto *p = row.data() + g * 34;
+        const auto weights = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 2));
+        const auto magnitude = _mm256_sign_epi8(weights, weights);
+        const auto scale = half_float(read_half(p));
+        for (std::size_t t = 0; t < Count; ++t) {
+            const auto &x = input[t][g];
+            const auto values = _mm256_sign_epi8(_mm256_load_si256(reinterpret_cast<const __m256i *>(x.values.data())), weights);
+            const auto products = _mm256_dpbusd_epi32(_mm256_setzero_si256(), magnitude, values);
+            sums[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(products), _mm256_set1_ps(scale * x.scale), sums[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(sums[t]); }
+}
+STELLAN_VNNI512 void q4_batch_vnni512(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { q4_tile_vnni512<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q4_tile_vnni512<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: q4_tile_vnni512<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q4_tile_vnni512<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q4_tile_vnni512<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_VNNI512 void q6_batch_vnni512(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { q6_tile_vnni512<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q6_tile_vnni512<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: q6_tile_vnni512<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q6_tile_vnni512<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q6_tile_vnni512<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_VNNI512 void fine_batch_vnni512(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { fine_tile_vnni512<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { fine_tile_vnni512<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: fine_tile_vnni512<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: fine_tile_vnni512<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: fine_tile_vnni512<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+#endif
+namespace {
+// AVX-VNNI (Intel 12th gen and later, AMD Zen 5) or AVX512-VNNI with VL (Intel Ice Lake/Tiger Lake and
+// later server/laptop parts, AMD Zen 4). STELLAN_RUNTIME_NO_VNNI keeps the AVX2 kernels for comparison.
+enum class Vnni { none, avx, avx512 };
+Vnni vnni() {
+#ifdef STELLAN_HAS_VNNI
+    static const Vnni level = [] {
+        if (environment_set("STELLAN_RUNTIME_NO_VNNI") || !available()) { return Vnni::none; }
+        unsigned a = 0, b = 0, c = 0, d = 0;
+        if (__get_cpuid_count(7, 1, &a, &b, &c, &d) && (a & (1U << 4)) != 0) { return Vnni::avx; }
+        if (__get_cpuid_count(7, 0, &a, &b, &c, &d) && (c & (1U << 11)) != 0 && (b & (1U << 31)) != 0 && (b & (1U << 16)) != 0) {
+            // AVX-512 state must also be enabled by the operating system (XCR0 opmask and upper ZMM bits).
+            unsigned low = 0, high = 0;
+            __asm__("xgetbv" : "=a"(low), "=d"(high) : "c"(0));
+            if ((low & 0xE6) == 0xE6) { return Vnni::avx512; }
+        }
+        return Vnni::none;
+    }();
+    return level;
+#else
+    return Vnni::none;
+#endif
+}
+}
 bool accelerated_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const float> input, float &result) {
     static const bool enabled = available();
     if (!enabled || (type != 12 && type != 14)) { return false; }
@@ -401,20 +761,32 @@ bool accelerated_dot(std::uint32_t type, std::span<const std::byte> row, std::sp
 bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input, float &result) {
     static const bool enabled = available();
     if (!enabled) { return false; }
+#ifdef STELLAN_HAS_VNNI
+    if (vnni() == Vnni::avx) { result = q8_dot_vnni(type, row, input); return true; }
+    if (vnni() == Vnni::avx512) { result = q8_dot_vnni512(type, row, input); return true; }
+#endif
     result = q8_dot(type, row, input);
     return true;
 }
 bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     static const bool enabled = available();
     if (!enabled || (type != 8 && type != 12 && type != 14)) { return false; }
-    if (type == 8) { q8_0_batch(row, input, output); }
-    else if (type == 12) { q4_batch(row, input, output); }
+    if (type == 8) { q8_0_batch(row, input, output); return true; }
+#ifdef STELLAN_HAS_VNNI
+    if (vnni() == Vnni::avx) { if (type == 12) { q4_batch_vnni(row, input, output); } else { q6_batch_vnni(row, input, output); } return true; }
+    if (vnni() == Vnni::avx512) { if (type == 12) { q4_batch_vnni512(row, input, output); } else { q6_batch_vnni512(row, input, output); } return true; }
+#endif
+    if (type == 12) { q4_batch(row, input, output); }
     else { q6_batch(row, input, output); }
     return true;
 }
 bool accelerated_fine_batch_dot(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
     static const bool enabled = available();
     if (!enabled) { return false; }
+#ifdef STELLAN_HAS_VNNI
+    if (vnni() == Vnni::avx) { fine_batch_vnni(row, input, output); return true; }
+    if (vnni() == Vnni::avx512) { fine_batch_vnni512(row, input, output); return true; }
+#endif
     fine_batch(row, input, output);
     return true;
 }
