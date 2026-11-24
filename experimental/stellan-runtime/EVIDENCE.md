@@ -286,3 +286,16 @@ Same paired setup (3 rotating rounds, 2 threads, real Lite, AVX-VNNI VM), with t
 Decode is about 25% faster than before and now within 2–9% of llama.cpp; prompt reading is within 7–8%. On the 112-token prompt the whole run used less CPU time than llama.cpp. Peak memory is about 300 MB lower than llama.cpp (see the previous section). Generated IDs were identical across all three engines. Raw receipt: [lite-paired-q4k-unpack.json](evidence/lite-paired-q4k-unpack.json).
 
 **A loss, recorded:** a Q6_K kernel that feeds unsigned 6-bit weights through `maddubs` (32 products per instruction instead of 16) and corrects the offset once per block was exact (same checksums), but **slower** for batches on this Xeon: 32-token batch 2.9–3.4 ms against 2.1 ms (`stellan-batch-bench`, 4096-wide rows), with no change for single rows on Max's 137 MB `ffn_down` (memory-bound, 64 ms either way). Both versions use the same two multiply-port instructions per 32 values, and the old one's widening loads run on a different port for free. It was not merged. Q6_K speed-ups should come from fewer bytes moved, not fewer instructions.
+
+**Follow-up the same evening: per-token steps across cores.** Quantising each token's input before a batched multiply and the gate-and-normalise step after Mamba2 mixing ran on one core; both are per token, so tokens are now shared across cores (bit-identical; generated IDs identical across all three engines). A second paired run (3 rounds), with the build above as "previous":
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Process CPU ms |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 9,558 | 4,550 | 27,990 |
+| 112 tokens | previous Stellan-Run | 9,727 | 4,489 | 25,768 |
+| 112 tokens | this change | 9,340 | 5,056 | 26,841 |
+| 130 tokens | llama.cpp | 10,580 | 4,503 | 29,960 |
+| 130 tokens | previous Stellan-Run | 11,551 | 4,913 | 29,920 |
+| 130 tokens | this change | 11,729 | 4,939 | 30,891 |
+
+Honest reading: the change itself is **within noise** (−4% and +2% on prompts; decode does not use it, so the decode difference shows this VM's run-to-run spread of about 10%). It is kept because it is exact and removes serial work that matters more with more cores. The useful result is the comparison with llama.cpp: on the 112-token prompt Stellan-Run now **matches or beats llama.cpp on prompt reading and decode while using about 5–8% less CPU**; on the 130-token prompt it is still about 9–11% slower at reading the prompt. Raw receipt: [lite-paired-parallel-quantise.json](evidence/lite-paired-parallel-quantise.json).
