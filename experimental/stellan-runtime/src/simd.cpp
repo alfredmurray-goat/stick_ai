@@ -103,8 +103,7 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
                 if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
                 q = _mm256_and_si256(q, _mm256_set1_epi8(15));
                 const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
-                const auto sums = _mm256_madd_epi16(_mm256_maddubs_epi16(q, x), _mm256_set1_epi16(1));
-                accumulator = _mm256_add_epi32(accumulator, _mm256_mullo_epi32(sums, _mm256_set1_epi32(static_cast<int>(scale))));
+                accumulator = _mm256_add_epi32(accumulator, _mm256_madd_epi16(_mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale))));
                 minima += static_cast<int>(offset) * (input[b].sums[g * 2] + input[b].sums[g * 2 + 1]);
             } else {
                 const auto quarter = g % 4;
@@ -115,7 +114,7 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
                     const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
                     const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[b].values.data() + g * 32 + j)));
                     const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
-                    accumulator = _mm256_add_epi32(accumulator, _mm256_mullo_epi32(_mm256_madd_epi16(q, x), _mm256_set1_epi32(raw < 128 ? raw : raw - 256)));
+                    accumulator = _mm256_add_epi32(accumulator, _mm256_madd_epi16(_mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256))), x));
                 }
             }
         }
@@ -145,12 +144,12 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
             auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
             if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
             q = _mm256_and_si256(q, _mm256_set1_epi8(15));
-            const auto multiplier = _mm256_set1_epi32(static_cast<int>(scale));
+            // scale <= 63 and |maddubs| <= 3810, so scale * pair sum fits int32 exactly: same integers, one instruction.
+            const auto multiplier = _mm256_set1_epi16(static_cast<short>(scale));
             for (std::size_t t = 0; t < Count; ++t) {
                 const auto &x = input[t][block];
                 const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
-                const auto sums = _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), _mm256_set1_epi16(1));
-                accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(sums, multiplier));
+                accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), multiplier));
                 minima[t] += static_cast<int>(minimum) * (x.sums[g * 2] + x.sums[g * 2 + 1]);
             }
         }
@@ -180,10 +179,11 @@ STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::s
                 const auto high = _mm256_srl_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(p + 128 + (g / 4) * 32 + j))), _mm_cvtsi32_si128(static_cast<int>(quarter * 2)));
                 const auto q = _mm256_sub_epi16(_mm256_or_si256(_mm256_and_si256(low, _mm256_set1_epi16(15)), _mm256_slli_epi16(_mm256_and_si256(high, _mm256_set1_epi16(3)), 4)), _mm256_set1_epi16(32));
                 const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
-                const auto multiplier = _mm256_set1_epi32(raw < 128 ? raw : raw - 256);
+                // |q| <= 32 and |scale| <= 128, so q * scale fits int16; one multiply per group instead of one per token.
+                const auto scaled = _mm256_mullo_epi16(q, _mm256_set1_epi16(static_cast<short>(raw < 128 ? raw : raw - 256)));
                 for (std::size_t t = 0; t < Count; ++t) {
                     const auto x = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(input[t][block].values.data() + g * 32 + j)));
-                    accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_mullo_epi32(_mm256_madd_epi16(q, x), multiplier));
+                    accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_madd_epi16(scaled, x));
                 }
             }
         }
