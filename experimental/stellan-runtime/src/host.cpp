@@ -15,12 +15,13 @@ int entry(int argc, char **argv) {
     try {
         // A disconnected owner must not leave inference running with nowhere to send it.
         std::cout.exceptions(std::ios::badbit | std::ios::failbit);
-        if (argc < 5 || argc > 10) throw std::runtime_error("Usage: stellan-host MODEL SHA256 THREADS CONTEXT [--token-ids] [--force-max] [--split PATH SHA256]");
-        bool text = true, force = false;
+        if (argc < 5 || argc > 11) throw std::runtime_error("Usage: stellan-host MODEL SHA256 THREADS CONTEXT [--lazy] [--token-ids] [--force-max] [--split PATH SHA256]");
+        bool text = true, force = false, lazy = false;
         std::vector<std::string> split;
         for (int i = 5; i < argc; ++i) {
             const std::string_view option(argv[i]);
             if (option == "--token-ids" && text) text = false;
+            else if (option == "--lazy" && !lazy) lazy = true;
             else if (option == "--force-max" && !force) force = true;
             else if (option == "--split" && split.empty() && i + 2 < argc) { split.emplace_back("--split"); split.emplace_back(argv[++i]); split.emplace_back(argv[++i]); }
             else throw std::runtime_error("Unknown or duplicate native-host option");
@@ -30,7 +31,7 @@ int entry(int argc, char **argv) {
         storage.insert(storage.end(), split.begin(), split.end());
         std::vector<char *> args;
         for (auto &value : storage) args.push_back(value.data());
-        return stellan::session(static_cast<int>(args.size()), args.data(), [] { return cancelled.load(std::memory_order_relaxed); }, {true, text});
+        return stellan::session(static_cast<int>(args.size()), args.data(), [] { return cancelled.load(std::memory_order_relaxed); }, {true, text, lazy});
     } catch (const std::exception &error) { std::cerr << "stellan-host: " << error.what() << '\n'; return 1; }
 }
 }

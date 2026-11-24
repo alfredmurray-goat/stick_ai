@@ -90,6 +90,49 @@ std::vector<std::int32_t> ids(std::string_view csv, std::size_t vocabulary, std:
     if (result.empty()) { throw std::runtime_error("A session prompt is required"); }
     return result;
 }
+struct LoadedSession {
+    std::uintmax_t initial_size;
+    std::filesystem::file_time_type initial_time;
+    Mapping mapping;
+    std::optional<Mapping> split_mapping;
+    std::uintmax_t split_size = 0;
+    std::filesystem::file_time_type split_time {};
+    std::unique_ptr<Model> model;
+    std::optional<Tokenizer> tokenizer;
+    std::unique_ptr<Decoder> engine;
+    std::int32_t eos = 0;
+    double verify_ms = 0;
+    LoadedSession(const std::filesystem::path &path, const std::string &expected,
+                  const std::filesystem::path &split_path, const std::string &split_hash,
+                  unsigned threads, unsigned context, bool force, bool tagged, SessionOptions options)
+        : initial_size(std::filesystem::file_size(path)), initial_time(std::filesystem::last_write_time(path)), mapping(path) {
+        if (!split_path.empty()) { split_size = std::filesystem::file_size(split_path); split_time = std::filesystem::last_write_time(split_path); split_mapping.emplace(split_path); }
+        if (mapping.bytes().size() + split_size > 8ULL * 1024 * 1024 * 1024 && ram_bytes() < 16ULL * 1024 * 1024 * 1024 && !force) {
+            throw std::runtime_error("Stellan-1 Max needs 16 GB RAM or more; explicit --force-max is required");
+        }
+        if (force) { std::cerr << "Max may be very slow or crash on this computer\n"; }
+        const auto verify_start = Clock::now();
+        if (sha256(mapping.bytes()) != expected) { throw std::runtime_error("Model hash mismatch; refusing session"); }
+        if (split_mapping && sha256(split_mapping->bytes()) != split_hash) throw std::runtime_error("Split hash mismatch; refusing session");
+        verify_ms = elapsed(verify_start);
+        if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time) {
+            throw std::runtime_error("Model changed during verification");
+        }
+        model = std::make_unique<Model>(mapping.bytes());
+        if (split_mapping) { const Model continuation(split_mapping->bytes(), true); model->attach(continuation); }
+        else if (model->has("split.count") && model->number("split.count") > 1) throw std::runtime_error("Supply the verified continuation split");
+        if (tagged && model->architecture() != "mamba2") throw std::runtime_error("Tagged completion currently supports Lite only");
+        const auto boundary = model->number("tokenizer.ggml.eos_token_id");
+        if (boundary < 0 || boundary >= static_cast<double>(model->vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
+        eos = static_cast<std::int32_t>(boundary);
+        if (options.text && (model->architecture() != "mamba2" || model->text("tokenizer.ggml.model") != "llama")) throw std::runtime_error("Native host text currently supports Lite SentencePiece; use --token-ids for Max");
+        if (options.host) tokenizer.emplace(*model);
+        if (model->architecture() == "mamba2") { engine = std::make_unique<Lite>(*model, threads); }
+        else if (model->architecture() == "llama") { engine = std::make_unique<Max>(*model, threads, context); }
+        else { throw std::runtime_error("Unsupported session architecture"); }
+    }
+};
+
 }
 
 int session(int argc, char **argv, const std::function<bool()> &cancelled, SessionOptions options) {
@@ -116,43 +159,19 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
     if (expected.size() != 64 || !std::all_of(expected.begin(), expected.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); })) {
         throw std::runtime_error("Supply the trusted lowercase model SHA256");
     }
-    const auto initial_size = std::filesystem::file_size(path);
-    const auto initial_time = std::filesystem::last_write_time(path);
-    const Mapping mapping(path);
-    std::optional<Mapping> split_mapping;
-    std::uintmax_t split_size = 0;
-    std::filesystem::file_time_type split_time;
-    if (!split_path.empty()) { split_size = std::filesystem::file_size(split_path); split_time = std::filesystem::last_write_time(split_path); split_mapping.emplace(split_path); }
-    if (mapping.bytes().size() + split_size > 8ULL * 1024 * 1024 * 1024 && ram_bytes() < 16ULL * 1024 * 1024 * 1024 && !force) {
-        throw std::runtime_error("Stellan-1 Max needs 16 GB RAM or more; explicit --force-max is required");
-    }
-    if (force) { std::cerr << "Max may be very slow or crash on this computer\n"; }
-    const auto verify_start = Clock::now();
-    if (sha256(mapping.bytes()) != expected) { throw std::runtime_error("Model hash mismatch; refusing session"); }
-    if (split_mapping && sha256(split_mapping->bytes()) != split_hash) throw std::runtime_error("Split hash mismatch; refusing session");
-    const auto verify_ms = elapsed(verify_start);
-    if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time) {
-        throw std::runtime_error("Model changed during verification");
-    }
-    Model model(mapping.bytes());
-    if (split_mapping) { const Model continuation(split_mapping->bytes(), true); model.attach(continuation); }
-    else if (model.has("split.count") && model.number("split.count") > 1) throw std::runtime_error("Supply the verified continuation split");
-    if (tagged && model.architecture() != "mamba2") throw std::runtime_error("Tagged completion currently supports Lite only");
-    const auto boundary = model.number("tokenizer.ggml.eos_token_id");
-    if (boundary < 0 || boundary >= static_cast<double>(model.vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
-    const auto eos = static_cast<std::int32_t>(boundary);
-    std::optional<Tokenizer> tokenizer;
-    if (options.text && (model.architecture() != "mamba2" || model.text("tokenizer.ggml.model") != "llama")) throw std::runtime_error("Native host text currently supports Lite SentencePiece; use --token-ids for Max");
-    if (options.host) tokenizer.emplace(model);
-    std::unique_ptr<Decoder> engine;
-    if (model.architecture() == "mamba2") { engine = std::make_unique<Lite>(model, threads); }
-    else if (model.architecture() == "llama") { engine = std::make_unique<Max>(model, threads, context); }
-    else { throw std::runtime_error("Unsupported session architecture"); }
+    if (options.lazy && !options.host) throw std::runtime_error("Lazy loading requires the native host");
+    std::unique_ptr<LoadedSession> loaded;
+    const auto ensure = [&]() -> LoadedSession & {
+        if (!loaded) loaded = std::make_unique<LoadedSession>(path, expected, split_path, split_hash, threads, context, force, tagged, options);
+        return *loaded;
+    };
+    if (!options.lazy) ensure();
     std::vector<std::int32_t> processed;
     const std::vector<float> *logits = nullptr;
-    std::cout << "{\"event\":\"ready\",\"model_sha256\":" << json_string(expected) << ",\"verify_ms\":" << verify_ms
+    std::cout << "{\"event\":\"ready\",\"model_sha256\":" << json_string(expected) << ",\"verify_ms\":" << (loaded ? loaded->verify_ms : 0)
+              << ",\"model_loaded\":" << (loaded ? "true" : "false") << ",\"model_verified\":" << (loaded ? "true" : "false")
               << ",\"native_host\":" << (options.host ? "true" : "false") << ",\"input_mode\":" << json_string(options.text ? "utf8-hex" : "token-ids")
-              << ",\"state_bytes\":" << engine->state_bytes() << ",\"state_capacity_bytes\":" << engine->state_capacity_bytes() << ",\"cache_type\":" << stellan::json_string(std::string(engine->cache_type())) << "}\n" << std::flush;
+              << ",\"state_bytes\":" << (loaded ? loaded->engine->state_bytes() : 0) << ",\"state_capacity_bytes\":" << (loaded ? loaded->engine->state_capacity_bytes() : 0) << ",\"cache_type\":" << stellan::json_string(std::string(loaded ? loaded->engine->cache_type() : "unloaded")) << "}\n" << std::flush;
     std::string line;
     while (!cancelled() && (host_input ? host_input->read_line(line, cancelled) : read_line(line))) {
         unsigned request = 0;
@@ -161,15 +180,17 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
                 std::cout << "{\"event\":\"stopped\"}\n" << std::flush; break;
             }
             if (options.host && line == "status") {
-                std::cout << "{\"event\":\"status\",\"protocol\":1,\"node_required\":false,\"scope\":\"inference-only\",\"state_bytes\":" << engine->state_bytes() << ",\"idle_timeout_seconds\":" << host_input->idle_seconds() << ",\"cached_tokens\":" << processed.size() << "}\n" << std::flush;
+                std::cout << "{\"event\":\"status\",\"protocol\":1,\"node_required\":false,\"scope\":\"inference-only\",\"state_bytes\":" << (loaded ? loaded->engine->state_bytes() : 0) << ",\"model_loaded\":" << (loaded ? "true" : "false") << ",\"model_verified\":" << (loaded ? "true" : "false") << ",\"idle_timeout_seconds\":" << host_input->idle_seconds() << ",\"cached_tokens\":" << processed.size() << "}\n" << std::flush;
                 continue;
             }
             if (options.host && line == "reset") {
-                engine->reset(); processed.clear(); logits = nullptr;
+                if (loaded) loaded->engine->reset();
+                processed.clear(); logits = nullptr;
                 std::cout << "{\"event\":\"reset\"}\n" << std::flush; continue;
             }
-            if (std::filesystem::file_size(path) != initial_size || std::filesystem::last_write_time(path) != initial_time || (split_mapping && (std::filesystem::file_size(split_path) != split_size || std::filesystem::last_write_time(split_path) != split_time))) {
-                throw std::runtime_error("Model changed; restart and verify the session");
+            if (options.host && line == "unload") {
+                loaded.reset(); std::vector<std::int32_t>().swap(processed); logits = nullptr;
+                std::cout << "{\"event\":\"unloaded\"}\n" << std::flush; continue;
             }
             const auto first = line.find(' ');
             const auto second = first == std::string::npos ? first : line.find(' ', first + 1);
@@ -177,6 +198,14 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
             request = number(std::string_view(line).substr(0, first), std::numeric_limits<unsigned>::max());
             const auto limit = number(std::string_view(line).substr(first + 1, second - first - 1), 4096);
             const auto payload = std::string_view(line).substr(second + 1);
+            auto &state = ensure();
+            auto &model = *state.model;
+            auto &engine = state.engine;
+            auto &tokenizer = state.tokenizer;
+            const auto eos = state.eos;
+            if (std::filesystem::file_size(path) != state.initial_size || std::filesystem::last_write_time(path) != state.initial_time || (state.split_mapping && (std::filesystem::file_size(split_path) != state.split_size || std::filesystem::last_write_time(split_path) != state.split_time))) {
+                throw std::runtime_error("Model changed; restart and verify the session");
+            }
             const auto tokens = options.text ? tokenizer->encode(from_hex(payload), context) : ids(payload, model.vocabulary().size(), context);
             if (tokens.size() + limit > context) { throw std::runtime_error("Session context is full"); }
             const bool reuse = !processed.empty() && tokens.size() >= processed.size() && std::equal(processed.begin(), processed.end(), tokens.begin());
@@ -249,7 +278,8 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
                       << ",\"generated\":" << generated << ",\"cpu_ms\":" << usage().cpu_ms - cpu_start
                       << ",\"peak_rss_bytes\":" << usage().peak_rss_bytes << "}\n" << std::flush;
         } catch (const std::exception &error) {
-            engine->reset(); processed.clear(); logits = nullptr;
+            if (loaded) loaded->engine->reset();
+            processed.clear(); logits = nullptr;
             std::cout << "{\"event\":\"error\",\"request_id\":" << request << ",\"message\":" << json_string(error.what()) << "}\n" << std::flush;
             if (cancelled()) { return 130; }
         }
