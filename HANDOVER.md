@@ -100,15 +100,16 @@ Risks: maintainers are tired of low-quality AI PRs, so one bad PR can get the ac
   - AVX-VNNI/AVX512-VNNI kernels chosen at start-up, and vector lane totals;
   - the Mamba2 convolution split across cores, and the scan keeping its state in registers;
   - Q4_K scales unpacked with word operations instead of a store-then-reload scratch array.
-  - Outputs are identical at every step. Word-by-word decoding went from about 6.2 s to 5.0–5.4 s for 12 tokens, roughly level with llama.cpp; prompt reading is within about 10% on the 112-token prompt.
+  - Outputs are identical at every step. Paired with llama.cpp (3 rounds, real Lite, 2 threads): decode 4.8–5.1 s vs 4.7 s for 12 tokens (was 6.2–6.6 s); prompt reading within 7–8%; on the 112-token prompt Stellan-Run used less CPU in total than llama.cpp.
+  - Recorded loss: a Q6_K kernel using unsigned `maddubs` was exact but slower in batches on this Xeon, so it was not merged (EVIDENCE.md).
 - **Link:** `cross-spawn` replaced by `spawn-command.ts`, which escapes batch arguments twice (closing an injection path through `npx.cmd`), never searches the project folder, and is tested with a real `.cmd` on Windows CI. No third-party MCP code ships now.
-- **Host:** chat memory now lives in Host's native state store for packages that ship Host (gate 2, first piece), with a hash-checked client, carry-over of old notes and tests on every platform.
+- **Host:** chat memory now lives in Host's native state store for packages that ship Host (gate 2, first piece), with a hash-checked client, carry-over of old notes and a real-binary test in CTest on every platform. After a restart the window now shows the current chat again from those notes ("Earlier in this chat").
 
 ### Next steps per component
 
 - **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.
-- **Link:** the MCP SDK is now only a test dependency. Remaining: replace `cross-spawn` (Windows `.cmd`/PATHEXT handling and escaping must be exactly right; security-sensitive) and update `docs/MCP_CLIENT.md`, which still describes the SDK transports as in use.
-- **Host:** next gate is chat memory on the native state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
+- **Link:** done for now: no third-party MCP code ships. Next: a real MCP server smoke on every platform in CI (Windows `.cmd` path included).
+- **Host:** chat memory done; next the full conversation (model history) in the state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
 - **Forge:** repository list and issue picker, then the real Stellan adapter (above).
 
 ## Where things stand (earlier)

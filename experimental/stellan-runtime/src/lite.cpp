@@ -281,7 +281,9 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
             }
         }
     });
-    for (std::size_t t = 0; t < batch; ++t) {
+    // Gate and group norm are per token: shared across cores, same arithmetic.
+    executor_.parallel(batch, [&](std::size_t first_token, std::size_t last_token) {
+    for (auto t = first_token; t < last_token; ++t) {
         auto mixed = std::span(batch_mixed_).subspan(t * inner_, inner_);
         const auto projected = std::span(batch_projected_).subspan(t * projection_.size(), inner_);
         for (std::size_t i = 0; i < inner_; ++i) { mixed[i] *= silu(projected[i]); }
@@ -291,6 +293,7 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
             normalize(group, std::span(layer.gated_norm).subspan(g * group_width, group_width), group);
         }
     }
+    });
 }
 
 void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled) {
@@ -303,10 +306,11 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
     auto &quantized = batch_quantized_scratch_;
     std::array<std::span<const QuantizedInput>, prefill_batch_limit> views;
     if (fast) {
-        for (std::size_t t = 0; t < batch; ++t) {
-            quantize_input(input.subspan(t * columns, columns), quantized[t]);
-            views[t] = quantized[t];
-        }
+        // Each token is quantised on its own, so tokens are shared across cores (same results).
+        executor_.parallel(batch, [&](std::size_t first, std::size_t last) {
+            for (auto t = first; t < last; ++t) { quantize_input(input.subspan(t * columns, columns), quantized[t]); }
+        });
+        for (std::size_t t = 0; t < batch; ++t) { views[t] = quantized[t]; }
     }
     executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
         std::array<float, prefill_batch_limit> values;
