@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {join,delimiter} from 'node:path';
 import {homedir} from 'node:os';
 import {McpProcessTransport} from './mcp-process.js';
+import {McpProgress} from './mcp-progress.js';
 import {McpRpc,McpError} from './mcp-rpc.js';
 import {readExtensionJson,writeExtensionJson} from './extension-store.js';
 import {targetFor,executableName} from './platform.js';
@@ -14,7 +15,7 @@ export interface McpServerConfig {id:string;name:string;transport:'stdio'|'http'
 export const actuentUrl='https://agents.actuent.ai/api/mcp';
 export const actuent:McpServerConfig={id:'actuent',name:'Actuent web search',transport:'http',url:actuentUrl,builtin:true};
 interface Secrets {headers:Record<string,string>;env:Record<string,string>}
-interface Connection {rpc:McpRpc;tools:Tool[];stale:boolean;diagnostic:string}
+interface Connection {progress:McpProgress;rpc:McpRpc;tools:Tool[];stale:boolean;diagnostic:string}
 function record(value:unknown):value is Record<string,unknown>{return Boolean(value&&typeof value==='object'&&!Array.isArray(value));}
 function stringMap(value:unknown):Record<string,string>{if(value===undefined)return {};if(!record(value)||Object.keys(value).length>64||Object.entries(value).some(([key,v])=>typeof v!=='string'||!key||/[\x00-\x1f]/.test(key)||String(v).includes('\0'))||Buffer.byteLength(JSON.stringify(value))>16384)throw new McpError('Enter a JSON object of string values, under 16 KiB.');return value as Record<string,string>;}
 function config(input:unknown,id:string):McpServerConfig {
@@ -73,11 +74,12 @@ export class McpServers {
    const url=new URL(selected.url!);const headers=new Headers(secret.headers);for(const name of ['host','content-length','connection','proxy-authorization','cookie'])if(headers.has(name))throw new McpError('Use API authentication headers, without host, cookie, or transport headers.');
    transport=new McpHttpTransport(url,selected.transport,headers);
   }
-  const connection:Connection={rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')this.progress(selected.name,this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
+  const progress=new McpProgress(text=>{if(!connection.rpc.closed)this.progress(selected.name,text);});
+  const connection:Connection={progress,rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')progress.push(this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
   this.connections.set(id,connection);
-  try{await connection.rpc.connect(signal);await this.refresh(id,signal);}catch(error){await connection.rpc.close();this.connections.delete(id);const message=signal.aborted?'MCP connection cancelled.':id===actuent.id?'Web search needs an internet connection. Everything else in Stick AI works offline.':'Could not connect. Check the command, endpoint and session credentials. OAuth-only servers need a provider-issued access token.';this.errors.set(id,message);throw new McpError(message);}
+  try{await connection.rpc.connect(signal);await this.refresh(id,signal);}catch(error){progress.close();await connection.rpc.close();this.connections.delete(id);const message=signal.aborted?'MCP connection cancelled.':id===actuent.id?'Web search needs an internet connection. Everything else in Stick AI works offline.':'Could not connect. Check the command, endpoint and session credentials. OAuth-only servers need a provider-issued access token.';this.errors.set(id,message);throw new McpError(message);}
  }
- async disconnect(id:string){const current=this.connections.get(id);this.connections.delete(id);if(current)await current.rpc.close();}
+ async disconnect(id:string){const current=this.connections.get(id);this.connections.delete(id);if(current){current.progress.close();await current.rpc.close();}}
  async setProject(project:string){for(const c of this.configs)if(c.transport==='stdio')await this.disconnect(c.id);this.project=project;}
  async close(){await Promise.all(this.all().map(c=>this.disconnect(c.id)));}
  /** The built-in server connects on first use; others must be connected in settings. */
