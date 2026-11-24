@@ -347,12 +347,75 @@ bool accelerated_ssm(std::size_t, std::size_t, std::span<const float>, float, fl
 
 #if defined(__aarch64__) || defined(__arm64__)
 namespace stellan {
+namespace {
+template<std::size_t Count>
+void arm_batch_tile(std::uint32_t type, std::span<const std::byte> row,
+                    std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::fill(output.begin(), output.end(), 0.0f);
+    const auto half = [](const std::byte *p) {
+        const auto bits = static_cast<std::uint16_t>(std::to_integer<unsigned>(p[0]) | (std::to_integer<unsigned>(p[1]) << 8));
+        return vgetq_lane_f32(vcvt_f32_f16(vreinterpret_f16_u16(vdup_n_u16(bits))), 0);
+    };
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        const auto *p = row.data() + block * (type == 12 ? 144 : 210);
+        int sums[Count] {}, minima[Count] {};
+        for (std::size_t g = 0; g < 8; ++g) {
+            if (type == 12) {
+                const auto *scales = p + 4;
+                const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U : (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
+                const auto offset = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U : (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+                int32x4_t dots[Count];
+                for (auto &dot : dots) dot = vdupq_n_s32(0);
+                for (std::size_t j = 0; j < 32; j += 8) {
+                    auto q = vld1_u8(reinterpret_cast<const std::uint8_t *>(p + 16 + (g / 2) * 32 + j));
+                    if (g % 2 != 0) q = vshr_n_u8(q, 4);
+                    q = vand_u8(q, vdup_n_u8(15));
+                    for (std::size_t t = 0; t < Count; ++t) dots[t] = vpadalq_s16(dots[t], vmull_s8(vreinterpret_s8_u8(q), vld1_s8(input[t][block].values.data() + g * 32 + j)));
+                }
+                for (std::size_t t = 0; t < Count; ++t) {
+                    sums[t] += static_cast<int>(scale) * vaddvq_s32(dots[t]);
+                    minima[t] += static_cast<int>(offset) * (input[t][block].sums[g * 2] + input[t][block].sums[g * 2 + 1]);
+                }
+            } else {
+                const auto quarter = g % 4;
+                for (std::size_t j = 0; j < 32; j += 16) {
+                    int32x4_t dots[Count];
+                    for (auto &dot : dots) dot = vdupq_n_s32(0);
+                    for (std::size_t k = 0; k < 16; k += 8) {
+                        auto low = vld1_u8(reinterpret_cast<const std::uint8_t *>(p + (g / 4) * 64 + (quarter % 2) * 32 + j + k));
+                        if (quarter >= 2) low = vshr_n_u8(low, 4);
+                        auto high = vld1_u8(reinterpret_cast<const std::uint8_t *>(p + 128 + (g / 4) * 32 + j + k));
+                        high = vshl_u8(high, vdup_n_s8(static_cast<std::int8_t>(-static_cast<int>(quarter * 2))));
+                        const auto q = vsub_u8(vorr_u8(vand_u8(low, vdup_n_u8(15)), vshl_n_u8(vand_u8(high, vdup_n_u8(3)), 4)), vdup_n_u8(32));
+                        for (std::size_t t = 0; t < Count; ++t) dots[t] = vpadalq_s16(dots[t], vmull_s8(vreinterpret_s8_u8(q), vld1_s8(input[t][block].values.data() + g * 32 + j + k)));
+                    }
+                    const auto raw = std::to_integer<int>(p[192 + g * 2 + j / 16]);
+                    for (std::size_t t = 0; t < Count; ++t) sums[t] += (raw < 128 ? raw : raw - 256) * vaddvq_s32(dots[t]);
+                }
+            }
+        }
+        const auto scale = half(type == 12 ? p : p + 208);
+        const auto minimum = type == 12 ? half(p + 2) : 0.0f;
+        for (std::size_t t = 0; t < Count; ++t) output[t] += input[t][block].scale * (scale * static_cast<float>(sums[t]) - minimum * static_cast<float>(minima[t]));
+    }
+}
+}
 bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     static const bool scalar = environment_set("STELLAN_RUNTIME_SCALAR");
-    if (scalar) { return false; }
-    // Reuse the checked integer NEON dot path instead of scalar float reductions in prefill.
-    for (std::size_t t = 0; t < input.size(); ++t) {
-        if (!accelerated_quantized_dot(type, row, input[t], output[t])) { return false; }
+    static const bool untiled = environment_set("STELLAN_RUNTIME_ARM_UNTILED");
+    if (scalar) return false;
+    if (untiled) {
+        for (std::size_t t = 0; t < input.size(); ++t) if (!accelerated_quantized_dot(type, row, input[t], output[t])) return false;
+        return true;
+    }
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) arm_batch_tile<8>(type, row, input.subspan(first, 8), output.subspan(first, 8));
+    if (first + 4 <= input.size()) { arm_batch_tile<4>(type, row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: arm_batch_tile<3>(type, row, input.subspan(first), output.subspan(first)); break;
+        case 2: arm_batch_tile<2>(type, row, input.subspan(first), output.subspan(first)); break;
+        case 1: arm_batch_tile<1>(type, row, input.subspan(first), output.subspan(first)); break;
+        default: break;
     }
     return true;
 }
