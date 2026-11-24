@@ -174,7 +174,7 @@ int session(int argc, char **argv, const std::function<bool()> &cancelled, Sessi
             request = number(std::string_view(line).substr(0, first), std::numeric_limits<unsigned>::max());
             const auto limit = number(std::string_view(line).substr(first + 1, second - first - 1), 4096);
             const auto payload = std::string_view(line).substr(second + 1);
-            const auto tokens = options.text ? tokenizer->encode(from_hex(payload)) : ids(payload, model.vocabulary().size(), context);
+            const auto tokens = options.text ? tokenizer->encode(from_hex(payload), context) : ids(payload, model.vocabulary().size(), context);
             if (tokens.size() + limit > context) { throw std::runtime_error("Session context is full"); }
             const bool reuse = !processed.empty() && tokens.size() >= processed.size() && std::equal(processed.begin(), processed.end(), tokens.begin());
             if (!reuse) { engine->reset(); processed.clear(); logits = nullptr; }

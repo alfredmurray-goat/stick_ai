@@ -20,12 +20,13 @@ public:
 class Tokenizer {
 public:
     explicit Tokenizer(const Model &model);
-    std::vector<std::int32_t> encode(const std::string &text) const;
+    std::vector<std::int32_t> encode(const std::string &text, std::size_t token_limit = 32768) const;
     std::string decode(std::int32_t token) const;
     std::int32_t eos() const;
 private:
     const Model &model_;
     std::unordered_map<std::string, std::int32_t> lookup_;
+    std::vector<std::pair<std::string_view, std::int32_t>> specials_;
     std::unordered_map<unsigned, std::int32_t> bytes_;
     std::int32_t bos_;
     std::int32_t eos_;

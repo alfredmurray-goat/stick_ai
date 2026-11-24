@@ -96,6 +96,16 @@ class HostTests(unittest.TestCase):
             if process.poll() is None: process.kill(); process.wait(timeout=5)
             process.stdin.close(); process.stdout.close(); process.stderr.close()
 
+    def test_text_uses_configured_context_above_old_32k_limit(self):
+        prompt = ('[' * 33000).encode().hex()
+        result = subprocess.run([HOST, str(self.model), self.digest, '2', '65536'], input=f'1 1 {prompt}\nshutdown\n', capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertFalse([e for e in events if e['event'] == 'error'])
+        self.assertEqual(len([e for e in events if e['event'] == 'token']), 1)
+        result, events = self.invoke('1 1 '+prompt+'\nshutdown\n')
+        self.assertIn('configured limit', next(e['message'] for e in events if e['event']=='error'))
+
     def test_closed_output_stops_the_host_without_closing_stdin(self):
         process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
         try:
