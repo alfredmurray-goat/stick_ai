@@ -404,7 +404,7 @@ bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::by
     static const bool scalar = environment_set("STELLAN_RUNTIME_SCALAR");
     static const bool untiled = environment_set("STELLAN_RUNTIME_ARM_UNTILED");
     if (scalar) return false;
-    if (untiled) {
+    if (untiled || input.size() == 1) {
         for (std::size_t t = 0; t < input.size(); ++t) if (!accelerated_quantized_dot(type, row, input[t], output[t])) return false;
         return true;
     }
@@ -414,7 +414,7 @@ bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::by
     switch (input.size() - first) {
         case 3: arm_batch_tile<3>(type, row, input.subspan(first), output.subspan(first)); break;
         case 2: arm_batch_tile<2>(type, row, input.subspan(first), output.subspan(first)); break;
-        case 1: arm_batch_tile<1>(type, row, input.subspan(first), output.subspan(first)); break;
+        case 1: if (!accelerated_quantized_dot(type, row, input[first], output[first])) return false; break;
         default: break;
     }
     return true;

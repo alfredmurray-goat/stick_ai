@@ -181,3 +181,5 @@ Lite tagged sessions additionally constrain each response root (and the root aft
 
 
 ARM prefill tiling candidate: batches now share Q4/Q6 weight unpacking across up to eight activation vectors instead of invoking the single-vector NEON kernel for each token. Scratch remains bounded to small accumulators; no expanded weight copy, larger context, precision change or model architecture change is introduced. `STELLAN_RUNTIME_ARM_UNTILED=1` preserves the prior NEON batch path for paired diagnostics; scalar override remains available. ARM CI compares against that prior NEON path, not the much slower scalar path, and retains raw timings/checksums. Performance on real models and against llama.cpp remains unmeasured for this candidate.
+
+Linux AArch64 CI45362512821 passed eight native groups. Its first five-pair comparison measured batch32 Q4 7.34331->5.23616ms (~1.40x), Q6 15.8093->8.03479ms (~1.97x), relative to prior NEON. The1-token tiled case was slightly slower, so single-vector batches/tails retain the existing single-vector kernel. These are component timings on Linux ARM, not MacBook or whole-model results; Apple Silicon validation remains required.
