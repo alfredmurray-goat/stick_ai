@@ -15,7 +15,7 @@ class DockerSmoke(unittest.TestCase):
             root=Path(folder)/'run'
             config=runner.plan(Path(__file__).parents[1]/'examples/task-suite.json',root,os.environ['STELLAN_FORGE_IMAGE'],120)
             result=runner.run(root)
-            self.assertEqual(result['counts'],{'passed':1})
+            self.assertEqual(result['counts'],{'passed':1,'failed':1})
             record=forge.read_json(root/'results'/config['tasks'][0]['key']/'experience.pending.json')
             self.assertEqual(record['review']['decision'],'pending')
             self.assertEqual(record['payload']['task']['purpose'],'evaluation')

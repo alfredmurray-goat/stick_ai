@@ -12,7 +12,7 @@ import forge
 class RunnerTests(unittest.TestCase):
     def setup_run(self,folder,tasks=2):
         root=Path(folder);(root/'adapter').mkdir();(root/'adapter/agent.py').write_text('# fixture')
-        (root/'task/seed').mkdir(parents=True);(root/'task/seed/solution.py').write_text('wrong')
+        (root/'task/seed').mkdir(parents=True);(root/'task/seed/solution.py').write_text('wrong');(root/'task/seed/keep.py').write_text('keep')
         (root/'task/verify').mkdir();(root/'task/verify/check.py').write_text('# trusted fixture')
         suite={'format':1,'runtime':{**{k:'a'*40 for k in ['host','run','link','harness']},'model_sha256':'b'*64},'adapter_dir':'adapter','adapter':['python','/adapter/agent.py'],'tasks':[{'id':f'task-{i}','prompt':f'fixture {i}','bundle':'task','verifier':['python','/verify/check.py'],'repository':'fixture/repo','revision':'a'*40,'family':f'task-{i}','source':'forge','purpose':'evaluation'} for i in range(tasks)]}
         (root/'suite.json').write_text(json.dumps(suite));output=root/'run'
@@ -84,4 +84,23 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(record['review']['decision'],'pending')
             self.assertEqual(record['payload']['outcome']['status'],'passed')
             self.assertEqual(record['payload']['events'][-1]['kind'],'test')
+    def test_candidates_preserve_seed_files_and_support_explicit_deletions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output,config=self.setup_run(folder,tasks=1)
+            def execute(command,timeout,name):
+                if name.endswith('-agent'):
+                    return 0,json.dumps({'runtime':config['runtime'],'files':{'new.py':'new fixture','solution.py':None}}).encode(),b''
+                path=output/'results'/config['tasks'][0]['key']/'candidate'
+                self.assertFalse((path/'solution.py').exists());self.assertEqual((path/'keep.py').read_text(),'keep')
+                self.assertEqual((path/'new.py').read_text(),'new fixture')
+                return 0,json.dumps({'passed':True,'checks':[{'name':'fixture','passed':True}]}).encode(),b''
+            self.assertEqual(runner.run(output,execute)['counts'],{'passed':1})
+    def test_unsafe_candidate_is_an_unresolved_patch_not_infrastructure_success(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output,config=self.setup_run(folder,tasks=1)
+            def execute(command,timeout,name):
+                self.assertTrue(name.endswith('-agent'))
+                return 0,json.dumps({'runtime':config['runtime'],'files':{'../escape.py':'bad'}}).encode(),b''
+            self.assertEqual(runner.run(output,execute)['counts'],{'unresolved_patch':1})
+            self.assertFalse((output/'results/escape.py').exists())
 if __name__=='__main__':unittest.main()

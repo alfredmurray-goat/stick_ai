@@ -26,6 +26,20 @@
       "family": "synthetic-add",
       "source": "forge",
       "purpose": "evaluation"
+    },
+    {
+      "id": "synthetic-bad-syntax-fixture",
+      "prompt": "synthetic-bad-syntax",
+      "bundle": "fixture-task",
+      "verifier": [
+        "python",
+        "/verify/check.py"
+      ],
+      "repository": "fixture/forge",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "family": "synthetic-syntax-failure",
+      "source": "forge",
+      "purpose": "evaluation"
     }
   ]
 }

@@ -9,4 +9,5 @@ except OSError:
     pass
 else:
     raise AssertionError('Seed mount must be read-only')
-print(json.dumps({'runtime':request['runtime'],'files':{'solution.py':'def add(a, b):\n    return a + b\n'},'messages':[{'role':'user','content':request['prompt']},{'role':'assistant','content':'<done>Synthetic fixture correction</done>'}],'events':[{'kind':'correction','text':'Synthetic adapter returns the known fixture correction; no model used.'}]}))
+code='def broken(:\n' if request['prompt']=='synthetic-bad-syntax' else 'def add(a, b):\n    return a + b\n'
+print(json.dumps({'runtime':request['runtime'],'files':{'solution.py':code},'messages':[{'role':'user','content':request['prompt']},{'role':'assistant','content':'<done>Synthetic fixture candidate</done>'}],'events':[{'kind':'action','text':'Synthetic adapter returns a fixture candidate; no model used.'}]}))

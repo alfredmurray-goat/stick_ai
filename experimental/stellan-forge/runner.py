@@ -17,7 +17,9 @@ import time
 import uuid
 import forge
 
-STATUSES = {'passed', 'failed', 'incomplete', 'infrastructure_error'}
+STATUSES = {'passed', 'failed', 'incomplete', 'infrastructure_error', 'unresolved_patch'}
+class CandidateError(ValueError):
+    pass
 
 def relative(value):
     if not isinstance(value,str) or len(value)>240 or '\\' in value or '\0' in value or ':' in value or any(p in {'','.', '..'} or p.endswith(('.', ' ')) or re.match(r'(?i)^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)',p) for p in value.split('/')):
@@ -222,14 +224,19 @@ def run(root,executor=execute):
                 if rc:raise ValueError(f'Agent adapter exited {rc}')
                 prediction=json.loads(raw.decode('utf8'));files=prediction.get('files')
                 if prediction.get('runtime')!=config['runtime']:raise ValueError('Adapter runtime identity mismatch')
-                if not isinstance(files,dict) or not files or len(files)>1000:raise ValueError('Adapter must return a bounded files object')
-                candidate=reports/'candidate';candidate.mkdir(mode=0o700);total=0
+                if not isinstance(files,dict) or len(files)>1000:raise ValueError('Adapter must return a bounded files object')
+                candidate=reports/'candidate';snapshot(folder/'bundle/seed',candidate);total=0
                 for name,content in files.items():
-                    relative(name)
-                    if not isinstance(content,str):raise ValueError('Candidate files must contain UTF-8 text')
-                    data=content.encode('utf8');total+=len(data)
-                    if len(data)>262144 or total>1048576:raise ValueError('Candidate exceeds file budget')
-                    path=candidate/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700);path.write_bytes(data);path.chmod(0o600)
+                    try:
+                        relative(name);path=candidate/name
+                        if content is None:
+                            if path.is_dir():raise ValueError('Delete individual files, not directories')
+                            path.unlink(missing_ok=True);continue
+                        if not isinstance(content,str):raise ValueError('Candidate files must contain UTF-8 text or null deletion markers')
+                        data=content.encode('utf8');total+=len(data)
+                        if len(data)>262144 or total>1048576:raise ValueError('Candidate edits exceed file budget')
+                        path.parent.mkdir(parents=True,exist_ok=True,mode=0o700);path.write_bytes(data);path.chmod(0o600)
+                    except (ValueError,OSError) as error:raise CandidateError(str(error)) from error
                 forge.write_new(reports/'prediction.json',prediction)
                 value['reports']['prediction_sha256']=hashlib.sha256((reports/'prediction.json').read_bytes()).hexdigest()
                 rc,raw,err=executor(command(config,names[1],[(candidate,'/candidate'),(folder/'bundle/verify','/verify')],task['verifier']),config['timeout_seconds'],names[1])
@@ -250,6 +257,7 @@ def run(root,executor=execute):
                         value['experience_status']='pending_review'
                     except (ValueError,TypeError,KeyError,IndexError) as error:
                         value['experience_status']='review_blocked';value['experience_reason']=str(error)[:500]
+            except CandidateError as error:value['status']='unresolved_patch';value['reason']=str(error)[:1000]
             except TimeoutError as error:value['status']='incomplete';value['reason']=str(error)
             except (OSError,ValueError,TypeError,subprocess.SubprocessError) as error:value['status']='infrastructure_error';value['reason']=str(error)[:1000]
             forge.write_new(result,value)

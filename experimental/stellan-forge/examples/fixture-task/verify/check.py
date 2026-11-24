@@ -8,7 +8,10 @@ except OSError:
     pass
 else:
     raise AssertionError('Candidate mount must be read-only')
-spec=importlib.util.spec_from_file_location('solution','/candidate/solution.py')
-module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-checks=[{'name':f'add({a},{b})','passed':module.add(a,b)==expected} for a,b,expected in [(2,3,5),(-4,1,-3),(0,0,0)]]
+try:
+    spec=importlib.util.spec_from_file_location('solution','/candidate/solution.py')
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    checks=[{'name':f'add({a},{b})','passed':module.add(a,b)==expected} for a,b,expected in [(2,3,5),(-4,1,-3),(0,0,0)]]
+except Exception as error:
+    checks=[{'name':'candidate import and execution','passed':False,'error_type':type(error).__name__}]
 print(json.dumps({'passed':all(c['passed'] for c in checks),'checks':checks}))
