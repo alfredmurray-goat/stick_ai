@@ -1,4 +1,4 @@
-import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
+import type {JSONRPCMessage} from './mcp-types.js';
 
 export class McpWireError extends Error {
   constructor() { super('Invalid or oversized MCP message'); this.name = 'McpWireError'; }

@@ -113,3 +113,10 @@ after quitting even when configuration is preserved.
 
 
 The protocol client bounds both outstanding requests and unfinished transport writes to 64. A response arriving before its write finishes does not release that write's reservation in the shared 4 MiB outgoing budget. This keeps slow transports bounded even when responses arrive early.
+
+
+## Stellan-Link
+
+Stellan-Link is our tool-only MCP client: wire validation, initialization, RPC lifecycle, stdio processes, streamable HTTP, legacy SSE and tool-result validation use original implementations. The MCP SDK is retained only as a development-time test oracle; it is not imported into production. Human approvals, credential redaction, same-origin requests and message/queue budgets remain enforced. Interrupted resumable HTTP streams reconnect using event cursors without replaying the tool POST; failures without a cursor require an explicit reconnect. Legacy SSE disconnects also require reconnecting. OAuth authorization flows, resources/prompts subscriptions, sampling, elicitation and task execution are not advertised capabilities.
+
+Reference: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports and https://modelcontextprotocol.io/specification/2025-11-25/server/tools . A local minified launcher comparison measured477,076bytes before and328,427bytes after, with11 SDK source modules before and0 after. This is a bundle-size result, not a runtime RAM/CPU/latency benchmark or universal MCP compliance claim.
