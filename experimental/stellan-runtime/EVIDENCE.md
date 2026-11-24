@@ -215,3 +215,24 @@ Same setup as the previous section (rotating order, warmup, 3 rounds, Linux x64 
 Prompt reading is about 34% faster than the previous build on both prompts and uses about a quarter less CPU time. llama.cpp is still ahead: it reads these prompts about 1.3× as fast and decodes about 30% faster. Stellan-Run uses about 300 MiB less memory. Decode was not targeted by this change; its difference from the previous build is within this machine's run-to-run noise. Three rounds on a shared virtual machine: treat the numbers as directional. Raw receipt: [lite-vector-bookkeeping.json](evidence/lite-vector-bookkeeping.json).
 
 Where the time goes: in a timed build made before these two changes, the two big matrix multiplies per layer were about 88% of Lite's prompt time and the Mamba2 state update most of the rest; they are still the main cost, but that breakdown hasn't been re-measured on this build. Next candidates: repacking Q4_K weights once at load into an interleaved layout so each tile reads contiguous memory (llama.cpp's CPU "repack" path does this), and a faster decode path for single tokens.
+
+## The eye: Mistral Small 3.1's image encoder — 24 November 2026
+
+Stellan-Run now has an image encoder (`src/vision.cpp`, command `see`): Mistral Small 3.1's ~0.4B Pixtral-style vision transformer and Mistral 3's projector, read from llama.cpp-style `mmproj` GGUF files. It's the encoder Lite and Max will share once their projectors are trained (HANDOVER.md, "vision for Lite and Max").
+
+**Correctness.** `tests/vision.py` builds a small random encoder and checks every output against an independent reference written from Hugging Face's `PixtralVisionModel` and `Mistral3MultiModalProjector` (their weight layout, `rotate_half` 2D RoPE, unfold-ordered patch merging, exact GELU). It covers 1 and 3 threads, the portable non-AVX2 code, Q8_0 weights, no-merge files, resizing and bad input. Deliberately breaking the reference (swapping RoPE rows and columns, reordering the merge, using tanh GELU, or skipping llama.cpp's q/k row permutation) makes the test fail.
+
+**Real weights.** With ggml-org's Q8_0 `mmproj` for Mistral Small 3.1 (SHA-256 `6de5bee5…714fb4`), a 448×448 image becomes 256 tokens of width 5120, which is exactly Max's width. Compared with llama.cpp's own clip encoder (`bench/eye-parity.cpp`, pinned commit, `GGML_NATIVE=OFF`):
+
+| | Stellan-Run | llama.cpp |
+| --- | ---: | ---: |
+| Encode time, median of 3 alternating rounds (2 threads) | 12,885 ms | 12,163 ms |
+| Peak memory | 531 MiB | 561 MiB |
+| Output agreement (cosine, all tokens) | 0.99904 | — |
+| Per-token agreement, median / worst | 0.99974 / 0.96151 | — |
+
+Stellan-Run is about 6% slower here and uses about 5% less memory. It started at 45 s; the steps are in the receipt.
+
+**A finding about that file.** It was uploaded on 1 May 2025 with `clip.use_gelu = true`, copied from Mistral's original config. Mistral corrected the encoder's activation to SiLU on 9 May 2025 ("Updated `hidden_act` to `silu`", Hugging Face commit `73ce7c62b9`). llama.cpp follows the flag, so on the file as published its output differs substantially from the corrected model (cosine 0.66 against Stellan-Run). Stellan-Run always runs SiLU and reports `"file_says_gelu": true`. For the like-for-like numbers above, llama.cpp ran a copy with the key renamed to `clip.use_silu`.
+
+Not done yet: PNG/JPEG decoding inside Stellan-Run (`see` takes raw RGB), feeding image tokens into Lite or Max (that needs the trained projectors), and AVX-VNNI kernels for newer laptops. Raw receipt: [eye-mistral-small-3.1.json](evidence/eye-mistral-small-3.1.json).

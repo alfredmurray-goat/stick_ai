@@ -1,0 +1,39 @@
+{
+  "format": 1,
+  "date": "2026-11-24",
+  "purpose": "First real-weights check of Stellan-Run's image encoder (the eye) against llama.cpp's clip encoder",
+  "hardware": { "platform": "linux", "arch": "x64", "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz (4 vCPU cloud VM)", "threads": 2 },
+  "encoder": {
+    "file": "mmproj-Mistral-Small-3.1-24B-Instruct-2503-Q8_0.gguf",
+    "source": "https://huggingface.co/ggml-org/Mistral-Small-3.1-24B-Instruct-2503-GGUF",
+    "sha256": "6de5bee5ce4950fa362b97b875d0ffd1ae7e058c399834c1d0d1f7b014714fb4",
+    "licence": "apache-2.0",
+    "note": "Uploaded 2025-05-01 with clip.use_gelu=true from Mistral's original config; Mistral corrected hidden_act to silu on 2025-05-09 (commit 73ce7c62b9). Stellan-Run always runs SiLU and reports file_says_gelu. For a like-for-like comparison llama.cpp ran a copy with the key renamed to clip.use_silu."
+  },
+  "image": { "kind": "synthetic 448x448 gradient and checkerboard", "rgb_sha256": "e6917dcc612f52ccbdb2e357ae83b7e04f00d456032340e38d86222ece4e0197", "patches": 1024, "output_tokens": 256, "output_width": 5120 },
+  "reference": { "engine": "llama.cpp clip (libmtmd) via bench/eye-parity.cpp", "commit": "cd959bae99ff4bed22bef2604f45241c09bbb8c8", "ggml_native": false, "flash_attention": false },
+  "accuracy": {
+    "stellan_vs_llama_silu": { "overall_cosine": 0.99904, "token_cosine_min": 0.96151, "token_cosine_median": 0.99974 },
+    "stellan_vs_llama_with_stale_gelu_flag": { "overall_cosine": 0.66407, "token_cosine_min": 0.24471, "token_cosine_median": 0.73265 }
+  },
+  "timing_alternating_rounds": {
+    "stellan_run_ms": [13933.3, 12885.0, 12620.9],
+    "llama_cpp_ms": [12121.8, 12659.2, 12163.4],
+    "stellan_run_median_ms": 12885.0,
+    "llama_cpp_median_ms": 12163.4,
+    "stellan_run_peak_rss_mib": 531,
+    "llama_cpp_peak_rss_mib": 561
+  },
+  "optimisation_steps_same_image": [
+    { "step": "float matrix multiply, scalar attention", "encode_ms": 45089 },
+    { "step": "int8 Q8_0 kernel with 256-value activation blocks", "encode_ms": 32751, "note": "accuracy fell to 0.988 overall; rejected" },
+    { "step": "AVX2 attention with per-head contiguous keys and values", "encode_ms": 16987 },
+    { "step": "32-value activation blocks (as llama.cpp), cache-blocked rows x tokens", "encode_ms": 12697 }
+  ],
+  "limitations": [
+    "One synthetic image, one machine, three rounds: directional.",
+    "Stellan-Run's projector uses exact GELU; llama.cpp uses the tanh approximation, which explains part of the remaining difference.",
+    "Neither Lite nor Max can use these embeddings yet: the projectors must be trained (see HANDOVER.md).",
+    "PNG/JPEG decoding is not in Stellan-Run; `see` takes raw RGB."
+  ]
+}

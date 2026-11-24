@@ -47,6 +47,14 @@ experimental/stellan-runtime/build/stellan-runtime hash /path/to/model.gguf
 experimental/stellan-runtime/build/stellan-runtime tensorbench /path/to/model.gguf blk.0.ssm_in.weight 10
 ```
 
+**The eye (image encoder).** `see` runs Mistral Small 3.1's image encoder and projector from a Pixtral-type `mmproj` GGUF on raw 8-bit RGB pixels. It shrinks the image to fit 1540 px and rounds each side up to whole 28 px merged patches. It prints a JSON summary (size, image tokens, timing, memory), and `--out` writes the projected embeddings as float32:
+
+```sh
+experimental/stellan-runtime/build/stellan-run see /path/to/mmproj.gguf SHA256 image.rgb 448 448 2 --out embeddings.f32
+```
+
+It runs SiLU, as Mistral corrected on 9 May 2025, even when an older file says `clip.use_gelu`; the summary reports that as `"file_says_gelu": true`. Lite and Max can't use these embeddings until their projectors are trained. See EVIDENCE.md ("The eye") for the check against llama.cpp.
+
 Inspection prints architecture and tensor layouts, not vocabulary or file contents. Tensor benchmarks measure a single matrix with deterministic inputs, not assistant speed. The `generation_supported: false` inspection field remains conservative: the engine has not passed production qualification.
 
 For actual text generation, use the Node bridge with trusted hashes from your own build/verified release inputs:
@@ -119,7 +127,7 @@ The output must be a new report file. Both use the same tokenized prompts, 8192 
 
 ## File inputs
 
-After `npm ci` and `npm run build`, `run.mjs --capabilities` lists supported types. Add up to four `--file PATH` flags to the launcher. The shared app/runner processor reads text/code and extracts PDF/DOCX text locally, with byte/page limits, worker timeouts and explicit errors. For a formatted instruction prompt, end it at `[/INST]`; attachment text is inserted before that marker. Native inference still receives only text/token IDs. Images, scans without a text layer, audio and video are unsupported; see [the full input guide](../../docs/INPUTS.md).
+After `npm ci` and `npm run build`, `run.mjs --capabilities` lists supported types. Add up to four `--file PATH` flags to the launcher. The shared app/runner processor reads text/code and extracts PDF/DOCX text locally, with byte/page limits, worker timeouts and explicit errors. For a formatted instruction prompt, end it at `[/INST]`; attachment text is inserted before that marker. Native inference still receives only text/token IDs. The image encoder exists (`see`, above) but isn't connected to Lite or Max yet; images, scans without a text layer, audio and video are unsupported as model input; see [the full input guide](../../docs/INPUTS.md).
 
 ## Lower-RAM Max cache
 

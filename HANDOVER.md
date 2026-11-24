@@ -50,7 +50,8 @@ Plan:
 - **Data:** only datasets whose licences allow training and redistribution of the result; record each in `MODEL_LICENSE.md`.
 - **Fallback if training slips:** Ministral 3 3B (same eye, Apache-2.0, EU) as a hidden helper that turns an image into text for Lite. Not needed if the plan above works.
 - **Rejected for now:** non-EU vision models (Qwen, Gemma, Granite, SmolVLM, Moondream), per the owner's EU-only rule.
-- **Engine:** Stellan-Run gets the eye now (`experimental/stellan-runtime`, see its README and EVIDENCE). It reads the encoder and projector from a GGUF, so swapping in the trained projectors later needs no engine change. Image decoding (PNG/JPEG → pixels) still needs a bounded decoder before images reach the eye.
+- **Engine (done 24 November):** Stellan-Run has the eye (`stellan-run see`, `src/vision.cpp`). On Mistral's real encoder it matches llama.cpp (cosine 0.999), about 6% slower with 5% less memory (EVIDENCE.md, "The eye"). It reads the encoder and projector from an `mmproj` GGUF, so the trained projectors drop in with no engine change. Still to do: a bounded PNG/JPEG decoder in Stellan-Run, feeding image tokens into Lite's and Max's prompts (with `[IMG_BREAK]` per row and `[IMG_END]`), and AVX-VNNI kernels for newer laptops.
+- **Watch out:** the popular ggml-org `mmproj` for Mistral Small 3.1 says `clip.use_gelu`, copied from Mistral's original config, which Mistral corrected to SiLU on 9 May 2025. Stellan-Run always runs SiLU. Train our projectors with the corrected SiLU encoder, and record which encoder file and hash was used.
 - **Checks before shipping:** screenshots, photos of text, diagrams and code images; no made-up text in OCR checks; works offline; integrity-checked and lockable like the other models; images never leave the computer.
 
 ### What Forge is (owner's definition, 24 November 2026)

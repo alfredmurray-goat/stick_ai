@@ -314,7 +314,13 @@ Model::Model(std::span<const std::byte> bytes, bool continuation) : bytes_(bytes
             }
         } else if (key.starts_with("split.") && (type == 2 || type == 4 || type == 5)) {
             numbers_[key] = static_cast<double>(reader.integer(type == 2 ? 2 : 4));
-        } else if (key.starts_with("mamba2.") || key.starts_with("llama.") || key.starts_with("tokenizer.ggml.")) {
+        } else if ((key == "clip.vision.image_mean" || key == "clip.vision.image_std") && type == 9) {
+            // Vision encoders store per-channel normalisation as a float array; keep it as key.0, key.1, ...
+            const auto element = reader.integer(4);
+            const auto length = reader.integer(8);
+            if (element != 6 || length == 0 || length > 4) { throw std::runtime_error("Invalid image normalisation metadata"); }
+            for (std::uint64_t j = 0; j < length; ++j) { numbers_[key + "." + std::to_string(j)] = std::bit_cast<float>(static_cast<std::uint32_t>(reader.integer(4))); }
+        } else if (key.starts_with("mamba2.") || key.starts_with("llama.") || key.starts_with("tokenizer.ggml.") || key.starts_with("clip.")) {
             if (type == 4 || type == 7) {
                 numbers_[key] = static_cast<double>(reader.integer(type == 4 ? 4 : 1));
             } else if (type == 6) {

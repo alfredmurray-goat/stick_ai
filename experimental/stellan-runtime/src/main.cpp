@@ -2,6 +2,7 @@
 #include "lite.hpp"
 #include "max.hpp"
 #include "session.hpp"
+#include "vision.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -9,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -132,7 +134,47 @@ int generate(int argc, char **argv) {
     return cancelled ? 130 : 0;
 }
 
+// see MMPROJ SHA256 RGB WIDTH HEIGHT [THREADS] [--out FILE]: runs the image encoder ("the eye") on raw
+// 8-bit RGB pixels and prints a JSON summary; --out writes the projected embeddings as float32.
+int see(int argc, char **argv) {
+    std::string out;
+    if (argc >= 3 && std::string_view(argv[argc - 2]) == "--out") { out = argv[argc - 1]; argc -= 2; }
+    if (argc != 7 && argc != 8) { throw std::runtime_error("Usage: see MMPROJ SHA256 RGB_FILE WIDTH HEIGHT [THREADS] [--out FILE]"); }
+    const std::string expected(argv[3]);
+    if (expected.size() != 64 || !std::all_of(expected.begin(), expected.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); })) {
+        throw std::runtime_error("Supply the trusted lowercase SHA256 of the image encoder");
+    }
+    const auto width = bounded(argv[5], 65535), height = bounded(argv[6], 65535);
+    const auto threads = argc == 8 ? bounded(argv[7], 64) : 2;
+    const stellan::Mapping mapping(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[2]))));
+    if (stellan::sha256(mapping.bytes()) != expected) { throw std::runtime_error("Image encoder hash mismatch; refusing to run"); }
+    const stellan::Mapping pixels(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[4]))));
+    const stellan::Model model(mapping.bytes());
+    const stellan::Eye eye(model, threads);
+    const auto rgb = std::span(reinterpret_cast<const std::uint8_t *>(pixels.bytes().data()), pixels.bytes().size());
+    std::size_t prepared_width = 0, prepared_height = 0;
+    const auto start = Clock::now();
+    const auto prepared = eye.prepare(rgb, width, height, prepared_width, prepared_height);
+    const auto result = eye.encode(prepared, prepared_width, prepared_height, [] { return cancelled.load(std::memory_order_relaxed); });
+    const auto encode_ms = milliseconds(start);
+    double sum = 0, magnitude = 0;
+    for (const auto value : result.embeddings) { sum += value; magnitude += std::abs(value); }
+    if (!out.empty()) {
+        std::ofstream file(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(out.c_str()))), std::ios::binary | std::ios::trunc);
+        file.write(reinterpret_cast<const char *>(result.embeddings.data()), static_cast<std::streamsize>(result.embeddings.size() * sizeof(float)));
+        if (!file) { throw std::runtime_error("Could not write the embeddings file"); }
+    }
+    const auto usage = stellan::usage();
+    std::cout << std::setprecision(9) << "{\"event\":\"seen\",\"prepared_width\":" << prepared_width << ",\"prepared_height\":" << prepared_height
+              << ",\"rows\":" << result.rows << ",\"columns\":" << result.columns << ",\"tokens\":" << result.rows * result.columns
+              << ",\"output_width\":" << eye.output_width() << ",\"layers\":" << eye.layers() << ",\"break_token\":" << (eye.has_break_token() ? "true" : "false") << ",\"activation\":\"silu\",\"file_says_gelu\":" << (eye.stale_gelu_flag() ? "true" : "false")
+              << ",\"encode_ms\":" << encode_ms << ",\"cpu_ms\":" << usage.cpu_ms << ",\"peak_rss_bytes\":" << usage.peak_rss_bytes
+              << ",\"sum\":" << sum << ",\"mean_abs\":" << magnitude / static_cast<double>(result.embeddings.size()) << "}\n";
+    return cancelled ? 130 : 0;
+}
+
 int run(int argc, char **argv) {
+    if (argc >= 2 && std::string_view(argv[1]) == "see") { return see(argc, argv); }
     if (argc >= 2 && std::string_view(argv[1]) == "serve") { return stellan::session(argc, argv, [] { return cancelled.load(std::memory_order_relaxed); }); }
     if (argc == 3 && std::string_view(argv[1]) == "hash") {
         const stellan::Mapping mapping(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(argv[2]))));

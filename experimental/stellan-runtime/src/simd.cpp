@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstdlib>
 
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
@@ -39,6 +40,12 @@ STELLAN_AVX2 inline int hsum32(__m256i value) {
     return _mm_cvtsi128_si32(sum);
 }
 // minimum[g] * (sum of the activation's two 16-value sums in group g), for all eight groups at once.
+STELLAN_AVX2 inline float hsum_ps(__m256 value) {
+    auto sum = _mm_add_ps(_mm256_castps256_ps128(value), _mm256_extractf128_ps(value, 1));
+    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
+    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
+    return _mm_cvtss_f32(sum);
+}
 STELLAN_AVX2 inline int q4_minima(const QuantizedInput &x, __m256i minima) {
     return hsum32(_mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.sums.data())), minima));
 }
@@ -204,6 +211,144 @@ STELLAN_AVX2 void q6_tile(std::span<const std::byte> row, std::span<const std::s
         }
     }
 }
+// Q8_0 weights (32 int8 values and one f16 scale per block) against int8 activations. abs(weight) times
+// sign-adjusted activation keeps maddubs's unsigned-by-signed form; 128 * 127 * 2 still fits int16.
+template<std::size_t Count>
+STELLAN_AVX2 void q8_0_tile(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    __m256 sums[Count];
+    for (std::size_t t = 0; t < Count; ++t) { sums[t] = _mm256_setzero_ps(); }
+    const auto ones = _mm256_set1_epi16(1);
+    for (std::size_t block = 0; block < input.front().size(); ++block) {
+        // The weight scale changes every 32 values but the activation scale only every 256, so apply the
+        // weight scale in the loop and the activation scale once per block.
+        __m256 partial[Count];
+        for (std::size_t t = 0; t < Count; ++t) { partial[t] = _mm256_setzero_ps(); }
+        for (std::size_t g = 0; g < 8; ++g) {
+            const auto *p = row.data() + (block * 8 + g) * 34;
+            const auto weights = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 2));
+            const auto magnitude = _mm256_sign_epi8(weights, weights);
+            const auto scale = _mm256_set1_ps(half_float(read_half(p)));
+            for (std::size_t t = 0; t < Count; ++t) {
+                const auto values = _mm256_sign_epi8(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[t][block].values.data() + g * 32)), weights);
+                const auto products = _mm256_madd_epi16(_mm256_maddubs_epi16(magnitude, values), ones);
+                partial[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(products), scale, partial[t]);
+            }
+        }
+        for (std::size_t t = 0; t < Count; ++t) { sums[t] = _mm256_fmadd_ps(partial[t], _mm256_set1_ps(input[t][block].scale), sums[t]); }
+    }
+    for (std::size_t t = 0; t < Count; ++t) {
+        auto half_sum = _mm_add_ps(_mm256_castps256_ps128(sums[t]), _mm256_extractf128_ps(sums[t], 1));
+        half_sum = _mm_add_ps(half_sum, _mm_movehl_ps(half_sum, half_sum));
+        half_sum = _mm_add_ss(half_sum, _mm_movehdup_ps(half_sum));
+        output[t] = _mm_cvtss_f32(half_sum);
+    }
+}
+template<std::size_t Count>
+STELLAN_AVX2 void fine_tile(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    __m256 sums[Count];
+    for (std::size_t t = 0; t < Count; ++t) { sums[t] = _mm256_setzero_ps(); }
+    const auto ones = _mm256_set1_epi16(1);
+    for (std::size_t g = 0; g < input.front().size(); ++g) {
+        const auto *p = row.data() + g * 34;
+        const auto weights = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 2));
+        const auto magnitude = _mm256_sign_epi8(weights, weights);
+        const auto scale = half_float(read_half(p));
+        for (std::size_t t = 0; t < Count; ++t) {
+            const auto &x = input[t][g];
+            const auto values = _mm256_sign_epi8(_mm256_load_si256(reinterpret_cast<const __m256i *>(x.values.data())), weights);
+            const auto products = _mm256_madd_epi16(_mm256_maddubs_epi16(magnitude, values), ones);
+            sums[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(products), _mm256_set1_ps(scale * x.scale), sums[t]);
+        }
+    }
+    for (std::size_t t = 0; t < Count; ++t) { output[t] = hsum_ps(sums[t]); }
+}
+STELLAN_AVX2 void fine_batch(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { fine_tile<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { fine_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: fine_tile<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: fine_tile<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: fine_tile<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+STELLAN_AVX2 void q8_0_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
+    std::size_t first = 0;
+    for (; first + 8 <= input.size(); first += 8) { q8_0_tile<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
+    if (first + 4 <= input.size()) { q8_0_tile<4>(row, input.subspan(first, 4), output.subspan(first, 4)); first += 4; }
+    switch (input.size() - first) {
+        case 3: q8_0_tile<3>(row, input.subspan(first), output.subspan(first)); break;
+        case 2: q8_0_tile<2>(row, input.subspan(first), output.subspan(first)); break;
+        case 1: q8_0_tile<1>(row, input.subspan(first), output.subspan(first)); break;
+        default: break;
+    }
+}
+// exp for x <= 0 (attention scores after subtracting the maximum): Cephes-style range reduction and
+// a degree-5 polynomial, accurate to a few float ulps.
+STELLAN_AVX2 inline __m256 exp_ps(__m256 x) {
+    x = _mm256_max_ps(x, _mm256_set1_ps(-87.0F));
+    auto fx = _mm256_floor_ps(_mm256_fmadd_ps(x, _mm256_set1_ps(1.44269504088896341F), _mm256_set1_ps(0.5F)));
+    x = _mm256_fnmadd_ps(fx, _mm256_set1_ps(0.693359375F), x);
+    x = _mm256_fnmadd_ps(fx, _mm256_set1_ps(-2.12194440e-4F), x);
+    auto y = _mm256_set1_ps(1.9875691500e-4F);
+    y = _mm256_fmadd_ps(y, x, _mm256_set1_ps(1.3981999507e-3F));
+    y = _mm256_fmadd_ps(y, x, _mm256_set1_ps(8.3334519073e-3F));
+    y = _mm256_fmadd_ps(y, x, _mm256_set1_ps(4.1665795894e-2F));
+    y = _mm256_fmadd_ps(y, x, _mm256_set1_ps(1.6666665459e-1F));
+    y = _mm256_fmadd_ps(y, x, _mm256_set1_ps(5.0000001201e-1F));
+    y = _mm256_fmadd_ps(y, _mm256_mul_ps(x, x), _mm256_add_ps(x, _mm256_set1_ps(1.0F)));
+    const auto power = _mm256_slli_epi32(_mm256_add_epi32(_mm256_cvttps_epi32(fx), _mm256_set1_epi32(127)), 23);
+    return _mm256_mul_ps(y, _mm256_castsi256_ps(power));
+}
+// One query of one head against every key (no mask): scores, softmax and the weighted sum of values.
+STELLAN_AVX2 void attention_row(std::size_t tokens, std::size_t dim, std::size_t stride, const float *q, const float *keys, const float *values, float scale, float *scores, float *out) {
+    const auto lanes = dim / 8;
+    __m256 query[16];
+    for (std::size_t i = 0; i < lanes; ++i) { query[i] = _mm256_mul_ps(_mm256_loadu_ps(q + i * 8), _mm256_set1_ps(scale)); }
+    std::size_t j = 0;
+    for (; j + 4 <= tokens; j += 4) {
+        auto a0 = _mm256_setzero_ps(), a1 = _mm256_setzero_ps(), a2 = _mm256_setzero_ps(), a3 = _mm256_setzero_ps();
+        const auto *k = keys + j * stride;
+        for (std::size_t i = 0; i < lanes; ++i) {
+            a0 = _mm256_fmadd_ps(query[i], _mm256_loadu_ps(k + i * 8), a0);
+            a1 = _mm256_fmadd_ps(query[i], _mm256_loadu_ps(k + stride + i * 8), a1);
+            a2 = _mm256_fmadd_ps(query[i], _mm256_loadu_ps(k + 2 * stride + i * 8), a2);
+            a3 = _mm256_fmadd_ps(query[i], _mm256_loadu_ps(k + 3 * stride + i * 8), a3);
+        }
+        const auto h = _mm256_hadd_ps(_mm256_hadd_ps(a0, a1), _mm256_hadd_ps(a2, a3));
+        _mm_storeu_ps(scores + j, _mm_add_ps(_mm256_castps256_ps128(h), _mm256_extractf128_ps(h, 1)));
+    }
+    for (; j < tokens; ++j) {
+        auto a = _mm256_setzero_ps();
+        for (std::size_t i = 0; i < lanes; ++i) { a = _mm256_fmadd_ps(query[i], _mm256_loadu_ps(keys + j * stride + i * 8), a); }
+        scores[j] = hsum_ps(a);
+    }
+    auto top = _mm256_set1_ps(-INFINITY);
+    j = 0;
+    for (; j + 8 <= tokens; j += 8) { top = _mm256_max_ps(top, _mm256_loadu_ps(scores + j)); }
+    alignas(32) float tops[8];
+    _mm256_store_ps(tops, top);
+    float maximum = *std::max_element(tops, tops + 8);
+    for (; j < tokens; ++j) { maximum = std::max(maximum, scores[j]); }
+    auto total = _mm256_setzero_ps();
+    float tail = 0;
+    j = 0;
+    for (; j + 8 <= tokens; j += 8) {
+        const auto e = exp_ps(_mm256_sub_ps(_mm256_loadu_ps(scores + j), _mm256_set1_ps(maximum)));
+        _mm256_storeu_ps(scores + j, e); total = _mm256_add_ps(total, e);
+    }
+    for (; j < tokens; ++j) { scores[j] = std::exp(scores[j] - maximum); tail += scores[j]; }
+    const auto inverse = 1.0F / (hsum_ps(total) + tail);
+    __m256 sum[16];
+    for (std::size_t i = 0; i < lanes; ++i) { sum[i] = _mm256_setzero_ps(); }
+    for (j = 0; j < tokens; ++j) {
+        const auto weight = _mm256_set1_ps(scores[j]);
+        const auto *v = values + j * stride;
+        for (std::size_t i = 0; i < lanes; ++i) { sum[i] = _mm256_fmadd_ps(weight, _mm256_loadu_ps(v + i * 8), sum[i]); }
+    }
+    for (std::size_t i = 0; i < lanes; ++i) { _mm256_storeu_ps(out + i * 8, _mm256_mul_ps(sum[i], _mm256_set1_ps(inverse))); }
+}
 STELLAN_AVX2 void q4_batch(std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     std::size_t first = 0;
     for (; first + 8 <= input.size(); first += 8) { q4_tile<8>(row, input.subspan(first, 8), output.subspan(first, 8)); }
@@ -261,9 +406,22 @@ bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> ro
 }
 bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     static const bool enabled = available();
-    if (!enabled || (type != 12 && type != 14)) { return false; }
-    if (type == 12) { q4_batch(row, input, output); }
+    if (!enabled || (type != 8 && type != 12 && type != 14)) { return false; }
+    if (type == 8) { q8_0_batch(row, input, output); }
+    else if (type == 12) { q4_batch(row, input, output); }
     else { q6_batch(row, input, output); }
+    return true;
+}
+bool accelerated_fine_batch_dot(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    static const bool enabled = available();
+    if (!enabled) { return false; }
+    fine_batch(row, input, output);
+    return true;
+}
+bool accelerated_attention(std::size_t tokens, std::size_t dim, std::size_t stride, const float *q, const float *keys, const float *values, float scale, float *scores, float *out) {
+    static const bool enabled = available();
+    if (!enabled || dim % 8 != 0 || dim > 128 || tokens == 0) { return false; }
+    attention_row(tokens, dim, stride, q, keys, values, scale, scores, out);
     return true;
 }
 bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
@@ -275,6 +433,10 @@ bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const floa
 }
 }
 #elif defined(__aarch64__) || defined(__arm64__)
+namespace stellan {
+bool accelerated_attention(std::size_t, std::size_t, std::size_t, const float *, const float *, const float *, float, float *, float *) { return false; }
+bool accelerated_fine_batch_dot(std::span<const std::byte>, std::span<const std::span<const FineInput>>, std::span<float>) { return false; }
+}
 #include <arm_neon.h>
 namespace stellan {
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &) { return false; }
@@ -346,6 +508,8 @@ bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> ro
 }
 #else
 namespace stellan {
+bool accelerated_attention(std::size_t, std::size_t, std::size_t, const float *, const float *, const float *, float, float *, float *) { return false; }
+bool accelerated_fine_batch_dot(std::span<const std::byte>, std::span<const std::span<const FineInput>>, std::span<float>) { return false; }
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &) { return false; }
 bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::span<const QuantizedInput>, float &) { return false; }
 bool accelerated_ssm(std::size_t, std::size_t, std::span<const float>, float, float, float, std::span<const float>, std::span<const float>, std::span<float>, std::span<float>) { return false; }
@@ -410,7 +574,7 @@ void arm_batch_tile(std::uint32_t type, std::span<const std::byte> row,
 bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
     static const bool scalar = environment_set("STELLAN_RUNTIME_SCALAR");
     static const bool untiled = environment_set("STELLAN_RUNTIME_ARM_UNTILED");
-    if (scalar) return false;
+    if (scalar || type == 8) return false;
 #if defined(__APPLE__)
     // Apple Silicon CI regressed on large Q4 batches; retain the measured reference there.
     const bool retain_large_q4 = type == 12 && input.size() > 8;

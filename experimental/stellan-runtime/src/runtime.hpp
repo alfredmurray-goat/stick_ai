@@ -98,5 +98,16 @@ std::vector<QuantizedInput> quantize_input(std::span<const float> input);
 float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input);
 
 void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output);
+// 32-value int8 blocks with their own scale, matching Q8_0 weights block for block. Finer than
+// QuantizedInput's 256-value blocks, for activations with large outliers (the image encoder).
+struct alignas(32) FineInput {
+    std::array<std::int8_t, 32> values;
+    float scale;
+    std::array<std::byte, 28> alignment_padding {};
+};
+static_assert(sizeof(FineInput) == 64);
+void quantize_fine(std::span<const float> input, std::span<FineInput> result);
+// Q8_0 weight row against up to prefill_batch_limit fine-quantised inputs.
+void fine_batch_dot(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output);
 
 }
