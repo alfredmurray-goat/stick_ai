@@ -386,6 +386,7 @@ async function update() {
     if (disk && disk.free < disk.minimum) byId("disk-warning").textContent = `This computer has only ${mb(disk.free)} free. Stick AI needs at least ${mb(disk.minimum)} free to start the model. Free up some space (empty the Bin or Trash, delete large downloads), then click Retry.`;
     else if (disk && disk.free < disk.comfortable) byId("disk-warning").textContent = `This computer has ${mb(disk.free)} free. Stick AI works, but new conversations start a little slower. With ${mb(disk.comfortable)} free it uses faster start-up caches.`;
     internetAllowed = state.internet !== false; maybeCheckUpdates();
+    if (state.personal) savedPersonal = state.personal;
     if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
     const context = state.contextUsage;
     const knownUsage = context && Number.isSafeInteger(context.used) && context.used >= 0 && context.capacity > 0;
@@ -407,7 +408,11 @@ async function update() {
     for (const event of state.events) {
       after = event.id;
       if (event.kind === "user") { beginTurn(event.text); }
-      if (event.kind === "attachments") { message(`Attached: ${event.data.map(file => file.name).join(", ")} · read locally as text`, "status"); }
+      if (event.kind === "attachments") {
+        const documents = event.data.filter(file => file.kind !== "image"), images = event.data.filter(file => file.kind === "image");
+        if (documents.length) message(`Attached: ${documents.map(file => file.name).join(", ")} · read locally as text`, "status");
+        if (images.length) message(`Attached image${images.length === 1 ? "" : "s"}: ${images.map(file => file.label || file.name).join(", ")} · Stellan can add ${images.length === 1 ? "it" : "them"} to your project when you approve`, "status");
+      }
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; lastTaskAttachments = []; pendingAttachments = []; renderAttachments(); if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
@@ -422,7 +427,8 @@ async function update() {
         const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         const web = event.data.kind === "web", search = web && event.data.title === "Search the web";
         const shell = event.data.kind === "shell";
-        for (const [label, allow] of [[shell ? "Don’t run" : web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [shell ? "Run it" : web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
+        const image = event.data.kind === "image";
+        for (const [label, allow] of [[shell ? "Don’t run" : image ? "Don’t add" : web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [shell ? "Run it" : image ? "Add image" : web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
@@ -454,6 +460,13 @@ function approvalCard(data) {
     card.className = `approval-card${data.isolated ? "" : " unsandboxed"}`; title.textContent = "Run this command?"; sub.textContent = data.note;
     text.append(title, sub); head.append(icon("terminal"), text); card.append(head);
     const preview = document.createElement("pre"); preview.className = "command-preview"; preview.textContent = data.after; card.append(preview); return card;
+  }
+  if (data.kind === "image") {
+    title.textContent = "Add this image to your project?"; sub.textContent = `${data.path}${data.replaces ? " · replaces the file that's there" : ""}`;
+    text.append(title, sub); head.append(icon("file"), text); card.append(head);
+    const details = document.createElement("p"); details.className = "approval-detail"; details.textContent = data.title; card.append(details);
+    if (typeof data.preview === "string" && data.preview.startsWith("data:image/")) { const img = document.createElement("img"); img.className = "approval-image"; img.alt = `Preview of ${data.file}`; img.src = data.preview; card.append(img); }
+    return card;
   }
   const web = data.kind === "web", mcp = data.kind === "mcp" || web; const editing = !mcp && Boolean(data.before);
   title.textContent = web ? (data.title === "Search the web" ? "Search the web for this?" : "Read this web page?") : mcp ? `Allow MCP call: ${data.title}?` : `Save changes to ${data.file}?`;
@@ -672,12 +685,30 @@ const expandedFolders = new Set();
 function toast(text) { byId("toast").textContent = text; byId("toast").hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { byId("toast").hidden = true; }, 3500); }
 function openSettings(tab = "models") {
   for (const button of document.querySelectorAll("[data-settings]")) button.classList.toggle("active", button.dataset.settings === tab);
-  for (const name of ["models","github","mcp","skills","hooks","updates"]) byId(`settings-${name}`).hidden = name !== tab;
+  for (const name of ["models","you","github","mcp","skills","hooks","updates"]) byId(`settings-${name}`).hidden = name !== tab;
+  if (tab === "you") showPersonal();
   byId("github-panel").open = true;
   if (["mcp","skills","hooks"].includes(tab) && !native) void refreshExtensions();
   if (tab === "github" && !native) void refreshSignIn();
   if (!byId("settings-dialog").open) byId("settings-dialog").showModal();
 }
+// "About you": filled from the saved settings each time the tab opens, saved only when the user presses Save.
+let savedPersonal = null;
+function showPersonal() {
+  byId("personal-native").hidden = !native; byId("personal-fields").hidden = Boolean(native);
+  if (native || !savedPersonal) return;
+  byId("personal-name").value = savedPersonal.name || ""; byId("personal-about").value = savedPersonal.about || "";
+  byId("personal-style").value = savedPersonal.style || "balanced"; byId("personal-preferences").value = savedPersonal.preferences || "";
+  byId("personal-message").textContent = "";
+}
+byId("personal-save").onclick = async () => {
+  byId("personal-save").disabled = true;
+  try {
+    const result = await api("/api/personal", { name: byId("personal-name").value, about: byId("personal-about").value, style: byId("personal-style").value, preferences: byId("personal-preferences").value });
+    savedPersonal = result.personal; byId("personal-message").textContent = "Saved. Stellan will use this from your next message.";
+  } catch (error) { byId("personal-message").textContent = error.message || "Couldn't save. Try again."; }
+  finally { byId("personal-save").disabled = false; }
+};
 byId("open-settings").onclick = () => openSettings("models");
 byId("open-github").onclick = () => openSettings("github");
 byId("open-updates").onclick = () => openSettings("updates");
@@ -691,8 +722,8 @@ byId("sidebar-toggle").onclick = () => { if (innerWidth <= 860) document.body.cl
 byId("activity-toggle").onclick = () => { if (innerWidth <= 620) document.body.classList.toggle("inspector-open"); else document.body.classList.toggle("inspector-hidden"); };
 function inspectorTab(file) { byId("activity-panel").hidden = file; byId("file-panel").hidden = !file; byId("tab-file").classList.toggle("active", file); byId("tab-activity").classList.toggle("active", !file); document.body.classList.remove("inspector-hidden"); if (innerWidth <= 620) document.body.classList.add("inspector-open"); }
 byId("tab-file").onclick = () => inspectorTab(true); byId("tab-activity").onclick = () => inspectorTab(false);
-const toolTitle = (tool) => ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Run command",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page"})[tool] || tool;
-const toolIcon = (tool) => ({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass"})[tool] || "sparkle";
+const toolTitle = (tool) => ({read_file:"Read file",list_dir:"Explore files",search_files:"Search project",write_file:"Write file",edit_file:"Edit file",delegate_code:"Hand off to Max",run_shell:"Run command",mcp_tools:"Discover MCP tools",mcp_call:"Call MCP tool",use_skill:"Read skill",web_search:"Search the web",read_web_page:"Read web page",save_image:"Add image"})[tool] || tool;
+const toolIcon = (tool) => ({read_file:"file",list_dir:"folder",search_files:"search",write_file:"pencil",edit_file:"pencil",delegate_code:"arrow-right",run_shell:"terminal",mcp_tools:"plug",mcp_call:"plug",use_skill:"book",web_search:"compass",read_web_page:"compass",save_image:"file"})[tool] || "sparkle";
 function renderTool(data) {
   turnStep(data, toolTitle(data.tool), toolIcon(data.tool));
   let card = toolCards.get(data.step);

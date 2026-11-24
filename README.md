@@ -38,6 +38,8 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **MCP servers and skills.** Connect local or remote MCP tool servers and reusable SKILL.md workflows. Every MCP call asks first.
 - **Hooks.** Like Claude Code's hooks: run your own command, or notify another app on your computer, when you send a message, before or after Stellan uses a tool, when it needs your approval, or when it finishes. A hook can stop a message or tool call, or add notes for Stellan, but it can never approve anything for you. See [HOOKS.md](docs/HOOKS.md).
 - **Signed app updates.** The app checks for signed updates and installs them without re-downloading your models.
+- **It gets to know you.** Settings → About you: tell Stellan your name, what you do, how you'd like it to talk (normal, short, explanatory or beginner-friendly) and anything else to keep in mind. It's saved on your stick and shapes every new conversation.
+- **Add your logo and pictures.** Attach a PNG, JPEG, GIF, WebP, ICO, BMP or AVIF and ask Stellan to use it. It picks the right folder, shows you a preview and the exact path, and copies the image into your project only when you press **Add image**. Stellan can't see what's in a picture yet; that needs the vision encoder planned for the next training.
 
 <table>
   <tr>
@@ -123,12 +125,18 @@ Files are linked by path, never copied. Keep them outside the app folder, for ex
 - **Follow along.** Under each message, a live line shows what Stellan is doing; click it to read its thinking and each step. The **Activity** panel has the full detail. **Stop** or Esc cancels at any time.
 - **Resting.** After 10 quiet minutes the model is paused so it stops holding memory (about 4.5 GB for Lite), and the status says **Resting**. Your next message wakes it in a few seconds with the conversation intact.
 - **Run tests.** Stellan can run a command such as your project's tests to check its own fixes. Each command shows an approval card first. On Mac and Linux it runs in the computer's sandbox (only the project folder can change, no internet); on Windows there is no sandbox, so the card warns that it runs with your permissions.
+- **Attach files and images.** Attach, drag in or paste up to four files. Documents (text, code, PDF, DOCX) are read locally as text. Images are added to your project when you approve. See [INPUTS.md](docs/INPUTS.md).
+- **Make it yours.** Settings → About you sets your name, a few words about you, how Stellan should talk and anything it should remember.
 - **Edit files yourself.** Click a file in the sidebar to open it in **File preview**, edit it and save.
 - **Use skills.** Type `/` to pick a skill, or manage them under **Skills**.
 - **Switch appearance.** It follows your system's light or dark mode until you choose one.
 
 <p align="center">
   <img src="docs/settings.png" alt="The Stick AI settings window with an app tile, a segmented Models, GitHub, MCP, Skills and Updates control, and grouped cards for linking Lite and Max files" width="820">
+</p>
+
+<p align="center">
+  <img src="docs/about-you.png" alt="Settings, About you: fields for what Stellan should call you, what you do, a Beginner-friendly talking style and extra preferences such as British spelling, with a Save button" width="520">
 </p>
 
 ## Privacy

@@ -20,33 +20,61 @@ Read this first; older sections below may describe the earlier llama.cpp app.
 
 - **No customers yet.** Stellan-Run stays the default engine; keep improving it before sticks are sold. Rebuild and publish releases as normal.
 - **Keep working on Run, Link, Host and Forge** (next steps below).
-- **Add a hidden third model for images (planned, not started).** Users can attach images; a small vision model, never shown as a choice in the app, turns each image into text that Lite and Max then use.
+- **Images: no third model, EU models only (superseded the earlier "hidden third model" idea the same day).** Teach Lite and Max to see in the next training by giving both the same small image encoder ("the eye") plus a small adapter each. Every vision component must come from an EU company. Put the eye into Stellan-Run now, before training, so it's ready.
+- **Shipped now without vision:** attach an image (for example a logo) and Stellan adds it to the project with `save_image` after the user approves (`docs/INPUTS.md`). Settings → **About you** (name, what you do, how to talk, preferences) shapes replies, like Claude's personal preferences. New, clearer system prompts for Lite and Max.
+- **Forge is the open-source showcase and data loop** (owner's definition, below). It replaces the "unnamed initiative" of 22 November.
+- **Long-term goal: a Rolling LM** (below).
 
-### Planned: hidden vision model
+### Long-term goal: the Rolling LM
 
-Today both models are text-only and the app rejects images (`docs/INPUTS.md`). Plan:
+Build our own model that keeps learning from its own work on a rolling schedule (overnight, or even hourly), so it's always getting smarter. Call it a **Rolling LLM** or **Rolling LM**.
 
-- **How it fits.** When a message has an image, the app loads the vision model on demand, asks it for a faithful description plus any visible text (OCR, code, error messages, UI labels), unloads it, and passes that text to Lite as a clearly marked, untrusted attachment, the same way PDF text is passed now. Lite can ask for a closer look with a tool (for example `look_at_image` with a question), so Max never needs vision. Users see one assistant; the model picker still shows only Lite and Max.
-- **Candidates to evaluate** (check each official model card and licence before choosing): Qwen3-VL-2B/4B (listed as Apache-2.0; strong document/screenshot OCR), IBM Granite Vision 4.1 (4B, Apache-2.0, publishes a GGUF with a vision projector), SmolVLM2-2.2B (Apache-2.0, about 1.6 GB at Q4), Gemma 4 E2B (reported Apache-2.0, about 1.5 GB at Q4). Avoid Moondream 3 (BSL/own licence) and Gemma-terms models unless the licence is reviewed.
-- **Engine work.** Stellan-Run has no image encoder. Needed: the chosen model's vision encoder (ViT) and projector in Stellan-Run, image decoding/resizing in a bounded worker (PNG/JPEG only, size and pixel limits, no EXIF/scripts), then the text decoder already shared with our transformer path. Until then, llama.cpp's multimodal tool could be used for evaluation only.
-- **Budget.** About 1.5–3 GB extra on the stick; loaded only while an image is read, so normal RAM use is unchanged. 64 GB sticks have room.
-- **Checks before shipping.** Screenshot, photo-of-text, diagram and code-image test set; no hallucinated text in OCR checks; works offline; integrity-checked and lockable like the other models; images never leave the computer.
+How the pieces line up: Forge produces reviewed, verified experience (real issues, real tests, maintainer feedback); training turns accepted experience into a new version; Stellan-Run serves it; signed updates deliver it to sticks. Things that must be solved first, honestly:
+- **Forgetting.** Training on new work erodes old skills. Each rolling update needs a fixed regression suite (HumanEval, a private agentic suite, a frozen SWE-bench slice) and is only shipped if nothing regresses.
+- **Quality of the data.** Only learn from attempts that a verifier passed and a person (or a maintainer's merge) accepted; never from unreviewed output, or it learns its own mistakes.
+- **Evaluation leakage.** Keep holdout and benchmark tasks out of training for good (Forge's export already enforces this).
+- **Cost and cadence.** A full fine-tune of a 24B model every hour isn't realistic yet; start with small LoRA updates on a schedule (weekly → nightly), measure, then shorten.
+- **Updates to sticks.** A new model is a multi-GB update; ship adapters (LoRA deltas) rather than whole models where possible, signed like app updates.
+- **Licences and consent.** Only train on code and conversations we have the right to use; customer chats never leave the stick unless a customer explicitly opts in.
 
-### What Forge is, in plain words
+Until then, **About you** in Settings gives the feel of a model that knows you, without training.
 
-Forge is the workshop for teaching the models later. It does three things and nothing else yet:
-1. **Records attempts**: a coding task, every step Stellan took, the tests and whether they passed (`forge.py record`).
-2. **Has a person review them** before anything can be used (`forge.py review`), then **exports** approved, passing attempts as a training file while keeping benchmark/test tasks out (`forge.py export`).
-3. **Runs a task once in a locked-down Docker box** and grades it with a separate checker it can't tamper with (`runner.py plan/run/summary`).
+### Planned: vision for Lite and Max (EU only)
 
-It does **not** train the models, and it isn't connected to Stellan yet: the only "model" it runs today is a synthetic test fixture. Next: a real Stellan adapter (Lite + Max through Stellan-Run inside the Docker image), then a small private task suite, then reviewed experience.
+Facts (checked 24 November 2026 against Mistral's official `config.json` files on Hugging Face): Mistral Small 3.1 (Paris, Apache-2.0) has a ~0.4B Pixtral-style image encoder: patch 14, width 1024, 24 layers, 16 heads, gated SiLU MLP 4096, 2D RoPE (theta 10,000), images up to 1540 px; its projector is an RMSNorm, a 2×2 patch merger and a two-layer GELU MLP into the language model. Mistral reuses that same frozen encoder in the Ministral 3 family (3B/8B/14B, December 2025, Apache-2.0). Max's base, Devstral Small 2505, was fine-tuned from Mistral Small 3.1 with the vision encoder removed; Lite is a 7.3B Mamba2 with a Mistral tokenizer.
+
+Plan:
+- **One eye for both.** Use Mistral Small 3.1's encoder unchanged and frozen.
+- **Max:** start from Mistral Small 3.1's own projector (made for Max's ancestor), then re-align it to Max: train the projector only, then a short LoRA pass on image + code tasks.
+- **Lite:** train a new projector (1024×4 → Lite's width) from scratch, LLaVA-style: projector-only on image–caption pairs, then a LoRA pass. Mamba2 with image tokens is less proven than transformers, so measure it; if Lite can't see well enough, Lite can hand image questions to Max.
+- **Data:** only datasets whose licences allow training and redistribution of the result; record each in `MODEL_LICENSE.md`.
+- **Fallback if training slips:** Ministral 3 3B (same eye, Apache-2.0, EU) as a hidden helper that turns an image into text for Lite. Not needed if the plan above works.
+- **Rejected for now:** non-EU vision models (Qwen, Gemma, Granite, SmolVLM, Moondream), per the owner's EU-only rule.
+- **Engine:** Stellan-Run gets the eye now (`experimental/stellan-runtime`, see its README and EVIDENCE). It reads the encoder and projector from a GGUF, so swapping in the trained projectors later needs no engine change. Image decoding (PNG/JPEG → pixels) still needs a bounded decoder before images reach the eye.
+- **Checks before shipping:** screenshots, photos of text, diagrams and code images; no made-up text in OCR checks; works offline; integrity-checked and lockable like the other models; images never leave the computer.
+
+### What Forge is (owner's definition, 24 November 2026)
+
+**Forge is how Stellan shows itself to the world and gets better at the same time.** Stellan Lite and Max work on real issues in open-source repositories that explicitly welcome AI-assisted ("vibe-coded") contributions, and open pull requests as public demos. Every attempt is recorded: we **benchmark** their work in those repos (fixed or not, tests passing, maintainer accepted, how much a person had to help), and the reviewed data becomes **training data for the next training** (and, later, the Rolling LM).
+
+What exists today in `experimental/stellan-forge` is the workshop half: `forge.py` records attempts, has a person review them and exports approved, verified ones as training files (benchmark and holdout tasks stay out); `runner.py` runs one task once in a locked-down Docker box and grades it with a separate checker. It isn't connected to Stellan yet.
+
+Still to build, in order:
+1. **Repository list:** projects whose current CONTRIBUTING/AGENTS rules explicitly allow AI-assisted pull requests, with the policy link and the date it was checked. Many projects ban AI-generated PRs; never assume.
+2. **Issue picker:** small, reproducible, maintainer-labelled issues not claimed by anyone.
+3. **Real Stellan adapter** in the runner: Lite + Max through Stellan-Run inside the Docker image. Fix the four gaps found on 24 November first: per-model memory/CPU limits (Max needs more than the fixed 8 GB / 2 CPUs), a read-only hash-checked model mount instead of baking weights into the image, keeping tool results in exported rows (today only messages survive), and running the whole Lite + Max agent loop inside the adapter.
+4. **Pull requests:** a person reviews every diff before it's opened, from one clearly labelled account that discloses AI assistance as each project asks. One PR per project at a time; no bulk submissions.
+5. **Outcome tracking:** merged, closed, review comments and follow-up fixes feed back into each Forge record, so the benchmark and the training data reflect what maintainers actually accepted.
+6. **Public results page:** fixes proposed, tests passed, maintainers' decisions, human help and time, including failures.
+
+Risks: maintainers are tired of low-quality AI PRs, so one bad PR can get the account banned and hurt the brand; GitHub allows one free machine account per person; maintainers' review comments are their own words, so check licences before training on them.
 
 ### Next steps per component
 
 - **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.
 - **Link:** the MCP SDK is now only a test dependency. Remaining: replace `cross-spawn` (Windows `.cmd`/PATHEXT handling and escaping must be exactly right; security-sensitive) and update `docs/MCP_CLIENT.md`, which still describes the SDK transports as in use.
 - **Host:** next gate is chat memory on the native state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
-- **Forge:** real Stellan adapter and first private task suite (above).
+- **Forge:** repository list and issue picker, then the real Stellan adapter (above).
 
 ## Where things stand (earlier)
 
@@ -136,7 +164,7 @@ The owner asked whether our own Ollama or llama.cpp could make Stellan faster. T
 
 Continue the independent Stellan runtime on `experimental/stellan-runtime`. The owner has conditionally authorised replacing llama.cpp on main **only after** the new engine runs the real models correctly, is faster and puts less load on the host. This is not permission to merge an incomplete prototype or to claim unmeasured speed/security improvements. Retain the production engine until the parity, performance, resource and security acceptance checks pass, including the desktop packaging and all supported platforms. Website copy must distinguish research from shipped features.
 
-Save for later: an **unnamed** initiative that demonstrates Stellan by fixing issues in open-source GitHub projects which explicitly welcome AI-assisted contributions.
+Save for later: an **unnamed** initiative that demonstrates Stellan by fixing issues in open-source GitHub projects which explicitly welcome AI-assisted contributions. **Update 24 November 2026: this is Forge; see "What Forge is" above. The rules below still apply.**
 
 - Find projects with clear contribution rules permitting AI-assisted fixes; check each repository's current policy and issue ownership before choosing work. Do not assume a public repository permits automated submissions.
 - Start with small, reproducible bugs and maintainer-labelled help-wanted issues. Read CONTRIBUTING, AGENTS, licence, CLA/DCO requirements and the relevant tests.
