@@ -414,6 +414,7 @@ async function update() {
         if (documents.length) message(`Attached: ${documents.map(file => file.name).join(", ")} · read locally as text`, "status");
         if (images.length) message(`Attached image${images.length === 1 ? "" : "s"}: ${images.map(file => file.label || file.name).join(", ")} · Stellan can add ${images.length === 1 ? "it" : "them"} to your project when you approve`, "status");
       }
+      if (event.kind === "restored") { message(event.text, "status"); streaming = undefined; }
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; lastTaskAttachments = []; pendingAttachments = []; renderAttachments(); if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }

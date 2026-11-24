@@ -73,7 +73,16 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     const previous = chatMemory; chatMemory = undefined; await previous?.close().catch(log);
     try { chatMemory = await ChatMemory.open(root, box.root, nativeHostExecutable(root)); } catch (error) { log(error); }
   };
-  await openChatMemory();
+  // After a restart the window shows the current chat again from its saved notes; the model gets the same
+  // notes through recall(), so what the person sees matches what Stellan remembers.
+  const unfinished: Record<string, string> = { cancelled: "This task was stopped before it finished.", failed: "This task didn’t finish.", blocked: "This task was blocked." };
+  const restoreChat = (): void => {
+    const turns = chatMemory?.saved() ?? [];
+    if (!turns.length) return;
+    publish("restored", `Earlier in this chat (${turns.length} saved turn${turns.length === 1 ? "" : "s"}; long answers are shortened)`);
+    for (const turn of turns) { publish("user", turn.task); publish("answer", turn.answer || unfinished[turn.status] || "No answer was saved."); }
+  };
+  await openChatMemory(); restoreChat();
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID();
     const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
@@ -213,7 +222,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   const startAppApi = async (): Promise<void> => { if (!appKey) { appKey = newAppKey(); appApi.setKey(appKey); await savePreferences(); } await appApi.start(); };
   if (appApiEnabled) { await startAppApi().catch(log); }
   const appApiView = () => ({ enabled: appApiEnabled, running: appApi.running, url: `http://127.0.0.1:${appApi.port}/v1/chat/completions`, key: appApiEnabled ? appKey : "", problem: appApi.problem });
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); restoreChat(); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
     tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
