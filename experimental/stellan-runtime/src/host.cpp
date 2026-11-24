@@ -1,4 +1,5 @@
 #include "session.hpp"
+#include "workspace.hpp"
 #include "runtime.hpp"
 #include <atomic>
 #include <csignal>
@@ -15,6 +16,10 @@ int entry(int argc, char **argv) {
     try {
         // A disconnected owner must not leave inference running with nowhere to send it.
         std::cout.exceptions(std::ios::badbit | std::ios::failbit);
+        if (argc == 3 && std::string_view(argv[1]) == "--workspace") {
+            const std::string root(argv[2]);
+            return stellan::workspace_service(std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(root.data()), root.size())), [] { return cancelled.load(std::memory_order_relaxed); });
+        }
         if (argc < 5 || argc > 11) throw std::runtime_error("Usage: stellan-host MODEL SHA256 THREADS CONTEXT [--lazy] [--token-ids] [--force-max] [--split PATH SHA256]");
         bool text = true, force = false, lazy = false;
         std::vector<std::string> split;
