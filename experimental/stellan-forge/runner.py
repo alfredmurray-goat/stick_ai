@@ -174,8 +174,23 @@ def execute(args,timeout,name):
     return process.returncode,bytes(buffers[0]),bytes(buffers[1])
 
 def config_for(root):
-    config=forge.read_json(Path(root)/'run.json');original=config.pop('config_sha256')
+    config=forge.read_json(Path(root)/'run.json')
+    if not isinstance(config,dict) or config.get('format')!=1 or config.get('attempt_budget')!=1 or not isinstance(config.get('config_sha256'),str):raise ValueError('Invalid run manifest')
+    original=config.pop('config_sha256')
     if forge.digest(config)!=original:raise ValueError('Run configuration changed; create a new run')
+    if not isinstance(config.get('image'),str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._/:\-]*@sha256:[a-f0-9]{64}',config['image']):raise ValueError('Invalid pinned run image')
+    if str(uuid.UUID(config.get('run_id','')))!=config.get('run_id'):raise ValueError('Invalid run ID')
+    if config.get('cpus')!=2 or config.get('memory')!='8g' or type(config.get('timeout_seconds')) is not int or not 1<=config['timeout_seconds']<=3600:raise ValueError('Invalid run resource limits')
+    argv(config.get('adapter'))
+    if not isinstance(config.get('adapter_sha256'),str) or not re.fullmatch('[a-f0-9]{64}',config['adapter_sha256']):raise ValueError('Invalid adapter snapshot identity')
+    tasks=config.get('tasks')
+    if not isinstance(tasks,list) or not 1<=len(tasks)<=500:raise ValueError('Invalid selected task list')
+    ids=set()
+    for task in tasks:
+        if not isinstance(task,dict):raise ValueError('Invalid selected task')
+        forge.text(task.get('id'),'task ID',200)
+        if task['id'] in ids or task.get('key')!=hashlib.sha256(task['id'].encode()).hexdigest()[:24]:raise ValueError('Invalid task storage identity')
+        ids.add(task['id']);argv(task.get('verifier'))
     config['config_sha256']=original
     return config
 

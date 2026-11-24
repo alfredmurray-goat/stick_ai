@@ -103,4 +103,14 @@ class RunnerTests(unittest.TestCase):
                 return 0,json.dumps({'runtime':config['runtime'],'files':{'../escape.py':'bad'}}).encode(),b''
             self.assertEqual(runner.run(output,execute)['counts'],{'unresolved_patch':1})
             self.assertFalse((output/'results/escape.py').exists())
+    def test_rehashed_manifest_cannot_inject_docker_flags_or_escape_task_storage(self):
+        for field,value in [('image','--privileged'),('key','../../escape')]:
+            with tempfile.TemporaryDirectory() as folder:
+                output,config=self.setup_run(folder,tasks=1)
+                config.pop('config_sha256')
+                if field=='image':config[field]=value
+                else:config['tasks'][0][field]=value
+                config['config_sha256']=forge.digest(config)
+                (output/'run.json').write_text(json.dumps(config))
+                with self.assertRaises(ValueError):runner.run(output,lambda *args:self.fail('must not execute'))
 if __name__=='__main__':unittest.main()
