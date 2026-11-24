@@ -196,3 +196,22 @@ Rotating-order paired run (`bench-paired.mjs`, warmup, `bench/prompts-prefill.js
 | 130 tokens | this change | 28,758 | 6,418 | 60,728 | 4,247 MiB |
 
 Prompt time fell about 19% and 6% versus our previous build; llama.cpp still reads prompts about twice as fast and decodes about 25% faster here. Three rounds on a shared virtual machine: treat the improvement as directional. Raw receipt: [lite-scale-fold.json](evidence/lite-scale-fold.json).
+
+## Vectorised Q4_K/Q6_K block bookkeeping — 24 November 2026
+
+On top of the folded scales, the per-block bookkeeping is now vectorised: Q4_K block minimums are applied to all 16 activation group sums with one `_mm256_madd_epi16`, and the lane totals in the Q4, Q6 and Q8 paths use an in-register horizontal add instead of storing and looping. No `_mm256_mullo_epi32` remains. Integer sums are still exact; all 10 native tests pass and the generated IDs matched across all three engines (`identicalGeneratedIds: true`).
+
+Same setup as the previous section (rotating order, warmup, 3 rounds, Linux x64 4-core cloud VM, 2 threads, 8,192 context, real Lite, pinned llama.cpp `cd959bae` CPU build). "Previous" is the build before both kernel changes. Medians:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | CPU ms | Peak RSS |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 12,427 | 5,160 | 34,880 | 4,546 MiB |
+| 112 tokens | previous Stellan-Run | 24,311 | 6,160 | 54,018 | 4,247 MiB |
+| 112 tokens | this change | 16,032 | 6,642 | 41,516 | 4,247 MiB |
+| 130 tokens | llama.cpp | 14,772 | 4,984 | 39,100 | 4,550 MiB |
+| 130 tokens | previous Stellan-Run | 29,055 | 6,608 | 61,530 | 4,247 MiB |
+| 130 tokens | this change | 19,341 | 6,770 | 45,873 | 4,247 MiB |
+
+Prompt reading is about 34% faster than the previous build on both prompts and uses about a quarter less CPU time. llama.cpp is still ahead: it reads these prompts about 1.3× as fast and decodes about 30% faster. Stellan-Run uses about 300 MiB less memory. Decode was not targeted by this change; its difference from the previous build is within this machine's run-to-run noise. Three rounds on a shared virtual machine: treat the numbers as directional. Raw receipt: [lite-vector-bookkeeping.json](evidence/lite-vector-bookkeeping.json).
+
+Where the remaining time goes (single timed run of the same build, 112-token prompt): the two big matrix multiplies per layer are still about 85% of prompt time and the Mamba2 state update most of the rest. Next candidates: repacking Q4_K weights once at load into an interleaved layout so each tile reads contiguous memory (llama.cpp's CPU "repack" path does this), and a faster decode path for single tokens.
