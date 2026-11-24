@@ -71,6 +71,25 @@ void halves() {
 }
 
 void quantized() {
+    // Reused storage must be bit-identical when dimensions shrink/grow and blocks change.
+    std::vector<stellan::QuantizedInput> scratch;
+    std::vector<float> activation(1024);
+    for (std::size_t i = 0; i < activation.size(); ++i) activation[i] = static_cast<float>(static_cast<int>(i % 37) - 18) / 13;
+    for (const auto size : {1024U, 256U, 512U, 1024U}) {
+        const auto input = std::span(activation).first(size);
+        const auto expected = stellan::quantize_input(input);
+        stellan::quantize_input(input, scratch);
+        require(scratch.size() == expected.size());
+        for (std::size_t i = 0; i < scratch.size(); ++i) {
+            require(scratch[i].values == expected[i].values && scratch[i].sums == expected[i].sums && scratch[i].scale == expected[i].scale);
+        }
+    }
+    const auto *storage = scratch.data();
+    std::fill(activation.begin(), activation.end(), 0);
+    stellan::quantize_input(activation, scratch);
+    require(storage == scratch.data());
+    for (const auto &block : scratch) { require(block.scale == 0); for (const auto value : block.values) require(value == 0); for (const auto sum : block.sums) require(sum == 0); }
+
     std::mt19937 random(1201);
     for (unsigned trial = 0; trial < 200; ++trial) {
         std::array<std::byte, 288> weights {};
