@@ -255,3 +255,15 @@ Same paired setup (3 rounds, 2 threads, real Lite, this VM has AVX-VNNI). This r
 | 130 tokens | this change | 17,698 | 6,767 | 4,247 MiB |
 
 About 5–15% faster prompts and 5% faster decode than main; llama.cpp still reads prompts about 1.3–1.4× as fast and decodes about 25% faster. The remaining gap is structural: llama.cpp's CPU path repacks Q4_K rows so one load serves eight rows. Next step (the M1 principle): store Lite's weights pre-interleaved for our kernels when the stick is made. Raw receipt: [lite-vnni-lane-totals.json](evidence/lite-vnni-lane-totals.json).
+
+## Stellan-native layout: measured before building — 25 November 2026
+
+The plan was to store Lite's weights pre-arranged ("repacked") for our kernels when the stick is made, as llama.cpp's CPU path rearranges Q4_K rows at load. Before building a new on-stick format, we measured whether it could pay off.
+
+**Where Lite's prompt time goes** (112-token prompt, 2 threads, VNNI build, timers in a separate copy of `lite.cpp`): big matrix multiplies 8.8 s, Mamba2 mixing 2.0 s (serial preparation 0.5 s, parallel scan 1.4 s), input quantisation 0.3 s, norms 0.04 s; total 11.2 s in that run.
+
+**How close the Q4_K kernel is to the chip's limit** (`stellan-batch-bench`, one thread, 4096-wide rows, 32-token batch): 54.6 GMAC/s with AVX-VNNI and 50.2 without, against a ceiling of about 74 GMAC/s at 2.3 GHz (two multiply-type instructions per 32 multiply-adds). That is about 74% of the limit; Q6_K reaches about 38%, but Lite uses Q6_K only for its output layer.
+
+**Conclusion:** Q4_K needs two multiply-type instructions per 32 products whether rows are interleaved or not (`maddubs` then a scale multiply), and llama.cpp's repacked AVX2 kernel needs the same two. So a repacked layout can only remove overhead (loads, nibble unpacking, scale decoding), worth perhaps 10–15% of the multiply time on x86. It is not the large win it first looked like. It is more promising on ARM, where the `i8mm` matrix instructions need rows interleaved in pairs (Apple M2 and later, recent Snapdragon), and for a future model trained for a simpler 4-bit format (docs/TRAINING.md, Rule 1).
+
+**Next targets, by size:** the Mamba2 mixing step (2.0 s, partly single-threaded), Q6_K for Max's mixed layers, and only then the repacked layout. Every step is measured against the pinned llama.cpp in a same-time paired run, because this shared VM's speed drifts during the day (the same build measured 16.0 s and 18.1 s hours apart).
