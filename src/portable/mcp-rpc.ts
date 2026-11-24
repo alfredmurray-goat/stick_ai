@@ -6,7 +6,7 @@ export class McpError extends Error {constructor(message:string){super(message);
 /** MCP request lifecycle without an artificial tool-call deadline. Stop closes the transport. */
 export class McpRpc {
  private connecting=false;private stopped=new AbortController();private responding=0;
- private next=0;private pendingBytes=0;private pending=new Map<number,{resolve(value:unknown):void;reject(error:unknown):void;cleanup():void}>();closed=false;ready=false;private closing:Promise<void>|undefined;
+ private next=0;private writing=0;private pendingBytes=0;private pending=new Map<number,{resolve(value:unknown):void;reject(error:unknown):void;cleanup():void}>();closed=false;ready=false;private closing:Promise<void>|undefined;
  constructor(private transport:Transport,private notification:(method:string,params:Record<string,unknown>)=>void=()=>{}) {
   transport.onmessage=message=>{void this.receive(message).catch(()=>this.close());};
   transport.onclose=()=>this.finish(new McpError('The MCP server disconnected. Reconnect it in settings.'));
@@ -55,19 +55,21 @@ export class McpRpc {
 
  request(method:string,params:Record<string,unknown>,signal:AbortSignal):Promise<unknown>{
   signal.throwIfAborted();if(this.closed)return Promise.reject(new McpError('Connect this MCP server first.'));
-  if(this.pending.size>=64)return Promise.reject(new McpError('Too many MCP requests are waiting. Wait for a response or reconnect the server.'));
+  if(this.pending.size>=64||this.writing>=64)return Promise.reject(new McpError('Too many MCP requests are waiting. Wait for a response or reconnect the server.'));
   const id=this.next+1,message=parseMcpMessage({jsonrpc:'2.0',id,method,params:{...params,_meta:{progressToken:String(id)}}});
   const bytes=Buffer.byteLength(JSON.stringify(message));
   if(bytes>4*1024**2-this.pendingBytes)return Promise.reject(new McpError('MCP requests exceed the 4 MiB in-flight budget. Wait for a response or reconnect the server.'));
-  this.next=id;this.pendingBytes+=bytes;
+  this.next=id;++this.writing;this.pendingBytes+=bytes;
   return new Promise((resolve,reject)=>{
-   let released=false;
-   const cleanup=()=>{signal.removeEventListener('abort',cancel);if(!released){released=true;this.pendingBytes-=bytes;}};
+   let released=false,responseSettled=false,writeSettled=false;
+   const release=()=>{if(!released&&responseSettled&&writeSettled){released=true;this.pendingBytes-=bytes;}};
+   const cleanup=()=>{signal.removeEventListener('abort',cancel);responseSettled=true;release();};
    const cancel=()=>{this.pending.delete(id);cleanup();reject(signal.reason);try{void this.transport.send({jsonrpc:'2.0',method:'notifications/cancelled',params:{requestId:id,reason:'Cancelled by user'}}).catch(()=>{});}catch{}void this.close();};
    this.pending.set(id,{resolve,reject,cleanup});signal.addEventListener('abort',cancel,{once:true});
-   if(signal.aborted){cancel();return;}
+   if(signal.aborted){--this.writing;writeSettled=true;cancel();return;}
    const failed=()=>{const entry=this.pending.get(id);if(entry){this.pending.delete(id);entry.cleanup();entry.reject(new McpError('Could not send the MCP request. Reconnect the server.'));}};
-   try{void this.transport.send(message).catch(failed);}catch{failed();}
+   const written=()=>{--this.writing;writeSettled=true;release();};
+   try{void this.transport.send(message).then(written,()=>{written();failed();});}catch{written();failed();}
   });
  }
  async close(){if(this.closing)return this.closing;this.finish(new McpError('MCP connection closed.'));this.closing=Promise.resolve().then(()=>this.transport.close()).catch(()=>{});return this.closing;}

@@ -122,3 +122,12 @@ it('recovers when Lite mistakenly wraps a tool request in done without executing
  expect(await runAgent(options)).toBe('finished');expect(options.tools.execute).toHaveBeenCalledOnce();expect(options.messages[2]?.content).toContain('did not execute');
  expect(parseStep('<done>{"answer":42}</done>').step.kind).toBe('done');
 });
+
+
+it('requests explicit final tags after an untagged answer and still requires a valid retry',async()=>{
+ const options=setup(['I read the file.','<done>I read the file.</done>']);
+ expect(await runAgent(options)).toBe('finished');
+ expect(options.messages[2]?.content).toContain('repeat your answer inside <done>Your final summary</done>, including both tags');
+ expect(options.tools.execute).not.toHaveBeenCalled();
+ expect(parseStep('I read the file.').step.kind).toBe('error');
+});

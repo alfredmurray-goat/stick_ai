@@ -38,6 +38,7 @@ HostInput::HostInput() {
 bool HostInput::read_line(std::string &line, const std::function<bool()> &cancelled) {
     using Clock = std::chrono::steady_clock;
     auto activity = Clock::now();
+    auto request_start = Clock::time_point::max();
     if (line.capacity() > 65536) { std::string().swap(line); }
     else { line.clear(); }
     while (!cancelled()) {
@@ -55,7 +56,9 @@ bool HostInput::read_line(std::string &line, const std::function<bool()> &cancel
                 return true;
             }
         }
-        const auto remaining = std::chrono::seconds(idle_seconds_) - (Clock::now() - activity);
+        const auto deadline = request_start == Clock::time_point::max() ? activity : std::min(activity, request_start);
+        const auto remaining = std::chrono::seconds(idle_seconds_) - (Clock::now() - deadline);
+        if (remaining <= Clock::duration::zero() && !line.empty()) throw std::runtime_error("Host request did not finish within the input timeout");
         if (remaining <= Clock::duration::zero()) { rested_ = true; return false; }
 #ifdef _WIN32
         const auto handle = GetStdHandle(STD_INPUT_HANDLE);
@@ -85,6 +88,7 @@ bool HostInput::read_line(std::string &line, const std::function<bool()> &cancel
 #endif
         if (count == 0) { if (!line.empty()) throw std::runtime_error("Incomplete host request"); return false; }
         first_ = 0; end_ = static_cast<std::size_t>(count); activity = Clock::now();
+        if (request_start == Clock::time_point::max()) request_start = activity;
     }
     return false;
 }

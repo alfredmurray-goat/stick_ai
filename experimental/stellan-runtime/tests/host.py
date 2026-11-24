@@ -83,6 +83,19 @@ class HostTests(unittest.TestCase):
             if process.poll() is None: process.kill(); process.wait(timeout=5)
             process.stdin.close(); process.stdout.close(); process.stderr.close()
 
+    def test_partial_request_cannot_extend_timeout_by_dripping_bytes(self):
+        process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], env={**os.environ, 'STELLAN_HOST_IDLE_SECONDS':'1'}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        try:
+            self.assertEqual(json.loads(process.stdout.readline())['event'], 'ready')
+            for _ in range(3):
+                process.stdin.write('x'); process.stdin.flush(); time.sleep(0.3)
+            process.wait(timeout=0.7)
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn('input timeout', process.stderr.read())
+        finally:
+            if process.poll() is None: process.kill(); process.wait(timeout=5)
+            process.stdin.close(); process.stdout.close(); process.stderr.close()
+
     def test_closed_output_stops_the_host_without_closing_stdin(self):
         process = subprocess.Popen([HOST, str(self.model), self.digest, '2', '128'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
         try:

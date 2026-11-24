@@ -81,7 +81,7 @@ export function parseStep(content: string): { content: string; step: Step } {
     else if (mode === "done") { summary += text[index]; }
     index++;
   }
-  return { content: text, step: { kind: "error", error: "Expected one complete <tool_call> JSON block or a <done> summary. Please use the required protocol." } };
+  return { content: text, step: { kind: "error", error: "Expected one complete <tool_call> JSON block or a <done> summary. If finished, repeat your answer inside <done>Your final summary</done>, including both tags. If a tool is needed, send a JSON object with name and arguments inside <tool_call>...</tool_call> using the appropriate tool and arguments, then wait for its result. Plain text without these tags is not a completed step." } };
 }
 export function toolResult(result: string): string { return `<tool_result>${result}</tool_result>`; }
 
