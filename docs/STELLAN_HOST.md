@@ -38,3 +38,13 @@ Paths are project-relative: no traversal, absolute paths, drive prefixes or acce
 4. Move the authenticated app API and desktop lifecycle, then prove a complete packaged start/task/tool/update flow with no bundled or launched Node process.
 
 Only the fourth gate permits calling Host the full app backend replacement. The gates are implementation work, not a feature reduction or a renamed Node process.
+
+## Native session-state persistence
+
+Development mode `stellan-host --state-store /absolute/private/state-root` stores bounded UTF-8 records without Node, a model or a network port. Supply an existing private directory dedicated to internal chat/session data. This is an owner-only persistence API, not a model-accessible project file tool. Do not expose its pipe to an untrusted caller or point it at an unrelated directory.
+
+Each request is `ID state_get UUID` or `ID state_put UUID EXPECTED_REVISION HEX_TEXT`. IDs are positive integers; keys are lowercase UUIDs, text uses UTF-8 hexadecimal (`-` for empty), and records are at most64KiB. A missing record has revision `missing`; existing revisions are content SHA256s. A write must supply the current revision. Conflicts require reading and reconciling rather than silently overwriting. Empty existing records remain distinct from missing records. The service retains an exclusive OS lock for its store lifetime and rejects a second owner. Do not remove its `.owner.lock` while it is running. Lock files remain after exit; OS locks are released automatically.
+
+Writes reuse the workspace service's temporary-file/flush/atomic-replacement path and cancellation-before-commit checks. These are opaque UTF-8 snapshots, not yet the app's structured ChatMemory schema, an encrypted vault, a multi-process database, or a promise of complete power-loss durability. The service does not validate that stored text is JSON. It does not train weights or turn memory into instructions/approval. The app still uses Node for its chat-memory implementation until schema/lifecycle/client integration is ported and tested.
+
+`tests/state.py` checks exclusive ownership, restart persistence, revision conflicts, empty/missing distinction, UUID traversal rejection and UTF-8/size bounds on every native CTest platform.

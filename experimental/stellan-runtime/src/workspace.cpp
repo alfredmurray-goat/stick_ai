@@ -19,6 +19,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 #endif
 
@@ -135,6 +136,18 @@ public:
         root_fd_.value = open(root_.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
         if (root_fd_.value < 0) throw std::runtime_error("Cannot open workspace root");
 #endif
+    }
+    Handle own_state_store() const {
+#ifdef _WIN32
+        Handle h(CreateFileW((root_ / L".owner.lock").c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        BY_HANDLE_FILE_INFORMATION info {};
+        if (h.value == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(h.value, &info) || (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) || info.nNumberOfLinks != 1) throw std::runtime_error("State store is unsafe or already owned");
+#else
+        Handle h(openat(root_fd_.value, ".owner.lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0600));
+        struct stat info {};
+        if (h.value < 0 || fstat(h.value, &info) != 0 || !S_ISREG(info.st_mode) || info.st_nlink != 1 || flock(h.value, LOCK_EX | LOCK_NB) != 0) throw std::runtime_error("State store is unsafe or already owned");
+#endif
+        return h;
     }
     std::filesystem::path resolve(const std::string &input) const {
         safe_input(input); std::string normalized = input; std::replace(normalized.begin(), normalized.end(), '\\', '/');
@@ -325,4 +338,53 @@ int workspace_service(const std::filesystem::path &root, const std::function<boo
     }
     return cancelled() ? 130 : 0;
 }
+int state_store_service(const std::filesystem::path &root, const std::function<bool()> &cancelled) {
+    Workspace box(root); auto ownership = box.own_state_store(); (void)ownership;
+    HostInput input;
+    std::cout << "{\"event\":\"ready\",\"protocol\":1,\"scope\":\"session-state\",\"node_required\":false,\"max_record_bytes\":65536}\n" << std::flush;
+    const auto valid_id = [](std::string_view id) {
+        if (id.size() != 36) return false;
+        for (std::size_t i = 0; i < id.size(); ++i) {
+            if (i == 8 || i == 13 || i == 18 || i == 23) { if (id[i] != '-') return false; }
+            else if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f'))) return false;
+        }
+        return true;
+    };
+    std::string line;
+    while (!cancelled() && input.read_line(line, cancelled)) {
+        unsigned id = 0;
+        try {
+            if (line == "shutdown") { std::cout << "{\"event\":\"stopped\"}\n" << std::flush; break; }
+            const auto first = line.find(' '), second = first == std::string::npos ? first : line.find(' ', first + 1);
+            if (first == std::string::npos || second == std::string::npos) throw std::runtime_error("Expected ID, operation and record ID");
+            const auto parsed = std::from_chars(line.data(), line.data() + first, id);
+            if (!id || parsed.ec != std::errc() || parsed.ptr != line.data() + first) throw std::runtime_error("Invalid request ID");
+            const auto operation = line.substr(first + 1, second - first - 1);
+            const auto args = std::string_view(line).substr(second + 1); const auto space = args.find(' ');
+            const auto key = args.substr(0, space);
+            if (!valid_id(key)) throw std::runtime_error("State record ID must be a lowercase UUID");
+            if (operation != "state_get" && operation != "state_put") throw std::runtime_error("Unsupported state operation");
+            const auto target = box.resolve(std::string(key) + ".txt"); auto before = box.read(target);
+            if (before && before->size() > 65536) throw std::runtime_error("State record exceeds 64 KiB");
+            const auto revision = before ? digest(*before) : "missing";
+            if (operation == "state_get") {
+                if (space != std::string_view::npos) throw std::runtime_error("Unexpected state_get arguments");
+                std::cout << "{\"event\":\"state\",\"request_id\":" << id << ",\"exists\":" << (before ? "true" : "false") << ",\"revision\":" << json_string(revision) << ",\"text\":" << json_string(before.value_or("")) << "}\n" << std::flush;
+            } else {
+                if (space == std::string_view::npos) throw std::runtime_error("Expected revision and hex text");
+                const auto next = args.find(' ', space + 1);
+                if (next == std::string_view::npos) throw std::runtime_error("Expected revision and hex text");
+                if (args.substr(space + 1, next - space - 1) != revision) throw std::runtime_error("State revision conflict; read and reconcile before saving");
+                const auto content = unhex(args.substr(next + 1), 65536);
+                if (cancelled()) throw std::runtime_error("Cancelled before state save");
+                box.write(target, content, cancelled);
+                std::cout << "{\"event\":\"saved\",\"request_id\":" << id << ",\"revision\":" << json_string(digest(content)) << ",\"bytes\":" << content.size() << "}\n" << std::flush;
+            }
+        } catch (const std::exception &error) {
+            std::cout << "{\"event\":\"error\",\"request_id\":" << id << ",\"message\":" << json_string(error.what()) << "}\n" << std::flush;
+        }
+    }
+    return cancelled() ? 130 : 0;
+}
+
 }
