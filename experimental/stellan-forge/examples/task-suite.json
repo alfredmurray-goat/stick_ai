@@ -1,0 +1,45 @@
+{
+  "format": 1,
+  "runtime": {
+    "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "run": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "link": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "harness": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "adapter_dir": "fixture-adapter",
+  "adapter": [
+    "python",
+    "/adapter/agent.py"
+  ],
+  "tasks": [
+    {
+      "id": "synthetic-add-fixture",
+      "prompt": "Fix the synthetic add function.",
+      "bundle": "fixture-task",
+      "verifier": [
+        "python",
+        "/verify/check.py"
+      ],
+      "repository": "fixture/forge",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "family": "synthetic-add",
+      "source": "forge",
+      "purpose": "evaluation"
+    },
+    {
+      "id": "synthetic-bad-syntax-fixture",
+      "prompt": "synthetic-bad-syntax",
+      "bundle": "fixture-task",
+      "verifier": [
+        "python",
+        "/verify/check.py"
+      ],
+      "repository": "fixture/forge",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "family": "synthetic-syntax-failure",
+      "source": "forge",
+      "purpose": "evaluation"
+    }
+  ]
+}
