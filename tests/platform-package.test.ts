@@ -23,7 +23,7 @@ it.each(["macos-arm64", "windows-x64", "linux-x64"] as const)("packages the upda
     await expect(buildPlatform(resolve("."), join(root, "wrong"), target, { ...inputs, server: fixture.servers["macos-x64"] })).rejects.toThrow("does not match");
     const output = join(root, "release"); const manifest = await buildPlatform(resolve("."), output, target, inputs);
     expect(manifest.nativeHost).toBe(true);
-    expect(manifest.files.some(file => file.path === `bin/${target}/stellan-host${target === "windows-x64" ? ".exe" : ""}`)).toBe(true);
+    expect(manifest.files.find(file => file.path === `bin/${target}/stellan-host${target === "windows-x64" ? ".exe" : ""}`)?.executable).toBe(true);
     expect(manifest.targets).toEqual([target]); await verifyStick(output);
     const desktop = mac ? "Stick AI.app/Contents/MacOS/stick-ai" : target === "windows-x64" ? "Stick AI.exe" : "stick-ai";
     expect(manifest.files.some((file) => file.path === desktop)).toBe(true);
