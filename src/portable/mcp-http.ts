@@ -15,7 +15,7 @@ export class McpEvents {
    let line=new TextDecoder('utf-8',{fatal:true}).decode(raw);if(this.first){line=line.replace(/^\uFEFF/,'');this.first=false;}
    if(!line){consume({event:this.kind,data:this.data.join('\n'),...(this.id!==undefined?{id:this.id}:{}),...(this.retry!==undefined?{retry:this.retry}:{})});this.data=[];this.kind='message';this.bytes=0;return;}
    if(line.startsWith(':'))return;const colon=line.indexOf(':'),field=colon<0?line:line.slice(0,colon);let value=colon<0?'':line.slice(colon+1);if(value.startsWith(' '))value=value.slice(1);
-   if(field==='data')this.data.push(value);else if(field==='event')this.kind=value;else if(field==='id'&&!value.includes('\0'))this.id=value;
+   if(field==='data')this.data.push(value);else if(field==='event')this.kind=value||'message';else if(field==='id'&&!value.includes('\0'))this.id=value;
    else if(field==='retry'&&/^\d+$/.test(value)){const ms=Number(value);if(!Number.isSafeInteger(ms)||ms>2147483647)throw Error('Invalid SSE retry interval');this.retry=ms;}
   });
  }
@@ -66,13 +66,13 @@ export class McpHttpTransport implements Transport {
   if(this.listening||this.mode!=='http')return;this.listening=true;
   this.listener=(async()=>{
    try{let id:string|undefined;
-    for(let attempt=0;attempt<4&&!this.ended;attempt++){
+    while(!this.ended){
      const h=this.headers('text/event-stream');if(id)h.set('Last-Event-ID',id);
      const response=await this.fetcher(this.url,{method:'GET',headers:h,redirect:'error',signal:this.control.signal});
      if(response.status===405){await response.body?.cancel();return;}if(!response.ok){await response.body?.cancel();throw Error('MCP notification stream failed');}
-     const state=await this.events(response,e=>this.message(e));id=state.lastId??id;if(!this.ended)await this.pause(state.retry);
+     const state=await this.events(response,e=>this.message(e));id=state.lastId??id;if(!this.ended)await this.pause(Math.max(50,state.retry));
     }
-    if(!this.ended)throw Error('MCP notification stream disconnected repeatedly. Reconnect the server.');
+
    }catch(error){this.fail(error);}
   })();
  }
@@ -89,8 +89,8 @@ export class McpHttpTransport implements Transport {
   const deliver=(input:unknown)=>{const value=parseMcpMessage(input);if(!('method'in value)&&value.id===message.id)matched=true;this.onmessage?.(value);};
   if(type.startsWith('application/json')){deliver(await this.json(response));if(!matched)throw Error('MCP response ID did not match its request');return;}
   let state=await this.events(response,e=>{if(e.event==='message'&&e.data)deliver(JSON.parse(e.data));if(matched)return false;});
-  for(let attempts=0;!matched&&attempts<3;attempts++){
-   if(!state.lastId)throw Error('MCP stream disconnected without a resume cursor');await this.pause(state.retry);
+  while(!matched){
+   if(!state.lastId)throw Error('MCP stream disconnected without a resume cursor');await this.pause(Math.max(50,state.retry));
    const h=this.headers('text/event-stream');h.set('Last-Event-ID',state.lastId);
    const resumed=await this.request(this.url,{method:'GET',headers:h});
    const next=await this.events(resumed,e=>{if(e.event==='message'&&e.data)deliver(JSON.parse(e.data));if(matched)return false;});state={...next,lastId:next.lastId??state.lastId};

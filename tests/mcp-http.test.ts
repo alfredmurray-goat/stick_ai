@@ -42,9 +42,9 @@ it('rejects a legacy endpoint on another origin without forwarding credentials',
 it('resumes a disconnected request by cursor without replaying the POST',async()=>{
  let posts=0,gets=0;const fixture=await serve(async(q,s)=>{
   if(q.method==='POST'){posts++;const m=await body(q);s.writeHead(200,{'Content-Type':'text/event-stream'});s.end('id: cursor-1\nretry: 0\ndata: \n\n');expect(m.id).toBe(7);}
-  else {gets++;expect(q.headers['last-event-id']).toBe('cursor-1');s.writeHead(200,{'Content-Type':'text/event-stream'});s.end('data: {"jsonrpc":"2.0","id":7,"result":{}}\n\n');}
+  else {gets++;expect(q.headers['last-event-id']).toBe('cursor-1');s.writeHead(200,{'Content-Type':'text/event-stream'});s.end(gets<5?'id: cursor-1\nretry: 0\ndata: \n\n':'data: {"jsonrpc":"2.0","id":7,"result":{}}\n\n');}
  });const transport=new McpHttpTransport(fixture.url,'http');const messages:unknown[]=[];transport.onmessage=m=>messages.push(m);
- try{await transport.start();await transport.send({jsonrpc:'2.0',id:7,method:'tools/list'});expect(posts).toBe(1);expect(gets).toBe(1);expect(messages).toHaveLength(1);}finally{await transport.close();await fixture.close();}
+ try{await transport.start();await transport.send({jsonrpc:'2.0',id:7,method:'tools/list'});expect(posts).toBe(1);expect(gets).toBe(5);expect(messages).toHaveLength(1);}finally{await transport.close();await fixture.close();}
 });
 it('cancels stalled legacy startup and closes its socket',async()=>{
  const fixture=await serve((_q,s)=>{s.writeHead(200,{'Content-Type':'text/event-stream'});s.flushHeaders();});const rpc=new McpRpc(new McpHttpTransport(fixture.url,'sse'));const control=new AbortController();
