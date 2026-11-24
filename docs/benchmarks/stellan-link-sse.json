@@ -1,0 +1,108 @@
+{
+  "scope": "Fresh-process synthetic LF SSE framing:40x256KiB events in64byte fragments; no model/network or whole-app claim",
+  "runs": [
+    {
+      "repeat": 0,
+      "engine": "previous",
+      "wallMs": 101.31945499999999,
+      "cpuMs": 130.479,
+      "peakRssBytes": 79175680,
+      "count": 40
+    },
+    {
+      "repeat": 0,
+      "engine": "candidate",
+      "wallMs": 62.857710999999995,
+      "cpuMs": 85.725,
+      "peakRssBytes": 79368192,
+      "count": 40
+    },
+    {
+      "repeat": 1,
+      "engine": "candidate",
+      "wallMs": 69.93775000000001,
+      "cpuMs": 90.82,
+      "peakRssBytes": 79200256,
+      "count": 40
+    },
+    {
+      "repeat": 1,
+      "engine": "previous",
+      "wallMs": 109.95528999999999,
+      "cpuMs": 132.389,
+      "peakRssBytes": 79433728,
+      "count": 40
+    },
+    {
+      "repeat": 2,
+      "engine": "previous",
+      "wallMs": 101.62121200000001,
+      "cpuMs": 122.925,
+      "peakRssBytes": 79020032,
+      "count": 40
+    },
+    {
+      "repeat": 2,
+      "engine": "candidate",
+      "wallMs": 72.314234,
+      "cpuMs": 98.042,
+      "peakRssBytes": 78999552,
+      "count": 40
+    },
+    {
+      "repeat": 3,
+      "engine": "candidate",
+      "wallMs": 39.391926999999995,
+      "cpuMs": 63.668,
+      "peakRssBytes": 79118336,
+      "count": 40
+    },
+    {
+      "repeat": 3,
+      "engine": "previous",
+      "wallMs": 74.368526,
+      "cpuMs": 96.533,
+      "peakRssBytes": 79904768,
+      "count": 40
+    },
+    {
+      "repeat": 4,
+      "engine": "previous",
+      "wallMs": 75.90572900000001,
+      "cpuMs": 98.354,
+      "peakRssBytes": 79523840,
+      "count": 40
+    },
+    {
+      "repeat": 4,
+      "engine": "candidate",
+      "wallMs": 36.110763,
+      "cpuMs": 52.131,
+      "peakRssBytes": 79089664,
+      "count": 40
+    }
+  ],
+  "medians": {
+    "previous": {
+      "wallMs": 101.31945499999999,
+      "cpuMs": 122.925,
+      "peakRssBytes": 79433728
+    },
+    "candidate": {
+      "wallMs": 62.857710999999995,
+      "cpuMs": 85.725,
+      "peakRssBytes": 79118336
+    }
+  },
+  "node": "24.22.1",
+  "settings": {
+    "eventPayloadBytes": 262144,
+    "fragmentBytes": 64,
+    "eventsPerProcess": 40,
+    "alternatingPairs": 5
+  },
+  "source_sha256": {
+    "previous": "fed0083e15ad12dfa0b8122aa942903c396f3e5cbf331e430ff3aa45d5440700",
+    "candidate": "cb8c786e3b671114c8b6c5773eee2e42f71d7122ee86af2e5f7e67b43237d4b9"
+  }
+}

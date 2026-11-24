@@ -71,7 +71,7 @@ export class McpServers {
    transport=new McpProcessTransport(node,[join(this.root,'app/stick-mcp.cjs'),spec],{...env,STICK_MCP_ENV_JSON:JSON.stringify(secret.env)},bytes=>{const c=this.connections.get(id);if(c)c.diagnostic=this.redact(id,(c.diagnostic+bytes.toString('utf8')).slice(-4000));});
   }else{
    const url=new URL(selected.url!);const headers=new Headers(secret.headers);for(const name of ['host','content-length','connection','proxy-authorization','cookie'])if(headers.has(name))throw new McpError('Use API authentication headers, without host, cookie, or transport headers.');
-   transport=new McpHttpTransport(url,selected.transport,headers,mcpFetch(url.origin));
+   transport=new McpHttpTransport(url,selected.transport,headers);
   }
   const connection:Connection={rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')this.progress(selected.name,this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
   this.connections.set(id,connection);

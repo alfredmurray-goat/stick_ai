@@ -55,3 +55,10 @@ it('frames byte fragments, UTF-8, all newline forms, comments and multiline data
  expect(events).toEqual([{event:'message',data:'{"text":\n"🦈"}'},{event:'message',data:'',id:'cursor',retry:5}]);
  expect(()=>new McpEvents().push(Buffer.from('data: '+'x'.repeat(4*1024**2)+'\n'),()=>{})).toThrow();
 });
+it('bounds direct HTTP JSON and SSE without a second fetch wrapper',async()=>{
+ for(const stream of [false,true]){
+  const fixture=await serve((_q,s)=>{s.writeHead(200,{'Content-Type':stream?'text/event-stream':'application/json'});s.end((stream?'data: ':'')+'x'.repeat(4*1024**2+1)+(stream?'\n\n':''));});
+  const transport=new McpHttpTransport(fixture.url,'http');
+  try{await transport.start();await expect(transport.send({jsonrpc:'2.0',id:1,method:'tools/list'})).rejects.toThrow(/large|4 MiB/);}finally{await transport.close();await fixture.close();}
+ }
+});
