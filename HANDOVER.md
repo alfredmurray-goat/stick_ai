@@ -35,7 +35,7 @@ Apple's M1 beat general-purpose chips because the hardware, operating system and
 
 ### Not this project: RLM (Rolling Language Model)
 
-The owner's **RLM (Rolling Language Model)** is a **separate project**: a new kind of model that keeps learning from what it does. It does not live in this repository; don't build it here. Ideas from 24 November 2026 that may help it: fast memory notes per task (no training), small nightly adapters trained only on verified and accepted work with a replay set against forgetting, a frozen regression gate before anything ships, monthly consolidation, and signed adapter updates. Stick AI can later ship RLM models through the normal update path. Inside Stick AI, **About you** gives the feel of a model that knows you.
+The owner's **RLM (Rolling Language Model)** is a **separate project**: a new kind of model that keeps learning from what it does. It does not live in this repository; don't build it here. Ideas from 24 November 2026 that may help it: fast memory notes per task (no training), small nightly adapters trained only on verified and accepted work with a replay set against forgetting, a frozen regression gate before anything ships, monthly consolidation, and signed adapter updates. Where it meets Stellan is still open: a separate project, built here, or an **add-on to Lite and Max added during training** (the owner's idea, saved in docs/TRAINING.md). Inside Stick AI today, **About you** gives the feel of a model that knows you.
 
 ### Planned: Stellan builds apps that Stellan powers
 
@@ -62,6 +62,9 @@ Customers should be able to ask "make me a game where the shopkeeper talks back"
 
 ### Planned: vision for Lite and Max (EU only)
 
+The full training plan is in **docs/TRAINING.md** (start there before training).
+
+
 Facts (checked 24 November 2026 against Mistral's official `config.json` files on Hugging Face): Mistral Small 3.1 (Paris, Apache-2.0) has a ~0.4B Pixtral-style image encoder: patch 14, width 1024, 24 layers, 16 heads, gated SiLU MLP 4096, 2D RoPE (theta 10,000), images up to 1540 px; its projector is an RMSNorm, a 2×2 patch merger and a two-layer GELU MLP into the language model. Mistral reuses that same frozen encoder in the Ministral 3 family (3B/8B/14B, December 2025, Apache-2.0). Max's base, Devstral Small 2505, was fine-tuned from Mistral Small 3.1 with the vision encoder removed; Lite is a 7.3B Mamba2 with a Mistral tokenizer.
 
 Plan:
@@ -77,7 +80,7 @@ Plan:
 
 ### What Forge is (owner's definition, 24 November 2026)
 
-**Forge is how Stellan shows itself to the world and gets better at the same time.** Stellan Lite and Max work on real issues in open-source repositories that explicitly welcome AI-assisted ("vibe-coded") contributions, and open pull requests as public demos. Every attempt is recorded: we **benchmark** their work in those repos (fixed or not, tests passing, maintainer accepted, how much a person had to help), and the reviewed data becomes **training data for the next training** (and, later, the Rolling LM).
+**Forge is how Stellan shows itself to the world and gets better at the same time.** Stellan Lite and Max work on real issues in open-source repositories that explicitly welcome AI-assisted ("vibe-coded") contributions, and open pull requests as public demos. Every attempt is recorded: we **benchmark** their work in those repos (fixed or not, tests passing, maintainer accepted, how much a person had to help), and the reviewed data becomes **training data for the next training** (and possibly, later, the owner's RLM).
 
 What exists today in `experimental/stellan-forge` is the workshop half: `forge.py` records attempts, has a person review them and exports approved, verified ones as training files (benchmark and holdout tasks stay out); `runner.py` runs one task once in a locked-down Docker box and grades it with a separate checker. It isn't connected to Stellan yet.
 
