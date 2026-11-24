@@ -236,7 +236,9 @@ public:
                     if (line.find(query) != std::string::npos) {
                         auto length = std::min<std::size_t>(line.size(), 300);
                         while (length < line.size() && length && (static_cast<unsigned char>(line[length]) & 0xc0) == 0x80) --length;
-                        const auto match = utf8(child.lexically_relative(root_)) + ":" + std::to_string(number) + ":" + std::string(line.substr(0, length));
+                        auto relative_name = utf8(child.lexically_relative(root_));
+                        std::replace(relative_name.begin(), relative_name.end(), '\\', '/');
+                        const auto match = relative_name + ":" + std::to_string(number) + ":" + std::string(line.substr(0, length));
                         if (result.size() + match.size() + 1 > 32768) return result;
                         if (!result.empty()) result += '\n';
                         result += match; ++matches;

@@ -67,7 +67,8 @@ with tempfile.TemporaryDirectory(prefix='stellan-workspace-') as directory:
             error('read_file', 'link/passwd')
             os.mkfifo(root/'fifo')
             error('read_file', 'fifo')
-        assert request('search_files', 'second')['text'] == 'new/nested/æ.txt:2:second'
+        found = request('search_files', 'second')
+        assert found.get('text') == 'new/nested/æ.txt:2:second', found
         assert request('search_files', 'not-here')['text'] == 'No matches'
         error('search_files', '')
         process.stdin.write('shutdown\n'); process.stdin.flush()
