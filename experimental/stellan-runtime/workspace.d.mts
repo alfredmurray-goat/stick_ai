@@ -1,0 +1,3 @@
+export interface WorkspaceApproval {event:'approval_required';request_id:number;approval_id:string;path:string;operation:string;bytes:number;after_sha256:string}
+export interface NativeWorkspace {closed:Promise<void>;readonly isClosed:boolean;execute(operation:string,args:string[],options?:{signal?:AbortSignal;approve?:(proposal:WorkspaceApproval,signal?:AbortSignal)=>Promise<boolean>}):Promise<string>;close():Promise<void>}
+export function openNativeWorkspace(options:{executable:string;executableSha256:string;root:string;signal?:AbortSignal;startupTimeoutMs?:number}):Promise<NativeWorkspace>;

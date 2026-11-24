@@ -356,3 +356,7 @@ Stellan-Link is our original tool-only MCP client, including stdio, streamable H
 ### Stellan Forge (experimental)
 
 [Stellan Forge](experimental/stellan-forge/README.md) is our unified task-experience and future learning project. Its first CLI records versioned experiences, requires explicit review and exports bounded datasets with held-out task exclusions. It does not yet execute agent tasks or train weights; recorded outcomes are not benchmark scores.
+
+### Native workspace tools
+
+New packages with the verified `nativeHost` capability route agent file reads, search and approved edits through [Stellan-Host](docs/STELLAN_HOST.md). Programs remain hash-checked, file changes still require approval, and host workers close on workspace changes and app shutdown. Node still runs the app server and other services; full backend migration is in progress.

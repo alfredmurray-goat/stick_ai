@@ -24,7 +24,7 @@ async function platforms(root: string): Promise<Record<Target, string>> {
     if (mac) { await mkdir(join(app, "Contents/MacOS"), { recursive: true }); }
     await cp(fixture.servers[target], mac ? join(app, "Contents/MacOS/stick-ai") : app);
     bases[target] = join(root, `base-${target}`);
-    await buildPlatform(resolve("."), bases[target], target, { app, node: fixture.nodes[target], server: fixture.servers[target], lite: fixture.lite, nodeLicense: fixture.nodeLicenses[target], serverLicense: fixture.nodeLicenses[target], desktopLicenses: notices, maxRelease: true });
+    await buildPlatform(resolve("."), bases[target], target, { host: fixture.servers[target], app, node: fixture.nodes[target], server: fixture.servers[target], lite: fixture.lite, nodeLicense: fixture.nodeLicenses[target], serverLicense: fixture.nodeLicenses[target], desktopLicenses: notices, maxRelease: true });
   }
   return bases;
 }
@@ -35,6 +35,13 @@ it("merges the four platform packages into one verified stick with one copy of e
     const macApp = join(root, "Universal.app"); await mkdir(join(macApp, "Contents/MacOS"), { recursive: true });
     await writeFile(join(macApp, "Contents/MacOS/stick-ai"), fatMachO()); await writeFile(join(macApp, "Contents/Info.plist"), "<plist/>");
     expect(await universalMachO(join(macApp, "Contents/MacOS/stick-ai"))).toBe(true);
+    const linuxManifest = JSON.parse(await readFile(join(bases["linux-x64"], "manifest.json"), "utf8"));
+    delete linuxManifest.nativeHost;
+    await writeFile(join(bases["linux-x64"], "manifest.json"), JSON.stringify(linuxManifest));
+    await expect(assembleUniversalStick(join(root, "mixed"), { bases, macApp })).rejects.toThrow("mix native-host and legacy");
+    expect((await lstat(join(bases["linux-x64"], "models/stellan-1-lite-q4_k_m.gguf"))).isFile()).toBe(true);
+    linuxManifest.nativeHost = true;
+    await writeFile(join(bases["linux-x64"], "manifest.json"), JSON.stringify(linuxManifest));
     const output = join(root, "Stick AI");
     const manifest = await assembleUniversalStick(output, { bases, macApp });
     expect(manifest.targets).toEqual([...targets]);
@@ -55,6 +62,8 @@ it("merges the four platform packages into one verified stick with one copy of e
     const extracted = await extractUpdateBundle(bundle, unpacked, "universal", new AbortController().signal);
     expect(extracted.files.some((file) => file.path === "Stick AI.exe")).toBe(true);
     await expect(lstat(join(unpacked, "models"))).rejects.toThrow();
+    expect(manifest.nativeHost).toBe(true);
+
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 60000);
 it("refuses a Mac app that only runs on one kind of Mac", async () => {
