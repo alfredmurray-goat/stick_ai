@@ -179,3 +179,20 @@ The 0.88% prompt difference and 0.08% CPU difference are small relative to share
 ## Natural tagged session completion
 
 The [local real Lite receipt](evidence/lite-tagged-session.json) completed an actual read_file/tool_result/done exchange with one native worker. Its second request reused920 evaluated tokens and read only24 new prompt tokens (1,995.95ms prompt time). Both requests ended naturally at tagged boundaries. Existing cancellation still retires partial state. This is one Linux functional test, not a paired timing comparison or evidence that Stellan-Run now beats llama.cpp.
+
+## Folded Q4_K/Q6_K block scales — 24 November 2026
+
+AVX2 kernels now apply Q4_K block scales inside `_mm256_madd_epi16` and pre-scale Q6_K int16 weights once per group (shared by every activation in a prefill tile), replacing per-token `_mm256_mullo_epi32`. Every intermediate stays exact, so integer results are unchanged; all 10 native tests pass and all generated IDs matched across engines.
+
+Rotating-order paired run (`bench-paired.mjs`, warmup, `bench/prompts-prefill.json`), 3 rounds, Linux x64 4-core cloud VM, 2 threads, 8,192 context, real Lite, pinned llama.cpp `cd959bae` CPU build. Medians:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | CPU ms | Peak RSS |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 12,639 | 5,014 | 34,800 | 4,545 MiB |
+| 112 tokens | previous Stellan-Run | 28,107 | 6,399 | 59,752 | 4,247 MiB |
+| 112 tokens | this change | 22,892 | 6,414 | 50,870 | 4,247 MiB |
+| 130 tokens | llama.cpp | 13,830 | 5,126 | 37,450 | 4,549 MiB |
+| 130 tokens | previous Stellan-Run | 30,722 | 6,077 | 63,650 | 4,247 MiB |
+| 130 tokens | this change | 28,758 | 6,418 | 60,728 | 4,247 MiB |
+
+Prompt time fell about 19% and 6% versus our previous build; llama.cpp still reads prompts about twice as fast and decodes about 25% faster here. Three rounds on a shared virtual machine: treat the improvement as directional. Raw receipt: [lite-scale-fold.json](evidence/lite-scale-fold.json).
