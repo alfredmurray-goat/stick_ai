@@ -1,8 +1,6 @@
-import {getDefaultEnvironment} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {SSEClientTransport} from '@modelcontextprotocol/sdk/client/sse.js';
-import {ListToolsResultSchema,CallToolResultSchema,type Tool} from '@modelcontextprotocol/sdk/types.js';
-import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+import {defaultMcpEnvironment,type Transport,type Tool} from './mcp-types.js';
+import {McpHttpTransport} from './mcp-http.js';
+import {parseToolList,parseToolResult} from './mcp-results.js';
 import {randomUUID} from 'node:crypto';
 import {join,delimiter} from 'node:path';
 import {homedir} from 'node:os';
@@ -68,13 +66,12 @@ export class McpServers {
   if(selected.transport==='stdio'){
    const target=targetFor(process.platform,process.arch),bin=join(this.root,'bin',target),node=join(bin,executableName(target,true));
    const args=(selected.args??[]).map(arg=>arg.replaceAll('${project}',this.project).replaceAll('${app}',this.root));const command=selected.command==='node'?node:selected.command!;
-   const spec=Buffer.from(JSON.stringify({command,args,cwd:this.project})).toString('base64'),env=getDefaultEnvironment();
+   const spec=Buffer.from(JSON.stringify({command,args,cwd:this.project})).toString('base64'),env=defaultMcpEnvironment();
    env.PATH=[bin,...(process.platform==='win32'?[join(homedir(),'AppData','Roaming','npm')]:['/opt/homebrew/bin','/usr/local/bin',join(homedir(),'.local','bin')]),env.PATH??''].join(delimiter);
    transport=new McpProcessTransport(node,[join(this.root,'app/stick-mcp.cjs'),spec],{...env,STICK_MCP_ENV_JSON:JSON.stringify(secret.env)},bytes=>{const c=this.connections.get(id);if(c)c.diagnostic=this.redact(id,(c.diagnostic+bytes.toString('utf8')).slice(-4000));});
   }else{
    const url=new URL(selected.url!);const headers=new Headers(secret.headers);for(const name of ['host','content-length','connection','proxy-authorization','cookie'])if(headers.has(name))throw new McpError('Use API authentication headers, without host, cookie, or transport headers.');
-   const options={requestInit:{headers,redirect:'error' as RequestRedirect},fetch:mcpFetch(url.origin)};
-   transport=selected.transport==='sse'?new SSEClientTransport(url,options):new StreamableHTTPClientTransport(url,options);
+   transport=new McpHttpTransport(url,selected.transport,headers,mcpFetch(url.origin));
   }
   const connection:Connection={rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')this.progress(selected.name,this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
   this.connections.set(id,connection);
@@ -90,7 +87,7 @@ export class McpServers {
   const c=this.connected(id),tools:Tool[]=[],seen=new Set<string>(),cursors=new Set<string>();let cursor:string|undefined,pages=0,bytes=0;
   do{
    if(++pages>1000)throw new McpError('MCP tool catalog exceeds 1,000 pages.');
-   const page=ListToolsResultSchema.parse(await c.rpc.request('tools/list',cursor?{cursor}:{},signal));
+   const page=parseToolList(await c.rpc.request('tools/list',cursor?{cursor}:{},signal));
    for(const tool of page.tools){
     if(seen.has(tool.name)||tool.name.length>128||tools.length>=1000)throw new McpError('Invalid or excessive MCP tool catalog.');
     bytes+=Buffer.byteLength(JSON.stringify(tool));if(bytes>4*1024**2)throw new McpError('MCP tool catalog exceeds 4 MiB.');
@@ -106,8 +103,8 @@ export class McpServers {
  async call(id:string,name:string,args:unknown,signal:AbortSignal,approve:(label:string,data:unknown,signal:AbortSignal)=>Promise<boolean>){
   const c=await this.ready(id,signal);if(c.stale)await this.refresh(id,signal);const selected=this.get(id);if(!c.tools.some(t=>t.name===name)||!record(args)||Buffer.byteLength(JSON.stringify(args))>65536)throw new McpError('Choose a listed MCP tool and JSON object arguments under 64 KiB.');
   if(!await approve(`${selected.name} · ${name}`,args,signal))return 'Denied by user';signal.throwIfAborted();
-  const result=CallToolResultSchema.parse(await c.rpc.request('tools/call',{name,arguments:args},signal));
-  const text=result.content.map(item=>item.type==='text'?item.text:item.type==='resource'&&'text' in item.resource?item.resource.text:`[${item.type} content returned; the current model accepts text.]`).join('\n');
+  const result=parseToolResult(await c.rpc.request('tools/call',{name,arguments:args},signal));
+  const text=result.content.map(item=>item.type==='text'?item.text:item.type==='resource'&&item.resource&&'text' in item.resource?item.resource.text:`[${item.type} content returned; the current model accepts text.]`).join('\n');
   return this.redact(id,(result.isError?'Error: ':'')+(text+(result.structuredContent?'\n'+JSON.stringify(result.structuredContent):'')).slice(0,30000));
  }
  async importProject(text:string){if(Buffer.byteLength(text)>65536)throw new McpError('MCP configuration exceeds 64 KiB.');let value:unknown;try{value=JSON.parse(text);}catch{throw new McpError('Enter valid .mcp.json JSON.');}if(!record(value)||!record(value.mcpServers))throw new McpError('Expected a mcpServers object.');const added=[];for(const [name,item]of Object.entries(value.mcpServers)){if(!record(item))throw new McpError('Invalid MCP server entry.');added.push(await this.add({name,transport:item.type==='sse'?'sse':item.url?'http':'stdio',command:item.command,args:item.args??[],url:item.url,headers:item.headers,env:item.env}));}return added;}

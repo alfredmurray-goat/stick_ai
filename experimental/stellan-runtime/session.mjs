@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { readTokenizer } from './tokenizer.mjs';
 import { launchPlan } from './plan.mjs';
 
-export async function openNativeSession({ executable, executableSha256, model, sha256, threads = 2, context = 8192, forceMax = false, kvCache = "f16", signal, startupTimeoutMs = 180000, idleMs = 600000, splitModel, splitSha256, environment }) {
+export async function openNativeSession({ executable, executableSha256, model, sha256, threads = 2, context = 8192, forceMax = false, kvCache = "f16", signal, startupTimeoutMs = 180000, idleMs = 600000, splitModel, splitSha256, environment, tagged = false }) {
   if (![sha256, executableSha256].every(value => /^[a-f0-9]{64}$/.test(value ?? ''))) { throw new Error('Trusted model and executable SHA256 hashes are required'); }
   if (!Number.isInteger(idleMs) || idleMs < 1 || !Number.isInteger(startupTimeoutMs) || startupTimeoutMs < 1) { throw new Error('Session timeouts must be positive integers'); }
   if (signal?.aborted) { throw new Error('Session startup cancelled'); }
@@ -19,9 +19,10 @@ export async function openNativeSession({ executable, executableSha256, model, s
   const tokenizer = await readTokenizer(model);
   launchPlan({ mode: tokenizer.mode, tokens: [1], threads, context, maxTokens: 1, forceMax, kvCache });
   if (signal?.aborted) { throw new Error('Session startup cancelled'); }
+  if (typeof tagged !== "boolean" || tagged && tokenizer.mode !== "llama") { throw new Error("Tagged completion supports Lite only"); }
   const nativeEnv = { ...(environment ?? process.env) };
   if (kvCache === "q8_0") nativeEnv.STELLAN_RUNTIME_KV_Q8 = "1"; else delete nativeEnv.STELLAN_RUNTIME_KV_Q8;
-  const child = spawn(resolve(executable), ['serve', resolve(model), sha256, String(threads), String(context), ...(forceMax ? ['--force-max'] : []), ...(splitModel ? ['--split', resolve(splitModel), splitSha256] : [])], { stdio: ['pipe', 'pipe', 'pipe'], env: nativeEnv, shell: false, windowsHide: true });
+  const child = spawn(resolve(executable), ['serve', resolve(model), sha256, String(threads), String(context), ...(forceMax ? ['--force-max'] : []), ...(tagged ? ['--tagged'] : []), ...(splitModel ? ['--split', resolve(splitModel), splitSha256] : [])], { stdio: ['pipe', 'pipe', 'pipe'], env: nativeEnv, shell: false, windowsHide: true });
   let buffer = '', diagnostic = '', pending, requestId = 0, stopped = false, ready = false, idleTimer, killTimer;
   let acceptReady, rejectReady, acceptClosed;
   const initialized = new Promise((accept, reject) => { acceptReady = accept; rejectReady = reject; });

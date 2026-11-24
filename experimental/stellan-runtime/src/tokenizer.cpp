@@ -34,6 +34,7 @@ Tokenizer::Tokenizer(const Model &model) : model_(model) {
         if (!lookup_.emplace(tokens[i], static_cast<std::int32_t>(i)).second) {
             throw std::runtime_error("Duplicate vocabulary entry");
         }
+        if (model.token_types()[i] == 3 || model.token_types()[i] == 4) specials_.emplace_back(tokens[i], static_cast<std::int32_t>(i));
         if (model.token_types()[i] == 6) {
             unsigned byte = 0;
             const auto parsed = tokens[i].size() == 6 ? std::from_chars(tokens[i].data() + 3, tokens[i].data() + 5, byte, 16) : std::from_chars_result {};
@@ -43,6 +44,7 @@ Tokenizer::Tokenizer(const Model &model) : model_(model) {
             bytes_[byte] = static_cast<std::int32_t>(i);
         }
     }
+    std::stable_sort(specials_.begin(), specials_.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
     if (model.text("tokenizer.ggml.model") == "llama" && bytes_.size() != 256) { throw std::runtime_error("All byte fallback tokens are required"); }
 }
 
@@ -105,7 +107,7 @@ void Tokenizer::ordinary(const std::string &text, std::vector<std::int32_t> &out
     }
 }
 
-std::vector<std::int32_t> Tokenizer::encode(const std::string &text) const {
+std::vector<std::int32_t> Tokenizer::encode(const std::string &text, std::size_t token_limit) const {
     if (bpe_) { throw std::runtime_error("Tekken text uses the Node tokenizer bridge; native decode accepts token IDs"); }
     if (text.size() > 1048576) { throw std::runtime_error("Prompt exceeds prototype limit"); }
     std::vector<std::int32_t> result {bos_};
@@ -115,12 +117,9 @@ std::vector<std::int32_t> Tokenizer::encode(const std::string &text) const {
         std::int32_t special = -1;
         std::size_t length = 0;
         if (text[i] == '<' || text[i] == '[') {
-            for (std::size_t j = 0; j < model_.vocabulary().size(); ++j) {
-                if (model_.token_types()[j] != 3 && model_.token_types()[j] != 4) { continue; }
-                const auto &piece = model_.vocabulary()[j];
-                if (piece.size() > length && text.compare(i, piece.size(), piece) == 0) {
-                    special = static_cast<std::int32_t>(j);
-                    length = piece.size();
+            for (const auto &[piece, token] : specials_) {
+                if (text.compare(i, piece.size(), piece) == 0) {
+                    special = token; length = piece.size(); break;
                 }
             }
         }
@@ -135,7 +134,7 @@ std::vector<std::int32_t> Tokenizer::encode(const std::string &text) const {
         }
     }
     ordinary(ordinary_text, result, prefix);
-    if (result.size() > 32768) { throw std::runtime_error("Prompt token count exceeds prototype limit"); }
+    if (token_limit == 0 || token_limit > 262144 || result.size() > token_limit) { throw std::runtime_error("Prompt token count exceeds configured limit"); }
     return result;
 }
 
@@ -155,7 +154,9 @@ std::string Tokenizer::decode(std::int32_t token) const {
         return decoded;
     }
     if (model_.token_types()[id] == 6) {
-        for (const auto &[byte, value] : bytes_) { if (value == token) { return std::string(1, static_cast<char>(byte)); } }
+        unsigned byte = 0;
+        std::from_chars(piece.data() + 3, piece.data() + 5, byte, 16);
+        return std::string(1, static_cast<char>(byte));
     }
     if (model_.token_types()[id] == 3) { return ""; }
     std::string output;

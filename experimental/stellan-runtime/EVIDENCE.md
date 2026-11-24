@@ -174,3 +174,8 @@ The final trial confined this packed calculation to batched prefill and restored
 | Prefill-only candidate | 10,054.86 ms | 1,512.82 ms | 21,658.75 ms | 4,453,580,800 bytes |
 
 The 0.88% prompt difference and 0.08% CPU difference are small relative to shared-host noise; peak RSS is essentially unchanged. Even the byte-identical decode function differed by about 2.6% in timing, illustrating that noise. The packed Q6 change is **not retained**: all prototype kernels are restored to the previous checkpoint. Keep the stronger independent extreme-value fixtures and all three receipts instead of claiming a speedup. All 54 twelve-token responses across these trials matched comparison IDs. llama.cpp still leads; these results do not qualify a production replacement.
+
+
+## Natural tagged session completion
+
+The [local real Lite receipt](evidence/lite-tagged-session.json) completed an actual read_file/tool_result/done exchange with one native worker. Its second request reused920 evaluated tokens and read only24 new prompt tokens (1,995.95ms prompt time). Both requests ended naturally at tagged boundaries. Existing cancellation still retires partial state. This is one Linux functional test, not a paired timing comparison or evidence that Stellan-Run now beats llama.cpp.

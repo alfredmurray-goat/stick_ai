@@ -1,6 +1,6 @@
 import {parseMcpMessage} from './mcp-wire.js';
-import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
-import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
+import type {Transport} from './mcp-types.js';
+import type {JSONRPCMessage} from './mcp-types.js';
 import {parseMcpInitialization,MCP_PROTOCOL_VERSION,MCP_PROTOCOL_VERSIONS} from './mcp-handshake.js';
 export class McpError extends Error {constructor(message:string){super(message);this.name='McpError';}}
 /** MCP request lifecycle without an artificial tool-call deadline. Stop closes the transport. */

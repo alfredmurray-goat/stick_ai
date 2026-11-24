@@ -1,4 +1,5 @@
-# Native service host — first slice
+# Stellan-Host
+
 
 Branch `feat/stellan-native-host` starts the portable-backend migration with a real C++ executable, `stellan-host`, linked directly to Stellan-Run. It loads and hashes the full model, keeps one decoder alive and serves private stdin/stdout requests. Node.js, llama.cpp and ggml are not needed to execute this inference-only path. This is a developer prototype; the portable app still uses its Node service and production engine.
 
@@ -43,3 +44,7 @@ The host also accepts `--split PATH SHA256`, preserving activation’s small dec
 The native host also treats a broken stdout pipe as a terminal error. If its owner closes the response channel while leaving stdin open, the host exits instead of retaining its mapped model or continuing to produce undeliverable output. POSIX can terminate through SIGPIPE; Windows uses checked iostream writes. A lifecycle test keeps the input pipe open while closing output and verifies termination after a status reply is attempted. This is a disconnect cleanup guarantee, not a throughput benchmark.
 
 A partial input command must also finish within the configured input timeout (default ten minutes). Sending occasional bytes cannot hold the host and its model mappings indefinitely. This limit applies while reading a command, not to active inference.
+
+Text input honors the configured context limit up to 262,144 tokens, rather than an unrelated 32,768-token tokenizer cap. This does not raise the app default or make long prompts free. Special-token matching uses a precomputed longest-first index rather than scanning the full vocabulary for every code bracket; byte fallback decode reads its already-validated byte directly. Full app services still require the Node backend.
+
+A five-pair alternating-order local Linux tokenizer diagnostic on the full Lite vocabulary retained identical token IDs. For8,000 opening brackets, fresh-process median wall time fell746.02ms to25.41ms (about29.4x). The ordinary-text control was7.46ms versus7.26ms; treat that small difference as noise. These timings include metadata parsing and process startup, not inference, full app work, or a comparison against Node. [Raw receipt](evidence/native-host-tokenizer-index.json).

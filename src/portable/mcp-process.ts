@@ -2,8 +2,8 @@ import {parseMcpMessage} from './mcp-wire.js';
 import {McpLines} from './mcp-lines.js';
 import spawn from 'cross-spawn';
 import type {ChildProcess} from 'node:child_process';
-import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
-import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+import type {JSONRPCMessage} from './mcp-types.js';
+import type {Transport} from './mcp-types.js';
 import {killProcessTree} from '../sandbox/process.js';
 /** NDJSON MCP transport with an isolated, supervised process group. */
 export class McpProcessTransport implements Transport {
