@@ -23,3 +23,13 @@ jobs:
           python-version: '3.12'
       - name: Test review, leakage exclusions and bounded exports
         run: python -m unittest discover -s experimental/stellan-forge/tests -v
+      - name: Provision a local synthetic test image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          docker pull python:3.12-slim
+          image=$(docker image inspect --format '{{index .RepoDigests 0}}' python:3.12-slim)
+          echo "STELLAN_FORGE_IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Test real local containers with synthetic tasks only
+        if: runner.os == 'Linux'
+        run: python -m unittest discover -s experimental/stellan-forge/tests -p test_docker.py -v
