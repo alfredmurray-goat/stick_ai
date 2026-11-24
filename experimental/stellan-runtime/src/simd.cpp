@@ -404,7 +404,13 @@ bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::by
     static const bool scalar = environment_set("STELLAN_RUNTIME_SCALAR");
     static const bool untiled = environment_set("STELLAN_RUNTIME_ARM_UNTILED");
     if (scalar) return false;
-    if (untiled || input.size() == 1) {
+#if defined(__APPLE__)
+    // Apple Silicon CI regressed on large Q4 batches; retain the measured reference there.
+    const bool retain_large_q4 = type == 12 && input.size() > 8;
+#else
+    constexpr bool retain_large_q4 = false;
+#endif
+    if (untiled || input.size() == 1 || retain_large_q4) {
         for (std::size_t t = 0; t < input.size(); ++t) if (!accelerated_quantized_dot(type, row, input[t], output[t])) return false;
         return true;
     }
