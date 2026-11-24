@@ -4,6 +4,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <immintrin.h>
@@ -42,6 +43,22 @@ STELLAN_AVX2 inline float hsum_ps(__m256 value) {
     sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
     return _mm_cvtss_f32(sum);
+}
+// Q4_K packs 8 six-bit scales and 8 six-bit minimums into 12 bytes. Unpacked four bytes at a time:
+// words[0] = scales 0-3, words[1] = scales 4-7, words[2] = minimums 0-3, words[3] = minimums 4-7.
+inline void unpack_q4k(const std::byte *packed, std::uint32_t words[4]) {
+    std::uint32_t w0, w1, w2;
+    std::memcpy(&w0, packed, 4); std::memcpy(&w1, packed + 4, 4); std::memcpy(&w2, packed + 8, 4);
+    words[0] = w0 & 0x3f3f3f3fU;
+    words[1] = (w2 & 0x0f0f0f0fU) | (((w0 >> 6) & 0x03030303U) << 4);
+    words[2] = w1 & 0x3f3f3f3fU;
+    words[3] = ((w2 >> 4) & 0x0f0f0f0fU) | (((w1 >> 6) & 0x03030303U) << 4);
+}
+// The 8 minimums as 16 int16 lanes, each repeated twice (one per 16-value activation sum), built in
+// registers rather than through a scratch array the CPU would have to forward from a store.
+STELLAN_AVX2 inline __m256i q4k_minima_vector(const std::uint32_t words[4]) {
+    const auto bytes = _mm_shuffle_epi8(_mm_set_epi32(0, 0, static_cast<int>(words[3]), static_cast<int>(words[2])), _mm_setr_epi8(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7));
+    return _mm256_cvtepu8_epi16(bytes);
 }
 STELLAN_AVX2 float half_float(std::uint16_t bits) {
     return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(static_cast<int>(bits))));
@@ -103,20 +120,16 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);
         auto accumulator = _mm256_setzero_si256();
-        alignas(32) std::int16_t mins[16] {};
+        std::uint32_t words[4] {};
+        if (type == 12) { unpack_q4k(p + 4, words); }
         for (std::size_t g = 0; g < 8; ++g) {
             if (type == 12) {
-                const auto *s = p + 4;
-                const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) & 15U) | ((std::to_integer<unsigned>(s[g - 4]) >> 6) << 4);
-                const auto offset = g < 4 ? std::to_integer<unsigned>(s[g + 4]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) >> 4) | ((std::to_integer<unsigned>(s[g]) >> 6) << 4);
+                const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
                 auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
                 if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
                 q = _mm256_and_si256(q, _mm256_set1_epi8(15));
                 const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
                 accumulator = _mm256_add_epi32(accumulator, _mm256_madd_epi16(_mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale))));
-                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
             } else {
                 const auto quarter = g % 4;
                 for (std::size_t j = 0; j < 32; j += 16) {
@@ -132,7 +145,7 @@ STELLAN_AVX2 float q8_dot(std::uint32_t type, std::span<const std::byte> row, st
         }
         // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
         if (type == 12) {
-            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), q4k_minima_vector(words));
             totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
             totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
         }
@@ -147,14 +160,11 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 144;
         __m256i accumulator[Count];
-        alignas(32) std::int16_t mins[16];
+        std::uint32_t words[4];
+        unpack_q4k(p + 4, words);
         for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
         for (std::size_t g = 0; g < 8; ++g) {
-            const auto *scales = p + 4;
-            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
-            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
             auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
             if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
             q = _mm256_and_si256(q, _mm256_set1_epi8(15));
@@ -165,11 +175,10 @@ STELLAN_AVX2 void q4_tile(std::span<const std::byte> row, std::span<const std::s
                 const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
                 accumulator[t] = _mm256_add_epi32(accumulator[t], _mm256_madd_epi16(_mm256_maddubs_epi16(q, values), multiplier));
             }
-            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
         }
         const auto scale = half_float(read_half(p));
         const auto minimum = half_float(read_half(p + 2));
-        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        const auto minima_vector = q4k_minima_vector(words);
         // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
         // the conversion is exact, and two horizontal sums per token per block disappear.
         for (std::size_t t = 0; t < Count; ++t) {
@@ -432,20 +441,16 @@ STELLAN_VNNI float q8_dot_vnni(std::uint32_t type, std::span<const std::byte> ro
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);
         auto accumulator = _mm256_setzero_si256();
-        alignas(32) std::int16_t mins[16] {};
+        std::uint32_t words[4] {};
+        if (type == 12) { unpack_q4k(p + 4, words); }
         for (std::size_t g = 0; g < 8; ++g) {
             if (type == 12) {
-                const auto *s = p + 4;
-                const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) & 15U) | ((std::to_integer<unsigned>(s[g - 4]) >> 6) << 4);
-                const auto offset = g < 4 ? std::to_integer<unsigned>(s[g + 4]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) >> 4) | ((std::to_integer<unsigned>(s[g]) >> 6) << 4);
+                const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
                 auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
                 if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
                 q = _mm256_and_si256(q, _mm256_set1_epi8(15));
                 const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
                 accumulator = _mm256_dpwssd_avx_epi32(accumulator, _mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale)));
-                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
             } else {
                 const auto quarter = g % 4;
                 for (std::size_t j = 0; j < 32; j += 16) {
@@ -461,7 +466,7 @@ STELLAN_VNNI float q8_dot_vnni(std::uint32_t type, std::span<const std::byte> ro
         }
         // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
         if (type == 12) {
-            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), q4k_minima_vector(words));
             totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
             totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
         }
@@ -476,14 +481,11 @@ STELLAN_VNNI void q4_tile_vnni(std::span<const std::byte> row, std::span<const s
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 144;
         __m256i accumulator[Count];
-        alignas(32) std::int16_t mins[16];
+        std::uint32_t words[4];
+        unpack_q4k(p + 4, words);
         for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
         for (std::size_t g = 0; g < 8; ++g) {
-            const auto *scales = p + 4;
-            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
-            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
             auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
             if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
             q = _mm256_and_si256(q, _mm256_set1_epi8(15));
@@ -494,11 +496,10 @@ STELLAN_VNNI void q4_tile_vnni(std::span<const std::byte> row, std::span<const s
                 const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
                 accumulator[t] = _mm256_dpwssd_avx_epi32(accumulator[t], _mm256_maddubs_epi16(q, values), multiplier);
             }
-            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
         }
         const auto scale = half_float(read_half(p));
         const auto minimum = half_float(read_half(p + 2));
-        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        const auto minima_vector = q4k_minima_vector(words);
         // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
         // the conversion is exact, and two horizontal sums per token per block disappear.
         for (std::size_t t = 0; t < Count; ++t) {
@@ -597,20 +598,16 @@ STELLAN_VNNI512 float q8_dot_vnni512(std::uint32_t type, std::span<const std::by
     for (std::size_t b = 0; b < input.size(); ++b) {
         const auto *p = row.data() + b * (type == 12 ? 144 : 210);
         auto accumulator = _mm256_setzero_si256();
-        alignas(32) std::int16_t mins[16] {};
+        std::uint32_t words[4] {};
+        if (type == 12) { unpack_q4k(p + 4, words); }
         for (std::size_t g = 0; g < 8; ++g) {
             if (type == 12) {
-                const auto *s = p + 4;
-                const auto scale = g < 4 ? std::to_integer<unsigned>(s[g]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) & 15U) | ((std::to_integer<unsigned>(s[g - 4]) >> 6) << 4);
-                const auto offset = g < 4 ? std::to_integer<unsigned>(s[g + 4]) & 63U :
-                    (std::to_integer<unsigned>(s[g + 4]) >> 4) | ((std::to_integer<unsigned>(s[g]) >> 6) << 4);
+                const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
                 auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
                 if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
                 q = _mm256_and_si256(q, _mm256_set1_epi8(15));
                 const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].values.data() + g * 32));
                 accumulator = _mm256_dpwssd_epi32(accumulator, _mm256_maddubs_epi16(q, x), _mm256_set1_epi16(static_cast<short>(scale)));
-                mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(offset);
             } else {
                 const auto quarter = g % 4;
                 for (std::size_t j = 0; j < 32; j += 16) {
@@ -626,7 +623,7 @@ STELLAN_VNNI512 float q8_dot_vnni512(std::uint32_t type, std::span<const std::by
         }
         // Lane totals stay in a float vector (exact int32 -> float below 2^24); one horizontal sum per row.
         if (type == 12) {
-            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), _mm256_load_si256(reinterpret_cast<const __m256i *>(mins)));
+            const auto minima = _mm256_madd_epi16(_mm256_loadu_si256(reinterpret_cast<const __m256i *>(input[b].sums.data())), q4k_minima_vector(words));
             totals = _mm256_fmadd_ps(_mm256_cvtepi32_ps(accumulator), _mm256_set1_ps(input[b].scale * half_float(read_half(p))), totals);
             totals = _mm256_fnmadd_ps(_mm256_cvtepi32_ps(minima), _mm256_set1_ps(input[b].scale * half_float(read_half(p + 2))), totals);
         }
@@ -641,14 +638,11 @@ STELLAN_VNNI512 void q4_tile_vnni512(std::span<const std::byte> row, std::span<c
     for (std::size_t block = 0; block < input.front().size(); ++block) {
         const auto *p = row.data() + block * 144;
         __m256i accumulator[Count];
-        alignas(32) std::int16_t mins[16];
+        std::uint32_t words[4];
+        unpack_q4k(p + 4, words);
         for (std::size_t t = 0; t < Count; ++t) { accumulator[t] = _mm256_setzero_si256(); }
         for (std::size_t g = 0; g < 8; ++g) {
-            const auto *scales = p + 4;
-            const auto scale = g < 4 ? std::to_integer<unsigned>(scales[g]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) & 15U) | ((std::to_integer<unsigned>(scales[g - 4]) >> 6) << 4);
-            const auto minimum = g < 4 ? std::to_integer<unsigned>(scales[g + 4]) & 63U :
-                (std::to_integer<unsigned>(scales[g + 4]) >> 4) | ((std::to_integer<unsigned>(scales[g]) >> 6) << 4);
+            const auto scale = (words[g / 4] >> (8 * (g % 4))) & 0xffU;
             auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 16 + (g / 2) * 32));
             if (g % 2 != 0) { q = _mm256_srli_epi16(q, 4); }
             q = _mm256_and_si256(q, _mm256_set1_epi8(15));
@@ -659,11 +653,10 @@ STELLAN_VNNI512 void q4_tile_vnni512(std::span<const std::byte> row, std::span<c
                 const auto values = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(x.values.data() + g * 32));
                 accumulator[t] = _mm256_dpwssd_epi32(accumulator[t], _mm256_maddubs_epi16(q, values), multiplier);
             }
-            mins[g * 2] = mins[g * 2 + 1] = static_cast<std::int16_t>(minimum);
         }
         const auto scale = half_float(read_half(p));
         const auto minimum = half_float(read_half(p + 2));
-        const auto minima_vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(mins));
+        const auto minima_vector = q4k_minima_vector(words);
         // Keep per-lane float totals and sum lanes once per row: each lane's int32 total is below 2^24, so
         // the conversion is exact, and two horizontal sums per token per block disappear.
         for (std::size_t t = 0; t < Count; ++t) {
