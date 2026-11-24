@@ -5,6 +5,7 @@ import collections
 import contextlib
 import hashlib
 import json
+import itertools
 import os
 from pathlib import Path
 import re
@@ -28,7 +29,9 @@ def snapshot(source,destination):
     if source.is_symlink() or not source.is_dir(): raise ValueError('Task inputs must be directories without symlinks')
     destination.mkdir(mode=0o700)
     records=[];total=0
-    for visited,path in enumerate(sorted(source.rglob('*')),1):
+    entries=list(itertools.islice(source.rglob('*'),4001))
+    if len(entries)>4000:raise ValueError('Task snapshot exceeds entry budget')
+    for visited,path in enumerate(sorted(entries),1):
         if visited>4000:raise ValueError('Task snapshot exceeds entry budget')
         name=relative(path.relative_to(source).as_posix())
         if path.is_symlink(): raise ValueError('Task input symlinks are forbidden')
@@ -45,8 +48,21 @@ def snapshot(source,destination):
     return forge.digest(records)
 
 def snapshot_hash(source):
-    with tempfile.TemporaryDirectory(prefix='forge-verify-') as temporary:
-        return snapshot(source,Path(temporary)/'snapshot')
+    source=Path(source)
+    if source.is_symlink() or not source.is_dir():raise ValueError('Unsafe snapshot directory')
+    entries=list(itertools.islice(source.rglob('*'),4001))
+    if len(entries)>4000:raise ValueError('Snapshot exceeds entry budget')
+    records=[];total=0
+    for path in sorted(entries):
+        name=relative(path.relative_to(source).as_posix())
+        if path.is_symlink():raise ValueError('Snapshot symlinks are forbidden')
+        if path.is_dir():records.append([name+'/', 'directory']);continue
+        info=path.stat();total+=info.st_size
+        if not path.is_file() or info.st_nlink!=1 or len(records)>=2000 or total>16*1024**2:raise ValueError('Unsafe or oversized snapshot')
+        with path.open('rb') as stream:data=stream.read(16*1024**2+1)
+        if len(data)!=info.st_size:raise ValueError('Snapshot changed while reading')
+        records.append([name,hashlib.sha256(data).hexdigest()])
+    return forge.digest(records)
 
 def source_in(parent,name):
     relative(name);path=parent
@@ -92,8 +108,8 @@ def plan(suite_path,output,image,timeout=300):
             if k not in {'host','run','link','harness','model_sha256'} or not isinstance(v,str) or not re.fullmatch('[a-f0-9]{64}' if k=='model_sha256' else '[a-f0-9]{40}',v): raise ValueError('Pin all runtime identities')
         if set(config['runtime'])!={'host','run','link','harness','model_sha256'}: raise ValueError('Missing runtime identity')
         config['config_sha256']=forge.digest(config)
-        forge.write_new(output/'run.json',config)
         (output/'results').mkdir(mode=0o700)
+        forge.write_new(output/'run.json',config)
         return config
     except BaseException:
         shutil.rmtree(output);raise
@@ -174,6 +190,9 @@ def summary(root):
                 report=folder/filename
                 forge.read_json(report)
                 if hashlib.sha256(report.read_bytes()).hexdigest()!=value['reports'].get(key):raise ValueError('Grading receipt changed')
+            grade=forge.read_json(folder/'verifier.json')
+            passed=value.get('verifier_exit_code')==0 and grade.get('passed') is True and bool(grade.get('checks')) and all(c.get('passed') is True for c in grade['checks'])
+            if (value['status']=='passed')!=passed:raise ValueError('Result status disagrees with grading receipt')
         counts[value['status']]+=1
     return {'run_id':config['run_id'],'selected_tasks':len(config['tasks']),'attempt_budget':1,'counts':dict(counts),'scope':'Forge task receipts; not official HumanEval/SWE scoring. No rate reported before complete grading.'}
 
@@ -214,6 +233,7 @@ def run(root,executor=execute):
                 forge.write_new(reports/'prediction.json',prediction)
                 value['reports']['prediction_sha256']=hashlib.sha256((reports/'prediction.json').read_bytes()).hexdigest()
                 rc,raw,err=executor(command(config,names[1],[(candidate,'/candidate'),(folder/'bundle/verify','/verify')],task['verifier']),config['timeout_seconds'],names[1])
+                value['verifier_exit_code']=rc
                 write_bytes_new(reports/'verifier.stdout',raw);write_bytes_new(reports/'verifier.stderr',err)
                 grade=json.loads(raw.decode('utf8'))
                 checks=grade.get('checks')

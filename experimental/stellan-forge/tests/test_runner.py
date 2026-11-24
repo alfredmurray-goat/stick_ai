@@ -41,6 +41,9 @@ class RunnerTests(unittest.TestCase):
                 return 0,json.dumps(data).encode(),b''
             result=runner.run(output,execute)
             self.assertEqual(result['selected_tasks'],2);self.assertEqual(result['counts'],{'failed':2})
+            config=runner.config_for(output);path=output/'results'/f"{config['tasks'][0]['key']}.json"
+            changed=json.loads(path.read_text());changed['status']='passed';path.write_text(json.dumps(changed))
+            with self.assertRaisesRegex(ValueError,'disagrees'):runner.summary(output)
     def test_snapshot_mutation_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory() as folder:
             output,config=self.setup_run(folder)
