@@ -10,9 +10,9 @@ bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::s
 
 bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>);
 
-std::vector<QuantizedInput> quantize_input(std::span<const float> input) {
+void quantize_input(std::span<const float> input, std::vector<QuantizedInput> &result) {
     if (input.empty() || input.size() % 256 != 0) { throw std::runtime_error("Quantized activations need complete 256-value blocks"); }
-    std::vector<QuantizedInput> result(input.size() / 256);
+    result.resize(input.size() / 256);
     for (std::size_t b = 0; b < result.size(); ++b) {
         auto &block = result[b];
         float maximum = 0;
@@ -29,6 +29,11 @@ std::vector<QuantizedInput> quantize_input(std::span<const float> input) {
             block.sums[i / 16] = static_cast<std::int16_t>(block.sums[i / 16] + value);
         }
     }
+}
+
+std::vector<QuantizedInput> quantize_input(std::span<const float> input) {
+    std::vector<QuantizedInput> result;
+    quantize_input(input, result);
     return result;
 }
 

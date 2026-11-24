@@ -93,6 +93,7 @@ struct alignas(32) QuantizedInput {
     std::array<std::byte, 28> alignment_padding {};
 };
 static_assert(sizeof(QuantizedInput) == 320);
+void quantize_input(std::span<const float> input, std::vector<QuantizedInput> &result);
 std::vector<QuantizedInput> quantize_input(std::span<const float> input);
 float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input);
 

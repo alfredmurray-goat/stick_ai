@@ -104,7 +104,8 @@ void Lite::multiply(const Tensor *matrix, std::span<const float> input, std::spa
     const auto data = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, input.size());
     const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
-    const auto quantized = fast ? quantize_input(input) : std::vector<QuantizedInput> {};
+    if (fast) quantize_input(input, quantized_scratch_);
+    const auto &quantized = quantized_scratch_;
     executor_.parallel(output.size(), [&](std::size_t first, std::size_t last) {
         for (auto row = first; row < last; ++row) {
             if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
@@ -247,11 +248,11 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
     const auto data = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, columns);
     const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
-    std::vector<std::vector<QuantizedInput>> quantized(batch);
+    auto &quantized = batch_quantized_scratch_;
     std::array<std::span<const QuantizedInput>, prefill_batch_limit> views;
     if (fast) {
         for (std::size_t t = 0; t < batch; ++t) {
-            quantized[t] = quantize_input(input.subspan(t * columns, columns));
+            quantize_input(input.subspan(t * columns, columns), quantized[t]);
             views[t] = quantized[t];
         }
     }
@@ -271,6 +272,11 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
 }
 
 const std::vector<float> &Lite::prefill(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, const std::function<void(std::size_t)> &progress) {
+    // Keep prefill scratch across layers/chunks, then return it before interactive decoding.
+    struct ReleaseScratch {
+        std::array<std::vector<QuantizedInput>, prefill_batch_limit> &buffers;
+        ~ReleaseScratch() { for (auto &buffer : buffers) std::vector<QuantizedInput>().swap(buffer); }
+    } release {batch_quantized_scratch_};
     if (tokens.empty()) { throw std::runtime_error("A prompt token is required"); }
     for (const auto token : tokens) {
         if (token < 0 || static_cast<std::size_t>(token) >= logits_.size()) { throw std::runtime_error("Invalid input token"); }

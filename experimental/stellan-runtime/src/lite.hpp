@@ -70,6 +70,8 @@ private:
     std::size_t kernel_;
     float epsilon_;
     std::vector<Layer> layers_;
+    std::vector<QuantizedInput> quantized_scratch_;
+    std::array<std::vector<QuantizedInput>, prefill_batch_limit> batch_quantized_scratch_;
     std::vector<float> hidden_;
     std::vector<float> normalized_;
     std::vector<float> projection_;
