@@ -65,6 +65,8 @@ Executor::~Executor() = default;
 void Executor::parallel(std::size_t count, const std::function<void(std::size_t, std::size_t)> &function) {
     auto &s = *state_;
     std::lock_guard submit(s.submit);
+    // Avoid waking sleeping workers for serial or empty/single-row work.
+    if (s.threads == 1 || count <= 1) { function(0, count); return; }
     {
         std::lock_guard lock(s.mutex);
         s.function = function;
