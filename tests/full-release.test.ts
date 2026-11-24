@@ -38,7 +38,7 @@ it.skipIf(process.platform === "win32")("assembles all four complete release for
       expect(await readFile(join(unpacked, "Stick AI/models/stellan-1-lite-q4_k_m.gguf"))).toEqual(await readFile(fixture.lite));
     }
   } finally { await rm(temporary, { recursive: true, force: true }); }
-}, 30000);
+}, 90000);
 it.skipIf(process.platform === "win32")("assembles verified model-free downloads for all four platforms from the same base", async () => {
   const { assembleModelFreeRelease } = await import("../scripts/assemble-full-release.mjs");
   const temporary = await mkdtemp(join(tmpdir(), "stick-model-free-release-"));

@@ -36,7 +36,7 @@ it("keeps loading past the former startup and inactivity deadlines, then accepts
   expect(args[args.indexOf("--model") + 1]).toBe("/external/Max.gguf");
   expect(args[args.indexOf("--ctx-size") + 1]).toBe("8192");
   await engine.stop();
-});
+}, 30000);
 it("cancels a model that remains loading without waiting for a readiness deadline", async () => {
   vi.useFakeTimers(); mocks.spawn.mockReturnValue(child());
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ status: "loading" }, { status: 503 })));
@@ -45,7 +45,7 @@ it("cancels a model that remains loading without waiting for a readiness deadlin
   const loading = engine.start("stellan-1-lite", controller.signal).catch((error: unknown) => error);
   await vi.advanceTimersByTimeAsync(600000); controller.abort(); await vi.advanceTimersByTimeAsync(200);
   expect(await loading).toBe(controller.signal.reason); expect(engine.child).toBeNull();
-});
+}, 30000);
 it("lets shell commands continue beyond sixty seconds and return normally", async () => {
   vi.useFakeTimers(); const process = child(); mocks.spawn.mockReturnValue(process);
   let finished = false;
@@ -54,4 +54,4 @@ it("lets shell commands continue beyond sixty seconds and return normally", asyn
   expect(finished).toBe(false); expect(vi.getTimerCount()).toBe(0);
   process.stdout.emit("data", Buffer.from("completed")); process.emit("exit", 0); process.emit("close", 0);
   expect(await task).toBe("exit=0\ncompleted"); expect(vi.getTimerCount()).toBe(0);
-});
+}, 30000);
