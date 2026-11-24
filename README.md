@@ -352,3 +352,7 @@ Desktop v0.2.0 packages use Stellan-Run by default, including activated locked m
 Our [original MCP client](docs/MCP_CLIENT.md) includes bounded protocol-envelope and tool-client initialization validation in our existing request/transport code. Its stdio reader avoids repeated partial-message copies and releases large buffers; pending requests have count and payload budgets. Server replies share the outgoing payload budget, so stalled writes cannot build an unbounded ping-response queue. The RPC core bundles independently of SDK/schema runtimes; whole-app SDK removal is still in progress. SDK transports and operation schemas remain until compatibility is complete.
 
 Stellan-Link is our original tool-only MCP client, including stdio, streamable HTTP, legacy SSE and bounded tool-result validation. The upstream MCP SDK is used only for development-time comparison tests and is absent from the production bundle. See [MCP connections](docs/MCP_SKILLS.md).
+
+### Stellan Forge (experimental)
+
+[Stellan Forge](experimental/stellan-forge/README.md) is our unified task-experience and future learning project. Its first CLI records versioned experiences, requires explicit review and exports bounded datasets with held-out task exclusions. It does not yet execute agent tasks or train weights; recorded outcomes are not benchmark scores.
