@@ -1,6 +1,6 @@
 import {parseMcpMessage} from './mcp-wire.js';
 import {McpLines} from './mcp-lines.js';
-import spawn from 'cross-spawn';
+import {spawnCommand} from './spawn-command.js';
 import type {ChildProcess} from 'node:child_process';
 import type {JSONRPCMessage} from './mcp-types.js';
 import type {Transport} from './mcp-types.js';
@@ -15,7 +15,7 @@ export class McpProcessTransport implements Transport {
  async start(){
   if(this.child)throw Error('MCP transport already started');
   await new Promise<void>((resolve,reject)=>{
-   const child=spawn(this.executable,this.args,{env:this.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32',windowsHide:true});this.child=child;this.exited=new Promise(resolve=>{child.once('exit',()=>resolve());child.once('error',()=>resolve());});
+   const child=spawnCommand(this.executable,this.args,{env:this.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32',windowsHide:true});this.child=child;this.exited=new Promise(resolve=>{child.once('exit',()=>resolve());child.once('error',()=>resolve());});
    child.once('spawn',resolve);child.once('error',error=>{reject(error);this.onerror?.(error);this.closed();});child.once('close',()=>this.closed());
    child.stdin?.on('error',error=>this.onerror?.(error));child.stderr?.on('data',this.diagnostic);
    child.stdout?.on('data',(chunk:Buffer)=>{if(this.closing||this.notified)return;try{

@@ -55,18 +55,16 @@
     "desktop:build": "cargo tauri build"
   },
   "dependencies": {
-    "cross-spawn": "7.0.6",
     "fflate": "0.8.2",
     "ignore": "7.0.5",
     "unpdf": "2.2.1",
     "yaml": "2.9.1"
   },
   "devDependencies": {
-    "@types/cross-spawn": "6.0.6",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "24.10.1",
     "esbuild": "0.28.2",
     "typescript": "5.9.3",
-    "vitest": "3.2.4",
-    "@modelcontextprotocol/sdk": "1.32.2"
+    "vitest": "3.2.4"
   }
 }

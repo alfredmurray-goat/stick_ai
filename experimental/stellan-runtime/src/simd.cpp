@@ -372,6 +372,36 @@ STELLAN_AVX2 void q6_batch(std::span<const std::byte> row, std::span<const std::
         default: break;
     }
 }
+// One channel's recurrence across a whole prefill batch. Half of the state (64 values) stays in eight
+// registers while every token passes through it, instead of loading and storing the state per token.
+// The arithmetic and its order match recurrent() exactly, so results are bit-identical.
+STELLAN_AVX2 void recurrent_tokens(std::size_t states, std::size_t tokens, const float *input, const float *dt, const float *attenuation,
+        const float *const *b, const float *const *c, float skip, float *state, float *output) {
+    __m256 sums[prefill_batch_limit];
+    for (std::size_t t = 0; t < tokens; ++t) { sums[t] = _mm256_setzero_ps(); }
+    for (std::size_t base = 0; base < states; base += 64) {
+        __m256 s[8];
+        for (std::size_t k = 0; k < 8; ++k) { s[k] = _mm256_loadu_ps(state + base + k * 8); }
+        for (std::size_t t = 0; t < tokens; ++t) {
+            const auto a = _mm256_set1_ps(attenuation[t]);
+            const auto x = _mm256_set1_ps(dt[t] * input[t]);
+            auto sum = sums[t];
+            for (std::size_t k = 0; k < 8; ++k) {
+                s[k] = _mm256_fmadd_ps(_mm256_loadu_ps(b[t] + base + k * 8), x, _mm256_mul_ps(a, s[k]));
+                sum = _mm256_fmadd_ps(s[k], _mm256_loadu_ps(c[t] + base + k * 8), sum);
+            }
+            sums[t] = sum;
+        }
+        for (std::size_t k = 0; k < 8; ++k) { _mm256_storeu_ps(state + base + k * 8, s[k]); }
+    }
+    for (std::size_t t = 0; t < tokens; ++t) {
+        alignas(32) float lanes[8];
+        _mm256_store_ps(lanes, sums[t]);
+        float y = skip * input[t];
+        for (const auto value : lanes) { y += value; }
+        output[t] = y;
+    }
+}
 STELLAN_AVX2 void recurrent(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
         std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output) {
     const auto attenuation = _mm256_set1_ps(decay);
@@ -796,6 +826,13 @@ bool accelerated_attention(std::size_t tokens, std::size_t dim, std::size_t stri
     attention_row(tokens, dim, stride, q, keys, values, scale, scores, out);
     return true;
 }
+bool accelerated_ssm_tokens(std::size_t states, std::size_t tokens, const float *input, const float *dt, const float *attenuation,
+        const float *const *b, const float *const *c, float skip, float *state, float *output) {
+    static const bool enabled = available();
+    if (!enabled || states % 64 != 0 || tokens == 0 || tokens > prefill_batch_limit) { return false; }
+    recurrent_tokens(states, tokens, input, dt, attenuation, b, c, skip, state, output);
+    return true;
+}
 bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
         std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output) {
     static const bool enabled = available();
@@ -807,6 +844,7 @@ bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const floa
 #elif defined(__aarch64__) || defined(__arm64__)
 namespace stellan {
 bool accelerated_attention(std::size_t, std::size_t, std::size_t, const float *, const float *, const float *, float, float *, float *) { return false; }
+bool accelerated_ssm_tokens(std::size_t, std::size_t, const float *, const float *, const float *, const float *const *, const float *const *, float, float *, float *) { return false; }
 bool accelerated_fine_batch_dot(std::span<const std::byte>, std::span<const std::span<const FineInput>>, std::span<float>) { return false; }
 }
 #include <arm_neon.h>
@@ -881,6 +919,7 @@ bool accelerated_quantized_dot(std::uint32_t type, std::span<const std::byte> ro
 #else
 namespace stellan {
 bool accelerated_attention(std::size_t, std::size_t, std::size_t, const float *, const float *, const float *, float, float *, float *) { return false; }
+bool accelerated_ssm_tokens(std::size_t, std::size_t, const float *, const float *, const float *, const float *const *, const float *const *, float, float *, float *) { return false; }
 bool accelerated_fine_batch_dot(std::span<const std::byte>, std::span<const std::span<const FineInput>>, std::span<float>) { return false; }
 bool accelerated_dot(std::uint32_t, std::span<const std::byte>, std::span<const float>, float &) { return false; }
 bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::span<const QuantizedInput>, float &) { return false; }
