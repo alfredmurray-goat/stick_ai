@@ -6,13 +6,18 @@ const limit=4*1024**2;
 interface Event {event:string;data:string;id?:string;retry?:number}
 /** SSE framing, including CR, LF, CRLF, split UTF-8 and multiline data. */
 export class McpEvents {
- private lines=new McpLines(true);private skipLf=false;private bytes=0;private data:string[]=[];private kind='message';private id:string|undefined;private retry:number|undefined;private first=true;
+ private decoder=new TextDecoder('utf-8',{fatal:true});private lines=new McpLines(true);private skipLf=false;private bytes=0;private data:string[]=[];private kind='message';private id:string|undefined;private retry:number|undefined;private first=true;
  push(chunk:Uint8Array,consume:(event:Event)=>void){
-  const normalized=Buffer.allocUnsafe(chunk.length);let length=0;
-  for(const b of chunk){if(this.skipLf&&b===10){this.skipLf=false;continue;}this.skipLf=b===13;normalized[length++]=b===13?10:b;}
-  this.lines.push(normalized.subarray(0,length),raw=>{
+  let bytes=Buffer.from(chunk.buffer,chunk.byteOffset,chunk.byteLength);
+  // Ordinary LF streams can use the incoming buffer directly; only CR streams need normalization.
+  if(this.skipLf||bytes.includes(13)){
+   const normalized=Buffer.allocUnsafe(chunk.length);let length=0;
+   for(const b of chunk){if(this.skipLf&&b===10){this.skipLf=false;continue;}this.skipLf=b===13;normalized[length++]=b===13?10:b;}
+   bytes=normalized.subarray(0,length);
+  }
+  this.lines.push(bytes,raw=>{
    this.bytes+=raw.length+1;if(this.bytes>limit)throw Error('Stellan-Link SSE event exceeds 4 MiB');
-   let line=new TextDecoder('utf-8',{fatal:true}).decode(raw);if(this.first){line=line.replace(/^\uFEFF/,'');this.first=false;}
+   let line=this.decoder.decode(raw);if(this.first){line=line.replace(/^\uFEFF/,'');this.first=false;}
    if(!line){consume({event:this.kind,data:this.data.join('\n'),...(this.id!==undefined?{id:this.id}:{}),...(this.retry!==undefined?{retry:this.retry}:{})});this.data=[];this.kind='message';this.bytes=0;return;}
    if(line.startsWith(':'))return;const colon=line.indexOf(':'),field=colon<0?line:line.slice(0,colon);let value=colon<0?'':line.slice(colon+1);if(value.startsWith(' '))value=value.slice(1);
    if(field==='data')this.data.push(value);else if(field==='event')this.kind=value||'message';else if(field==='id'&&!value.includes('\0'))this.id=value;
