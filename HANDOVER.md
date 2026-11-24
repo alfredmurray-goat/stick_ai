@@ -1,8 +1,22 @@
 # Handover
 
-The state of Stick AI as of **18 November 2026**, for whoever picks it up next. Update this file when you finish a piece of work or leave something half-done.
+The state of Stick AI as of **24 November 2026** (see the first section); the rest was written on 18–22 November, for whoever picks it up next. Update this file when you finish a piece of work or leave something half-done.
 
-## Where things stand
+## State on 24 November 2026 (review of the 21–24 November work)
+
+Read this first; older sections below may describe the earlier llama.cpp app.
+
+- **Engine.** Desktop v0.2 runs **Stellan-Run** (our C++ engine, `experimental/stellan-runtime`, `docs/STELLAN_RUN.md`) instead of llama.cpp ([#70](https://github.com/alfredmurray-goat/stick_ai/pull/70)). It is **CPU only**: no Metal/GPU, no speculative decoding, no grammar. It reads locked split models natively. Its own receipts (`experimental/stellan-runtime/EVIDENCE.md`) still show llama.cpp ahead on Lite prompt and decode speed, and full Max weights have not been validated on it. The owner's condition for replacing llama.cpp was measured correctness, more speed and less host load for both models; those measurements are still outstanding.
+- **Sold sticks already run it.** Builds 45339764815 and 45384223073 were uploaded to the update host ("Sold sticks will now update"). The newest publish (run 45403389094, build 45397920550) failed in universal assembly with `Changed file: bin/windows-x64/stellan-host.exe`; 8951118 fixes the Windows Host metadata but no Desktop build has run on 7a95112 yet.
+- **Stellan-Host** (`docs/STELLAN_HOST.md`): native C++ service; the packaged app's read/list/search/write/edit tools go through it (`nativeHost` capability, [#99](https://github.com/alfredmurray-goat/stick_ai/pull/99)); session-state store exists but chat memory still uses Node. Node is still required.
+- **Stellan-Link** (`docs/MCP_CLIENT.md`): our MCP client replaced the MCP SDK transports and validators ([#83](https://github.com/alfredmurray-goat/stick_ai/pull/83)).
+- **Stellan Forge** (`experimental/stellan-forge`): experience review/export CLI and one-attempt task runner with isolated verifier receipts; no training happens.
+- **App features:** sidebar context wheel and Long context switch, per-chat memory notes (`docs/CONTEXT_MEMORY.md`), file attachments converted to text (`docs/INPUTS.md`).
+- **Benchmarks:** Max **132/164 (80.5%)** HumanEval pass@1, measured with llama.cpp on Kaggle GPU ([#72](https://github.com/alfredmurray-goat/stick_ai/pull/72), `docs/benchmark/results/humaneval-max.json`). It is not a Stellan-Run score. The 26/30 partial is superseded. The SWE-bench Verified 10-task pilot is prepared (`docs/benchmark/SWE_BENCH.md`); no result yet. Codex's Kaggle CUDA fix ([#69](https://github.com/alfredmurray-goat/stick_ai/pull/69)) is open.
+- **Website:** shows Max 80.5% only against models it beats with metric-verified pass@1 rows, showcases Stellan-Run/Host/Link, non-tech mode paired with light mode.
+- **Still not done:** activation (`activationPublicKey` is empty; owner must set `ACTIVATION_ADMIN_TOKEN` in Vercel, run setup on /admin and send the public key), Hugging Face repos private, locking a stick's models, signing the apps.
+
+## Where things stand (earlier)
 
 Stick AI is a private, offline coding assistant: a Tauri desktop app around a local web workspace, an agent loop, and a bundled llama.cpp server running Stellan-1 Lite (Mamba2, about 4.1 GB) and Stellan-1 Max (about 14.3 GB). It ships for Apple Silicon Mac, Intel Mac, Windows x64 and Linux x64.
 
