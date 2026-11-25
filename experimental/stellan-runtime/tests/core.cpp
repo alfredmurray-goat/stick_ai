@@ -420,12 +420,48 @@ void additional_kernels() {
 }
 }
 
+void interleaved_rows() {
+    // Stellan's interleaved Q4_K layout must give the same products as the row-by-row kernels.
+    if (!stellan::interleaved_q4k_available()) { return; }
+    std::mt19937 random(77);
+    constexpr std::size_t blocks = 3, stride = blocks * 144;
+    for (unsigned trial = 0; trial < 20; ++trial) {
+        std::vector<std::byte> rows(8 * stride);
+        for (auto &b : rows) { b = static_cast<std::byte>(random() % 256); }
+        for (std::size_t r = 0; r < 8; ++r) {
+            for (std::size_t b = 0; b < blocks; ++b) {
+                set_half(rows, r * stride + b * 144, static_cast<std::uint16_t>(0x2000 + random() % 0x0c00));
+                set_half(rows, r * stride + b * 144 + 2, static_cast<std::uint16_t>(0x1c00 + random() % 0x0c00));
+            }
+        }
+        std::vector<std::byte> packed(blocks * stellan::q4k_interleaved_block_bytes);
+        stellan::interleave_q4k(rows, stride, packed);
+        std::array<std::vector<stellan::QuantizedInput>, stellan::prefill_batch_limit> inputs;
+        std::array<std::span<const stellan::QuantizedInput>, stellan::prefill_batch_limit> views;
+        for (std::size_t t = 0; t < inputs.size(); ++t) {
+            std::vector<float> values(blocks * 256);
+            for (auto &v : values) { v = static_cast<float>(static_cast<int>(random() % 2001) - 1000) / 250; }
+            inputs[t] = stellan::quantize_input(values); views[t] = inputs[t];
+        }
+        for (const std::size_t count : {1U, 2U, 3U, 4U, 5U, 7U, 8U, 13U, 31U, 32U}) {
+            std::vector<float> output(count * 8);
+            require(stellan::interleaved_q4k_batch(packed, std::span(views).first(count), output.data(), 8));
+            for (std::size_t t = 0; t < count; ++t) {
+                for (std::size_t r = 0; r < 8; ++r) {
+                    const auto expected = stellan::quantized_dot(12, std::span(rows).subspan(r * stride, stride), views[t]);
+                    close(output[t * 8 + r], expected, 1e-4 * (1 + std::abs(expected)));
+                }
+            }
+        }
+    }
+}
 int main() {
     try {
         tagged_boundaries(); halves();
         quantized();
         recurrence();
         additional_kernels();
+        interleaved_rows();
         cache_storage();
         require(stellan::json_string("a\n\"\\") == "\"a\\u000a\\\"\\\\\"");
         std::cout << checks << " checks passed\n";

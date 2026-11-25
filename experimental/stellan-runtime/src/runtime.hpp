@@ -97,6 +97,13 @@ void quantize_input(std::span<const float> input, std::vector<QuantizedInput> &r
 std::vector<QuantizedInput> quantize_input(std::span<const float> input);
 float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const QuantizedInput> input);
 
+// Stellan-native Q4_K layout: 8 rows interleaved per 256-value block (1216 bytes per 8 rows instead of 1152),
+// for one-instruction VNNI products. Only on x86 with AVX-VNNI or AVX512-VNNI.
+inline constexpr std::size_t q4k_interleaved_block_bytes = 1216;
+bool interleaved_q4k_available();
+void interleave_q4k(std::span<const std::byte> rows, std::size_t stride, std::span<std::byte> out);
+// output[t * stride + r] for the 8 interleaved rows r and tokens t.
+bool interleaved_q4k_batch(std::span<const std::byte> packed, std::span<const std::span<const QuantizedInput>> input, float *output, std::size_t stride);
 void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output);
 // 32-value int8 blocks with their own scale, matching Q8_0 weights block for block. Finer than
 // QuantizedInput's 256-value blocks, for activations with large outliers (the image encoder).

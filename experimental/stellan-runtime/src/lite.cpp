@@ -49,6 +49,9 @@ std::vector<float> Lite::floats(const Tensor *tensor) const {
 
 Lite::Lite(const Model &model, unsigned threads) : model_(model), executor_(threads) {
     if (model.architecture() != "mamba2") { throw std::runtime_error("This engine currently executes Mamba2 only"); }
+    // The copy is about the size of Lite's Q4_K weights; below 16 GiB the mapped file is kinder to the system.
+    interleave_ = interleaved_q4k_available() && !environment_set("STELLAN_RUNTIME_PRECISE") &&
+                  (environment_set("STELLAN_RUNTIME_INTERLEAVE") || ram_bytes() >= 16ULL * 1024 * 1024 * 1024);
     width_ = dimension(model, "embedding_length", 16384);
     inner_ = dimension(model, "ssm.inner_size", 65536);
     states_ = dimension(model, "ssm.state_size", 1024);
@@ -101,12 +104,35 @@ Lite::Lite(const Model &model, unsigned threads) : model_(model), executor_(thre
     logits_.resize(vocab);
 }
 
+const std::vector<std::byte> *Lite::interleaved(const Tensor *matrix, std::size_t rows, std::size_t stride) {
+    if (!interleave_ || matrix->type != 12 || rows % 8 != 0 || stride % 144 != 0) { return nullptr; }
+    if (const auto found = interleaved_.find(matrix); found != interleaved_.end()) { return &found->second; }
+    const auto data = model_.data(*matrix);
+    const auto group_bytes = stride / 144 * q4k_interleaved_block_bytes;
+    std::vector<std::byte> packed(rows / 8 * group_bytes);
+    executor_.parallel(rows / 8, [&](std::size_t first, std::size_t last) {
+        for (auto g = first; g < last; ++g) { interleave_q4k(data.subspan(g * 8 * stride, 8 * stride), stride, std::span(packed).subspan(g * group_bytes, group_bytes)); }
+    });
+    return &interleaved_.emplace(matrix, std::move(packed)).first->second;
+}
+
 void Lite::multiply(const Tensor *matrix, std::span<const float> input, std::span<float> output, const std::function<bool()> &cancelled) {
     const auto data = model_.data(*matrix);
     const auto stride = row_bytes(matrix->type, input.size());
     const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
     if (fast) quantize_input(input, quantized_scratch_);
     const auto &quantized = quantized_scratch_;
+    if (const auto *packed = fast ? interleaved(matrix, output.size(), stride) : nullptr) {
+        const auto group_bytes = stride / 144 * q4k_interleaved_block_bytes;
+        const std::span<const QuantizedInput> view(quantized);
+        executor_.parallel(output.size() / 8, [&](std::size_t first, std::size_t last) {
+            for (auto g = first; g < last; ++g) {
+                if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+                interleaved_q4k_batch(std::span(*packed).subspan(g * group_bytes, group_bytes), std::span(&view, 1), output.data() + g * 8, 0);
+            }
+        });
+        return;
+    }
     executor_.parallel(output.size(), [&](std::size_t first, std::size_t last) {
         for (auto row = first; row < last; ++row) {
             if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
@@ -311,6 +337,16 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
             for (auto t = first; t < last; ++t) { quantize_input(input.subspan(t * columns, columns), quantized[t]); }
         });
         for (std::size_t t = 0; t < batch; ++t) { views[t] = quantized[t]; }
+        if (const auto *packed = interleaved(matrix, rows, stride)) {
+            const auto group_bytes = stride / 144 * q4k_interleaved_block_bytes;
+            executor_.parallel(rows / 8, [&](std::size_t first, std::size_t last) {
+                for (auto g = first; g < last; ++g) {
+                    if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+                    interleaved_q4k_batch(std::span(*packed).subspan(g * group_bytes, group_bytes), std::span(views).first(batch), output.data() + g * 8, rows);
+                }
+            });
+            return;
+        }
     }
     executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
         std::array<float, prefill_batch_limit> values;

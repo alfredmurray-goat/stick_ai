@@ -71,6 +71,11 @@ private:
     float epsilon_;
     std::vector<Layer> layers_;
     std::vector<QuantizedInput> quantized_scratch_;
+    // Q4_K matrices in Stellan's interleaved layout, made on first use when the CPU has VNNI and the computer has
+    // room for the copy (the mapped originals then stay untouched and can be dropped by the system).
+    bool interleave_ = false;
+    std::unordered_map<const Tensor *, std::vector<std::byte>> interleaved_;
+    const std::vector<std::byte> *interleaved(const Tensor *matrix, std::size_t rows, std::size_t stride);
     std::array<std::vector<QuantizedInput>, prefill_batch_limit> batch_quantized_scratch_;
     std::vector<float> hidden_;
     std::vector<float> normalized_;

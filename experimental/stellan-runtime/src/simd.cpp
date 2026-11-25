@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <stdexcept>
 
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <immintrin.h>
@@ -813,6 +814,117 @@ bool accelerated_fine_batch_dot(std::span<const std::byte> row, std::span<const 
     fine_batch(row, input, output);
     return true;
 }
+// Q4_K rows interleaved 8 at a time (see interleave_q4k in runtime.hpp). With rows side by side, one VNNI
+// dpbusd multiplies 4 weights of each of 8 rows by the same 4 activation bytes: one instruction per 32
+// products instead of maddubs + dpwssd per row, and the per-group scales apply once per 8 rows.
+namespace {
+struct Q4kBlock8 { float d[8], dmin[8]; std::uint8_t scale[8][8], minimum[8][8]; std::uint8_t q[8][4][32]; };
+static_assert(sizeof(Q4kBlock8) == q4k_interleaved_block_bytes);
+#ifdef STELLAN_HAS_VNNI
+#define STELLAN_INTERLEAVED_TILE(NAME, TARGET, DPBUSD) \
+template<int T> TARGET void NAME(const Q4kBlock8 *w, std::size_t blocks, const QuantizedInput *const *x, float *out, std::size_t out_stride) { \
+    __m256 total[T]; \
+    for (int t = 0; t < T; ++t) { total[t] = _mm256_setzero_ps(); } \
+    const auto mask = _mm256_set1_epi8(15); \
+    for (std::size_t b = 0; b < blocks; ++b) { \
+        const auto &blk = w[b]; \
+        const auto d = _mm256_loadu_ps(blk.d), dmin = _mm256_loadu_ps(blk.dmin); \
+        __m256 sum[T], mins[T]; \
+        for (int t = 0; t < T; ++t) { sum[t] = _mm256_setzero_ps(); mins[t] = _mm256_setzero_ps(); } \
+        for (int g = 0; g < 8; ++g) { \
+            const auto scale = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i *>(blk.scale[g])))), d); \
+            const auto minimum = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i *>(blk.minimum[g])))), dmin); \
+            __m256i acc[T]; \
+            for (int t = 0; t < T; ++t) { acc[t] = _mm256_setzero_si256(); } \
+            for (int s = 0; s < 4; ++s) { \
+                const auto q = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(blk.q[g][s])); \
+                const auto lo = _mm256_and_si256(q, mask), hi = _mm256_and_si256(_mm256_srli_epi16(q, 4), mask); \
+                for (int t = 0; t < T; ++t) { \
+                    std::int32_t a, c; \
+                    std::memcpy(&a, x[t][b].values.data() + g * 32 + 4 * s, 4); \
+                    std::memcpy(&c, x[t][b].values.data() + g * 32 + 16 + 4 * s, 4); \
+                    acc[t] = DPBUSD(acc[t], lo, _mm256_set1_epi32(a)); \
+                    acc[t] = DPBUSD(acc[t], hi, _mm256_set1_epi32(c)); \
+                } \
+            } \
+            for (int t = 0; t < T; ++t) { \
+                /*  Each int32 total is below 2^24 (32 products of at most 15 * 127), so the conversion is exact. */ \
+                sum[t] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(acc[t]), scale, sum[t]); \
+                mins[t] = _mm256_fmadd_ps(minimum, _mm256_set1_ps(static_cast<float>(x[t][b].sums[2 * g] + x[t][b].sums[2 * g + 1])), mins[t]); \
+            } \
+        } \
+        for (int t = 0; t < T; ++t) { total[t] = _mm256_fmadd_ps(_mm256_sub_ps(sum[t], mins[t]), _mm256_set1_ps(x[t][b].scale), total[t]); } \
+    } \
+    for (int t = 0; t < T; ++t) { _mm256_storeu_ps(out + t * out_stride, total[t]); } \
+}
+STELLAN_INTERLEAVED_TILE(interleaved_tile_vnni, STELLAN_VNNI, _mm256_dpbusd_avx_epi32)
+STELLAN_INTERLEAVED_TILE(interleaved_tile_vnni512, STELLAN_VNNI512, _mm256_dpbusd_epi32)
+#undef STELLAN_INTERLEAVED_TILE
+template<bool Wide>
+void interleaved_batch(const Q4kBlock8 *w, std::size_t blocks, std::span<const std::span<const QuantizedInput>> input, float *out, std::size_t stride) {
+    const QuantizedInput *x[prefill_batch_limit];
+    for (std::size_t t = 0; t < input.size(); ++t) { x[t] = input[t].data(); }
+    std::size_t t = 0;
+    const auto run = [&]<int T>() { if constexpr (Wide) { interleaved_tile_vnni512<T>(w, blocks, x + t, out + t * stride, stride); } else { interleaved_tile_vnni<T>(w, blocks, x + t, out + t * stride, stride); } t += T; };
+    while (t + 4 <= input.size()) { run.template operator()<4>(); }
+    switch (input.size() - t) {
+        case 3: run.template operator()<3>(); break;
+        case 2: run.template operator()<2>(); break;
+        case 1: run.template operator()<1>(); break;
+        default: break;
+    }
+}
+#endif
+}
+bool interleaved_q4k_available() {
+#ifdef STELLAN_HAS_VNNI
+    static const bool enabled = available() && vnni() != Vnni::none && !environment_set("STELLAN_RUNTIME_NO_INTERLEAVE");
+    return enabled;
+#else
+    return false;
+#endif
+}
+void interleave_q4k(std::span<const std::byte> rows, std::size_t stride, std::span<std::byte> out) {
+    const auto blocks = stride / 144;
+    if (rows.size() < 8 * stride || out.size() < blocks * sizeof(Q4kBlock8)) { throw std::runtime_error("Invalid Q4_K interleave"); }
+    for (std::size_t b = 0; b < blocks; ++b) {
+        Q4kBlock8 block {};
+        for (std::size_t r = 0; r < 8; ++r) {
+            const auto *p = rows.data() + r * stride + b * 144;
+            block.d[r] = stellan::half(read_half(p));
+            block.dmin[r] = stellan::half(read_half(p + 2));
+            std::uint32_t words[4];
+            unpack_q4k(p + 4, words);
+            for (std::size_t g = 0; g < 8; ++g) {
+                block.scale[g][r] = static_cast<std::uint8_t>((words[g / 4] >> (8 * (g % 4))) & 0xffU);
+                block.minimum[g][r] = static_cast<std::uint8_t>((words[2 + g / 4] >> (8 * (g % 4))) & 0xffU);
+            }
+            const auto *qs = reinterpret_cast<const std::uint8_t *>(p + 16);
+            const auto value = [&](std::size_t i) { const auto g = i / 32, k = i % 32; const auto byte = qs[(g / 2) * 32 + k]; return static_cast<unsigned>(g % 2 ? byte >> 4 : byte & 15); };
+            for (std::size_t g = 0; g < 8; ++g) {
+                for (std::size_t s = 0; s < 4; ++s) {
+                    for (std::size_t j = 0; j < 4; ++j) {
+                        block.q[g][s][r * 4 + j] = static_cast<std::uint8_t>(value(g * 32 + 4 * s + j) | (value(g * 32 + 16 + 4 * s + j) << 4));
+                    }
+                }
+            }
+        }
+        std::memcpy(out.data() + b * sizeof(Q4kBlock8), &block, sizeof block);
+    }
+}
+bool interleaved_q4k_batch(std::span<const std::byte> packed, std::span<const std::span<const QuantizedInput>> input, float *output, std::size_t stride) {
+#ifdef STELLAN_HAS_VNNI
+    if (!interleaved_q4k_available() || input.empty() || input.size() > prefill_batch_limit) { return false; }
+    const auto *w = reinterpret_cast<const Q4kBlock8 *>(packed.data());
+    const auto blocks = packed.size() / sizeof(Q4kBlock8);
+    if (vnni() == Vnni::avx) { interleaved_batch<false>(w, blocks, input, output, stride); }
+    else { interleaved_batch<true>(w, blocks, input, output, stride); }
+    return true;
+#else
+    (void)packed; (void)input; (void)output; (void)stride;
+    return false;
+#endif
+}
 bool accelerated_attention(std::size_t tokens, std::size_t dim, std::size_t stride, const float *q, const float *keys, const float *values, float scale, float *scores, float *out) {
     static const bool enabled = available();
     if (!enabled || dim % 8 != 0 || dim > 128 || tokens == 0) { return false; }
@@ -1000,9 +1112,15 @@ bool accelerated_quantized_batch_dot(std::uint32_t type, std::span<const std::by
     }
     return true;
 }
+bool interleaved_q4k_available() { return false; }
+void interleave_q4k(std::span<const std::byte>, std::size_t, std::span<std::byte>) { throw std::runtime_error("Q4_K interleaving needs x86 VNNI"); }
+bool interleaved_q4k_batch(std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, float *, std::size_t) { return false; }
 }
 #elif !defined(__x86_64__) && !defined(__i386__) && !defined(_M_X64)
 namespace stellan {
 bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>) { return false; }
+bool interleaved_q4k_available() { return false; }
+void interleave_q4k(std::span<const std::byte>, std::size_t, std::span<std::byte>) { throw std::runtime_error("Q4_K interleaving needs x86 VNNI"); }
+bool interleaved_q4k_batch(std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, float *, std::size_t) { return false; }
 }
 #endif
