@@ -2,9 +2,9 @@
 
 Stellan-Host is an original C++20 service host. It currently provides inference control, the workspace file service and the session-state store, which now holds the app's **chat memory** in packages that ship Host. It is **not yet a full Node.js replacement for the application**. The desktop HTTP API, agent orchestration, GitHub, hooks, extension management, activation and updating still run in Node. Do not remove Node from app packages until those services have native implementations and pass their existing integration tests.
 
-## MCP bridge (macOS and Linux)
+## MCP bridge (all platforms)
 
-`stellan-host --mcp-bridge CWD -- PROGRAM [ARGS...]` supervises one local MCP server in place of a Node bridge process (about 3.5 MB instead of 47.5 MB per server). See `docs/MCP_CLIENT.md`. Windows still uses the Node bridge.
+`stellan-host --mcp-bridge CWD -- PROGRAM [ARGS...]` (Windows: `--cmdline APPLICATION COMMAND_LINE`, with a job object) supervises one local MCP server in place of a Node bridge process (about 3.5 MB instead of 47.5 MB per server). See `docs/MCP_CLIENT.md`. 
 
 ## Workspace service (development)
 
@@ -37,7 +37,7 @@ Paths are project-relative: no traversal, absolute paths, drive prefixes or acce
 ## Remaining migration gates
 
 1. Package and verify the host binary on every target; add a cancellable owner-pipe client and route existing file tool tests through it.
-2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. **Durable sessions: done (25 November 2026).** The model's conversation itself (messages and tool exchanges) is saved after every task in up to eight Host records (newest part kept, always starting at a task), validated on load and restored on start, so Lite carries on where it left off rather than from short notes. Next: approvals and the agent loop. Gate 3 has started: local MCP servers run under Host instead of a Node bridge on macOS and Linux.
+2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. **Durable sessions: done (25 November 2026).** The model's conversation itself (messages and tool exchanges) is saved after every task in up to eight Host records (newest part kept, always starting at a task), validated on load and restored on start, so Lite carries on where it left off rather than from short notes. Next: approvals and the agent loop. Gate 3 has started: local MCP servers run under Host instead of a Node bridge on every platform.
 3. Port MCP ownership, GitHub/hooks/update and activation services, preserving credentials and integrity checks.
 4. Move the authenticated app API and desktop lifecycle, then prove a complete packaged start/task/tool/update flow with no bundled or launched Node process.
 

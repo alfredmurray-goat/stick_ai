@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#else
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -15,7 +18,82 @@
 
 namespace stellan {
 #ifdef _WIN32
-int mcp_bridge(int, char **) { throw std::runtime_error("The native MCP bridge is not available on Windows yet"); }
+namespace {
+std::wstring wide(const char *utf8) {
+    const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, nullptr, 0);
+    if (length <= 0) { throw std::runtime_error("Invalid MCP bridge argument"); }
+    std::wstring result(static_cast<std::size_t>(length), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, result.data(), length);
+    result.resize(static_cast<std::size_t>(length - 1));
+    return result;
+}
+HANDLE job = nullptr;
+// The app closed its lifeline (or exited): end the job, which ends the program and everything it started.
+DWORD WINAPI watch_lifeline(void *handle) {
+    char buffer[64];
+    DWORD got = 0;
+    while (ReadFile(static_cast<HANDLE>(handle), buffer, sizeof buffer, &got, nullptr) && got > 0) {}
+    TerminateJobObject(job, 0);
+    ExitProcess(0);
+}
+}
+
+// stellan-host --mcp-bridge CWD --cmdline APPLICATION COMMAND_LINE
+// The app resolves APPLICATION through PATH/PATHEXT (never the project folder) and builds COMMAND_LINE with the
+// same quoting and batch-file escaping it uses itself. The program runs inside a job object that is ended when the
+// bridge exits, when the program exits, or when the app's lifeline (CRT file descriptor 3) closes.
+int mcp_bridge(int argc, char **argv) {
+    if (argc != 6 || std::string(argv[3]) != "--cmdline") { throw std::runtime_error("Usage: stellan-host --mcp-bridge CWD --cmdline APPLICATION COMMAND_LINE"); }
+    const auto cwd = wide(argv[2]), application = wide(argv[4]);
+    auto command = wide(argv[5]);
+    job = CreateJobObjectW(nullptr, nullptr);
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits {};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits)) { throw std::runtime_error("Cannot create the MCP job object"); }
+    HANDLE std_handles[3] = {GetStdHandle(STD_INPUT_HANDLE), GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
+    for (auto handle : std_handles) { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT); }
+    // Only the three standard handles are inherited; the lifeline and everything else stay with the bridge.
+    SIZE_T size = 0;
+    InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+    std::vector<unsigned char> storage(size);
+    auto attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &size) ||
+        !UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, std_handles, sizeof std_handles, nullptr, nullptr)) {
+        throw std::runtime_error("Cannot prepare the MCP program's handles");
+    }
+    STARTUPINFOEXW startup {};
+    startup.StartupInfo.cb = sizeof startup;
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.hStdInput = std_handles[0];
+    startup.StartupInfo.hStdOutput = std_handles[1];
+    startup.StartupInfo.hStdError = std_handles[2];
+    startup.lpAttributeList = attributes;
+    PROCESS_INFORMATION process {};
+    if (!CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_SUSPENDED | CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
+                        nullptr, cwd.c_str(), &startup.StartupInfo, &process)) {
+        DeleteProcThreadAttributeList(attributes);
+        static const char message[] = "The MCP program could not be started. Check its executable and arguments.\n";
+        DWORD written = 0;
+        WriteFile(std_handles[2], message, sizeof message - 1, &written, nullptr);
+        return 127;
+    }
+    DeleteProcThreadAttributeList(attributes);
+    if (!AssignProcessToJobObject(job, process.hProcess)) {
+        TerminateProcess(process.hProcess, 1);
+        throw std::runtime_error("Cannot supervise the MCP program");
+    }
+    ResumeThread(process.hThread);
+    CloseHandle(process.hThread);
+    const auto lifeline = reinterpret_cast<HANDLE>(_get_osfhandle(3));
+    if (lifeline != INVALID_HANDLE_VALUE) {
+        if (HANDLE thread = CreateThread(nullptr, 0, watch_lifeline, lifeline, 0, nullptr)) { CloseHandle(thread); }
+    }
+    WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(process.hProcess, &code);
+    TerminateJobObject(job, 0); // leftover descendants
+    return static_cast<int>(code);
+}
 #else
 namespace {
 volatile std::sig_atomic_t stop_requested = 0;
