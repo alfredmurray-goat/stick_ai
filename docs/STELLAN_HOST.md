@@ -41,6 +41,8 @@ Paths are project-relative: no traversal, absolute paths, drive prefixes or acce
 3. Port MCP ownership, GitHub/hooks/update and activation services, preserving credentials and integrity checks.
 4. Move the authenticated app API and desktop lifecycle, then prove a complete packaged start/task/tool/update flow with no bundled or launched Node process.
 
+**Measured cost of what remains in Node (25 November 2026):** the app server idles at about **79 MB RSS** (about 10 MB of it JavaScript heap, the rest the Node runtime), and is about 5,600 lines of TypeScript serving 44 API routes plus the agent loop, GitHub, MCP RPC, hooks, updates and activation. A native rewrite would save roughly 70 MB (Lite uses about 4.4 GB) at the cost of weeks of work and a second implementation to maintain. Per-instance Node processes were the better target and are done (MCP bridges, 47.5 → 3.5 MB each). Recommended order from here: keep Node for the app server until the owner decides; port only pieces that are per-instance, run often, or are security-critical; and measure each one before starting.
+
 Only the fourth gate permits calling Host the full app backend replacement. The gates are implementation work, not a feature reduction or a renamed Node process.
 
 ## Verified owner client
