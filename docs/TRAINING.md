@@ -94,3 +94,11 @@ After:
 - [ ] HumanEval and the agentic suites don't regress; new scores recorded with date and setup.
 - [ ] Speed and memory on Stellan-Run recorded against the previous model.
 - [ ] New model hashes pinned; locked splits and integrity manifests rebuilt.
+
+## Smaller versions for 8 GB computers (owner decision, 25 November 2026)
+
+The next training run also produces **smaller Lite and Max files**, made from the full-precision weights (never by re-compressing the shipped 4-bit files, which loses quality). Why: on 8 GB Apple Silicon Macs, Lite's 4.15 GB file can exceed the free file cache, and the model is then re-read from disk for every word (see HANDOVER.md, "Open issue found overnight"). Targets:
+
+- **Lite small:** about 3.3–3.5 GB (3-bit or mixed 3/4-bit), picked automatically on computers under 12 GB.
+- **Max small:** a lower-bit Max for 16 GB computers, where the current 14.3 GB Max is very slow.
+- Ship only if HumanEval stays within 3 points of the full version and the real tool smoke passes; record both in EVIDENCE.md. Stellan-Run gets kernels for the chosen formats (the M1 principle).
