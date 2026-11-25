@@ -21,25 +21,49 @@ Read this first; older sections below may describe the earlier llama.cpp app.
 - **No customers yet.** Stellan-Run stays the default engine; keep improving it before sticks are sold. Rebuild and publish releases as normal.
 - **Keep working on Run, Link, Host and Forge** (next steps below).
 - **Images: no third model, EU models only (superseded the earlier "hidden third model" idea the same day).** Teach Lite and Max to see in the next training by giving both the same small image encoder ("the eye") plus a small adapter each. Every vision component must come from an EU company. Put the eye into Stellan-Run now, before training, so it's ready.
-- **Shipped now without vision:** attach an image (for example a logo) and Stellan adds it to the project with `save_image` after the user approves (`docs/INPUTS.md`). Settings → **About you** (name, what you do, how to talk, preferences) shapes replies, like Claude's personal preferences. New, clearer system prompts for Lite and Max.
+- **Shipped now without vision:** attach an image (for example a logo) and Stellan adds it to the project with `save_image` after the user approves (`docs/INPUTS.md`). Settings → **About you** (name, what you do, how to talk, preferences) shapes replies, like Claude's personal preferences. A rewritten Lite system prompt was **reverted on 24 November**: in the release build it made Lite put tool requests inside `<done>` on all four platforms, failing the real Lite tool test. Lite now uses the previous, release-tested prompt plus one line about `<user_preferences>`. **Any change to Lite's system prompt must pass the real Lite smoke test** (run `desktop.yml` by hand on the branch) before merging. Max's improved specialist prompt stays.
 - **Forge is the open-source showcase and data loop** (owner's definition, below). It replaces the "unnamed initiative" of 22 November.
-- **Long-term goal: a Rolling LM** (below).
+- **RLM (Rolling Language Model) is a separate project** (below). Here: the **M1 principle**: engine, models and stick designed together. Also planned: Vibe Code Bench, and apps that Stellan builds and powers.
 
-### Long-term goal: the Rolling LM
+### Guiding principle: the M1 moment
 
-Build our own model that keeps learning from its own work on a rolling schedule (overnight, or even hourly), so it's always getting smarter. Call it a **Rolling LLM** or **Rolling LM**.
+Apple's M1 beat general-purpose chips because the hardware, operating system and apps were designed together. Our equivalent: **Stellan-Run, the Stellan models and the stick are designed together**. Stellan-Run doesn't need to run every model on Hugging Face; it needs to run Lite, Max and the eye faster and lighter than any general engine. Concretely:
+- **Pick the best instructions on each computer at start-up** (done for AVX2, AVX-VNNI and AVX512-VNNI; next: ARM dot-product/i8mm and Metal).
+- **Prepare the model for the engine when the stick is made**, not on the customer's computer: we control the stick, so weights can be stored in a Stellan-native layout (rows interleaved for our kernels, as llama.cpp's "repack" does at load time) that's checked like any other file.
+- **Specialise for our exact shapes**: Lite's width 4096 and Mamba2 state, Max's 5120 and 40 layers, and the eye's 1024; no generic code paths where a fixed shape is faster.
+- **Measure against the pinned llama.cpp every time** (EVIDENCE.md) and publish losses as well as wins.
 
-How the pieces line up: Forge produces reviewed, verified experience (real issues, real tests, maintainer feedback); training turns accepted experience into a new version; Stellan-Run serves it; signed updates deliver it to sticks. Things that must be solved first, honestly:
-- **Forgetting.** Training on new work erodes old skills. Each rolling update needs a fixed regression suite (HumanEval, a private agentic suite, a frozen SWE-bench slice) and is only shipped if nothing regresses.
-- **Quality of the data.** Only learn from attempts that a verifier passed and a person (or a maintainer's merge) accepted; never from unreviewed output, or it learns its own mistakes.
-- **Evaluation leakage.** Keep holdout and benchmark tasks out of training for good (Forge's export already enforces this).
-- **Cost and cadence.** A full fine-tune of a 24B model every hour isn't realistic yet; start with small LoRA updates on a schedule (weekly → nightly), measure, then shorten.
-- **Updates to sticks.** A new model is a multi-GB update; ship adapters (LoRA deltas) rather than whole models where possible, signed like app updates.
-- **Licences and consent.** Only train on code and conversations we have the right to use; customer chats never leave the stick unless a customer explicitly opts in.
+### Not this project: RLM (Rolling Language Model)
 
-Until then, **About you** in Settings gives the feel of a model that knows you, without training.
+The owner's **RLM (Rolling Language Model)** is a **separate project**: a new kind of model that keeps learning from what it does. It does not live in this repository; don't build it here. Ideas from 24 November 2026 that may help it: fast memory notes per task (no training), small nightly adapters trained only on verified and accepted work with a replay set against forgetting, a frozen regression gate before anything ships, monthly consolidation, and signed adapter updates. Where it meets Stellan is still open: a separate project, built here, or an **add-on to Lite and Max added during training** (the owner's idea, saved in docs/TRAINING.md). Inside Stick AI today, **About you** gives the feel of a model that knows you.
+
+### Planned: Stellan builds apps that Stellan powers
+
+Customers should be able to ask "make me a game where the shopkeeper talks back" and get a game whose characters are run by Stellan, on the same stick, offline.
+- **Built 25 November (first version, docs/APPS.md, `src/portable/app-api.ts`):** Settings → **Stellan for your apps**, off by default. When on, apps on this computer can call a local, OpenAI-compatible endpoint (`/v1/chat/completions` on 127.0.0.1 only, Host-header checked, CORS only for localhost origins) with a per-stick app key. The first request from each app shows an approval card; a busy model answers 503 "try again shortly" instead of interrupting the user's task; Lite's prompt cache is saved before and restored after each app request (`engine.saveLiteCache`/`restoreLiteCache`). Stellan gets the URL and key in the task message (never the system message). Plain chat only, no tools; replies capped at 1,024 tokens.
+- **After that:** a JavaScript/Python helper library the app can import, streaming replies, a small "game master" example project on the stick, and later letting a finished app ship with its own copy of Lite.
+
+### Planned: Vibe Code Bench (v1.1, now v1.1.1)
+
+[Vibe Code Bench](https://www.vals.ai/benchmarks/vibe-code) (Vals AI; paper [arXiv:2603.04601](https://arxiv.org/abs/2603.04601)) measures building whole web apps from a written spec: 100 specs (**50 private validation, 50 held-out test, none public**), 964 browser workflows with 10,131 substeps, checked by an autonomous browser agent against the deployed app, using the OpenHands harness. v1.1 (19 November 2026) has since been superseded by **v1.1.1** (stricter grader, every substep must pass). For reference on v1.1: Inkling 2 Mini 77.92%, Mistral Large 4 81.56%, Qwen 3.8 27B 64.85%, top 93.77% (checked 24 November 2026).
+- **We can't run it ourselves**: the specs are private, so Vals AI must run Stellan. Prepare an OpenAI-compatible endpoint for Max (and Lite + Max) on a hosted GPU, then ask Vals AI to evaluate on the current version.
+- **Our own practice suite first**: 20 internal web-app specs with Playwright browser checks, run through the app's own agent loop, so we can improve before an official run.
+- **Self-testing matters**: the paper found self-testing during generation strongly predicts success (r = 0.72). Give Stellan an approved, sandboxed browser check (open the app it built, click through, read errors) before claiming an app works.
+- Expect a low first score: a 24B dense model with a 7B orchestrator against frontier models. Publish it honestly with the date and version.
+
+### Lessons from Inkling 2 Mini (Thinking Machines, 20 November 2026)
+
+[Inkling 2 Mini](https://thinkingmachines.ai/news/inkling-2-mini/) is a 26.4B mixture-of-experts model with 3.4B active parameters per token. It loops its middle layers three times per token, is trained and run natively in 4-bit (NVFP4), takes about 20 GB, runs offline on a MacBook Pro, and scores 77.9% on Vibe Code Bench v1.1. It is a US model, so under the EU-only rule it's a source of ideas, not a base or teacher. What to borrow:
+- **Mixture of experts for Max's successor**: decode speed on a CPU is set by the parameters read per token, so a ~25B-total, ~3–5B-active EU model would answer several times faster than today's dense 24B Max at similar quality. Evaluate any EU open-weight MoE of that size when choosing the next base.
+- **Train for 4-bit**: quantisation-aware fine-tuning so the Q4 file on the stick loses nothing against the full-precision model.
+- **Looping**: more thinking per token without longer outputs. It needs training from the start, and on a CPU each loop re-reads those weights, so measure decode speed before adopting it.
+- **Tools instead of memorised facts**: they compensate for small-model knowledge with search; we already have Actuent web search. Train Stellan to use it well.
+- **The demo**: their headline was a laptop on a flight building a playable flight simulator offline. Ours should be the same idea on a stick: Stellan builds a game, offline, whose characters are powered by Stellan.
 
 ### Planned: vision for Lite and Max (EU only)
+
+The full training plan is in **docs/TRAINING.md** (start there before training).
+
 
 Facts (checked 24 November 2026 against Mistral's official `config.json` files on Hugging Face): Mistral Small 3.1 (Paris, Apache-2.0) has a ~0.4B Pixtral-style image encoder: patch 14, width 1024, 24 layers, 16 heads, gated SiLU MLP 4096, 2D RoPE (theta 10,000), images up to 1540 px; its projector is an RMSNorm, a 2×2 patch merger and a two-layer GELU MLP into the language model. Mistral reuses that same frozen encoder in the Ministral 3 family (3B/8B/14B, December 2025, Apache-2.0). Max's base, Devstral Small 2505, was fine-tuned from Mistral Small 3.1 with the vision encoder removed; Lite is a 7.3B Mamba2 with a Mistral tokenizer.
 
@@ -50,12 +74,13 @@ Plan:
 - **Data:** only datasets whose licences allow training and redistribution of the result; record each in `MODEL_LICENSE.md`.
 - **Fallback if training slips:** Ministral 3 3B (same eye, Apache-2.0, EU) as a hidden helper that turns an image into text for Lite. Not needed if the plan above works.
 - **Rejected for now:** non-EU vision models (Qwen, Gemma, Granite, SmolVLM, Moondream), per the owner's EU-only rule.
-- **Engine:** Stellan-Run gets the eye now (`experimental/stellan-runtime`, see its README and EVIDENCE). It reads the encoder and projector from a GGUF, so swapping in the trained projectors later needs no engine change. Image decoding (PNG/JPEG → pixels) still needs a bounded decoder before images reach the eye.
+- **Engine (done 24 November):** Stellan-Run has the eye (`stellan-run see`, `src/vision.cpp`). On Mistral's real encoder it matches llama.cpp (cosine 0.999), about 6% slower with 5% less memory (EVIDENCE.md, "The eye"). It reads the encoder and projector from an `mmproj` GGUF, so the trained projectors drop in with no engine change. Still to do: a bounded PNG/JPEG decoder in Stellan-Run, feeding image tokens into Lite's and Max's prompts (with `[IMG_BREAK]` per row and `[IMG_END]`), and AVX-VNNI kernels for newer laptops.
+- **Watch out:** the popular ggml-org `mmproj` for Mistral Small 3.1 says `clip.use_gelu`, copied from Mistral's original config, which Mistral corrected to SiLU on 9 May 2025. Stellan-Run always runs SiLU. Train our projectors with the corrected SiLU encoder, and record which encoder file and hash was used.
 - **Checks before shipping:** screenshots, photos of text, diagrams and code images; no made-up text in OCR checks; works offline; integrity-checked and lockable like the other models; images never leave the computer.
 
 ### What Forge is (owner's definition, 24 November 2026)
 
-**Forge is how Stellan shows itself to the world and gets better at the same time.** Stellan Lite and Max work on real issues in open-source repositories that explicitly welcome AI-assisted ("vibe-coded") contributions, and open pull requests as public demos. Every attempt is recorded: we **benchmark** their work in those repos (fixed or not, tests passing, maintainer accepted, how much a person had to help), and the reviewed data becomes **training data for the next training** (and, later, the Rolling LM).
+**Forge is how Stellan shows itself to the world and gets better at the same time.** Stellan Lite and Max work on real issues in open-source repositories that explicitly welcome AI-assisted ("vibe-coded") contributions, and open pull requests as public demos. Every attempt is recorded: we **benchmark** their work in those repos (fixed or not, tests passing, maintainer accepted, how much a person had to help), and the reviewed data becomes **training data for the next training** (and possibly, later, the owner's RLM).
 
 What exists today in `experimental/stellan-forge` is the workshop half: `forge.py` records attempts, has a person review them and exports approved, verified ones as training files (benchmark and holdout tasks stay out); `runner.py` runs one task once in a locked-down Docker box and grades it with a separate checker. It isn't connected to Stellan yet.
 
@@ -69,11 +94,28 @@ Still to build, in order:
 
 Risks: maintainers are tired of low-quality AI PRs, so one bad PR can get the account banned and hurt the brand; GitHub allows one free machine account per person; maintainers' review comments are their own words, so check licences before training on them.
 
+### Overnight 24–25 November 2026 (owner asleep; goals: Host the full replacement, Run faster than llama.cpp, Link solid)
+
+- **Run:** the multiplies already run near the chip's limit, so the gains came from elsewhere (EVIDENCE.md has every number):
+  - AVX-VNNI/AVX512-VNNI kernels chosen at start-up, and vector lane totals;
+  - the Mamba2 convolution split across cores, and the scan keeping its state in registers;
+  - Q4_K scales unpacked with word operations instead of a store-then-reload scratch array.
+  - Outputs are identical at every step. Paired with llama.cpp (3 rounds, real Lite, 2 threads): decode 4.8–5.1 s vs 4.7 s for 12 tokens (was 6.2–6.6 s); prompt reading within 7–8%; on the 112-token prompt Stellan-Run used less CPU in total than llama.cpp.
+  - Recorded loss: a Q6_K kernel using unsigned `maddubs` was exact but slower in batches on this Xeon, so it was not merged (EVIDENCE.md).
+- **Link:** `cross-spawn` replaced by `spawn-command.ts`, which escapes batch arguments twice (closing an injection path through `npx.cmd`), never searches the project folder, and is tested with a real `.cmd` on Windows CI. No third-party MCP code ships now.
+- **Host:** chat memory now lives in Host's native state store for packages that ship Host (gate 2, first piece), with a hash-checked client, carry-over of old notes and a real-binary test in CTest on every platform. After a restart the window now shows the current chat again from those notes ("Earlier in this chat").
+
+### Open issue found overnight: Lite on 8 GB Apple Silicon (memory, not code)
+
+The release smoke test failed on `macos-arm64` only (Linux, Windows and Intel Mac passed in 2–4 minutes). The Apple Silicon runner has 7.5 GB of RAM; when other processes hold a little more than usual, the file cache left over is smaller than Lite (4.15 GB). Every new word reads the whole model, so with a cache slightly too small *every* read misses and the model is re-read from disk again and again: about 270 GB of page-ins in one run, steps 15× slower than Linux. The last passing Apple Silicon run (72) had 0.45 GB in the memory compressor; the failing ones (74 on main, and tonight) had about 1.06 GB. Same cause, not a code change: Stellan-Run's Apple Silicon code did not change between them.
+
+Measured here by squeezing Stellan-Run into 3.7 GB: 2.15 s per word instead of 0.35 s (6× slower). `madvise` hints (sequential, random) changed nothing, and a quick pinning test was inconclusive in a Linux container. **This matters for customers with 8 GB Macs** with a browser open. Options, in order: (1) measure on a real 8 GB Apple Silicon Mac; (2) a smaller Lite file (training/packaging decision: e.g. a 3.5 GB quantisation, measured for quality first); (3) carefully pinning most of the model on low-memory machines, tested on real hardware. Until then the 8 GB Apple Silicon experience may be slow when other apps use memory.
+
 ### Next steps per component
 
 - **Run:** close the speed gap with llama.cpp on Lite prompt reading (the largest measured gap), validate full Max weights on a 32 GB machine, then a GPU backend (Metal first). Measure against the pinned llama.cpp with the same settings before claiming anything.
-- **Link:** the MCP SDK is now only a test dependency. Remaining: replace `cross-spawn` (Windows `.cmd`/PATHEXT handling and escaping must be exactly right; security-sensitive) and update `docs/MCP_CLIENT.md`, which still describes the SDK transports as in use.
-- **Host:** next gate is chat memory on the native state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
+- **Link:** done for now: no third-party MCP code ships. Next: a real MCP server smoke on every platform in CI (Windows `.cmd` path included).
+- **Host:** chat memory done; next the full conversation (model history) in the state store, then approvals and the agent loop (`docs/STELLAN_HOST.md`, Remaining migration gates).
 - **Forge:** repository list and issue picker, then the real Stellan adapter (above).
 
 ## Where things stand (earlier)

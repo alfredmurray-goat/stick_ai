@@ -9,6 +9,7 @@ namespace stellan {
 bool accelerated_quantized_dot(std::uint32_t, std::span<const std::byte>, std::span<const QuantizedInput>, float &);
 
 bool accelerated_quantized_batch_dot(std::uint32_t, std::span<const std::byte>, std::span<const std::span<const QuantizedInput>>, std::span<float>);
+bool accelerated_fine_batch_dot(std::span<const std::byte>, std::span<const std::span<const FineInput>>, std::span<float>);
 
 void quantize_input(std::span<const float> input, std::vector<QuantizedInput> &result) {
     if (input.empty() || input.size() % 256 != 0) { throw std::runtime_error("Quantized activations need complete 256-value blocks"); }
@@ -54,19 +55,53 @@ float quantized_dot(std::uint32_t type, std::span<const std::byte> row, std::spa
     return sum;
 }
 void quantized_batch_dot(std::uint32_t type, std::span<const std::byte> row, std::span<const std::span<const QuantizedInput>> input, std::span<float> output) {
-    if ((type != 12 && type != 14) || input.empty() || input.size() > prefill_batch_limit || input.size() != output.size() || input.front().empty() ||
+    if ((type != 8 && type != 12 && type != 14) || input.empty() || input.size() > prefill_batch_limit || input.size() != output.size() || input.front().empty() ||
         !std::all_of(input.begin(), input.end(), [&](const auto values) { return values.size() == input.front().size(); }) || row.size() != row_bytes(type, input.front().size() * 256)) {
         throw std::runtime_error("Invalid batched quantized matrix row");
     }
     if (accelerated_quantized_batch_dot(type, row, input, output)) { return; }
     std::fill(output.begin(), output.end(), 0.0f);
-    const auto stride = type == 12 ? 144U : 210U;
+    const auto stride = type == 8 ? 272U : type == 12 ? 144U : 210U;
     std::array<float, 256> expanded;
     for (std::size_t b = 0; b < input.front().size(); ++b) {
         decode_row(type, row.subspan(b * stride, stride), expanded);
         for (std::size_t t = 0; t < input.size(); ++t) {
             float partial = 0;
             for (std::size_t i = 0; i < 256; ++i) partial += expanded[i] * input[t][b].values[i];
+            output[t] += partial * input[t][b].scale;
+        }
+    }
+}
+
+void quantize_fine(std::span<const float> input, std::span<FineInput> result) {
+    if (input.size() != result.size() * 32) { throw std::runtime_error("Fine quantisation needs complete 32-value blocks"); }
+    for (std::size_t b = 0; b < result.size(); ++b) {
+        auto &block = result[b];
+        float maximum = 0;
+        for (std::size_t i = 0; i < 32; ++i) {
+            const auto value = input[b * 32 + i];
+            if (!std::isfinite(value)) { throw std::runtime_error("Non-finite matrix input"); }
+            maximum = std::max(maximum, std::abs(value));
+        }
+        block.scale = maximum == 0 ? 0 : std::max(maximum / 127, std::numeric_limits<float>::denorm_min());
+        for (std::size_t i = 0; i < 32; ++i) {
+            block.values[i] = static_cast<std::int8_t>(maximum == 0 ? 0 : static_cast<int>(std::clamp(std::nearbyint(input[b * 32 + i] / block.scale), -127.0F, 127.0F)));
+        }
+    }
+}
+void fine_batch_dot(std::span<const std::byte> row, std::span<const std::span<const FineInput>> input, std::span<float> output) {
+    if (input.empty() || input.size() > prefill_batch_limit || input.size() != output.size() || input.front().empty() ||
+        !std::all_of(input.begin(), input.end(), [&](const auto values) { return values.size() == input.front().size(); }) || row.size() != input.front().size() * 34) {
+        throw std::runtime_error("Invalid fine quantized matrix row");
+    }
+    if (accelerated_fine_batch_dot(row, input, output)) { return; }
+    std::fill(output.begin(), output.end(), 0.0f);
+    std::array<float, 32> expanded;
+    for (std::size_t b = 0; b < input.front().size(); ++b) {
+        decode_row(8, row.subspan(b * 34, 34), expanded);
+        for (std::size_t t = 0; t < input.size(); ++t) {
+            float partial = 0;
+            for (std::size_t i = 0; i < 32; ++i) { partial += expanded[i] * input[t][b].values[i]; }
             output[t] += partial * input[t][b].scale;
         }
     }

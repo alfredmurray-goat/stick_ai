@@ -129,3 +129,37 @@ it("loads Max once beside Lite and reuses it, and falls back to swapping if it w
   coder.plainFallback = true;
   expect(await lite.loadedCoder(signal, report)).toBeUndefined(); expect(lite.coder).toBeUndefined();
 });
+
+it("turns Stellan for your apps on and off, keeps it on the stick and refuses while the model isn't running", async () => {
+  const { mkdtemp, cp, rm } = await import("node:fs/promises");
+  const { join, resolve } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { webApp } = await import("../src/portable/web.js");
+  const root = await mkdtemp(join(tmpdir(), "stick-apps-"));
+  await cp(resolve("portable/ui"), join(root, "app/ui"), { recursive: true });
+  const engine = { active: null as string | null, baseUrl: "http://127.0.0.1:9", key: "k", plan: contextPlan(16 * GiB), async start(model: string) { this.active = model; }, async stop() { this.active = null; } };
+  const previous = process.env.STICK_APP_API_PORT; process.env.STICK_APP_API_PORT = "0";
+  const open = async () => {
+    const app = await webApp({ root, engine: engine as unknown as ManagedEngine, bytes: 16 * GiB, choices: ["stellan-1-lite"], noSwap: true, report: vi.fn(), log: vi.fn(), stop: async () => {} });
+    const url = new URL(app.url);
+    const api = async (path: string, data?: object): Promise<any> => (await fetch(url.origin + path, { method: data ? "POST" : "GET", headers: { Authorization: `Bearer ${url.hash.slice(1)}`, Origin: url.origin, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) })).json();
+    return { app, api };
+  };
+  try {
+    const first = await open();
+    expect((await first.api("/api/state")).appApi).toMatchObject({ enabled: false, running: false, key: "" });
+    const on = (await first.api("/api/app-api", { enabled: true })).appApi;
+    expect(on).toMatchObject({ enabled: true, running: true }); expect(on.key).toMatch(/^stellan-app-[0-9a-f]{48}$/);
+    const reply = await fetch(on.url, { method: "POST", headers: { Authorization: `Bearer ${on.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }) });
+    expect(reply.status).toBe(503); // no model is running yet, so the app is told before the user is asked anything
+    expect((await reply.json()).error.message).toContain("resting");
+    await first.app.close();
+    const second = await open();
+    const kept = (await second.api("/api/state")).appApi;
+    expect(kept).toMatchObject({ enabled: true, running: true, key: on.key });
+    const rotated = (await second.api("/api/app-api/new-key", {})).appApi;
+    expect(rotated.key).not.toBe(on.key);
+    expect((await second.api("/api/app-api", { enabled: false })).appApi).toMatchObject({ enabled: false, running: false, key: "" });
+    await second.app.close();
+  } finally { if (previous === undefined) { delete process.env.STICK_APP_API_PORT; } else { process.env.STICK_APP_API_PORT = previous; } await rm(root, { recursive: true, force: true }); }
+}, 30000);

@@ -250,6 +250,17 @@
       <p class="muted">Stellan itself always runs on this computer and never needs the internet. This switch covers the extras that do: web search, GitHub, MCP servers on other computers, hooks that notify other computers, and automatic app update checks. Turn it off and nothing leaves this computer.</p>
     </fieldset>
 
+    <fieldset id="app-api-settings" class="form-group"><legend>Stellan for your apps</legend>
+      <label class="check-label"><input id="app-api-enabled" type="checkbox"> Let apps on this computer use Stellan</label>
+      <p class="muted">Ask Stellan for "a game where the characters talk" and the game can use Stellan as its AI, offline. Only apps on this computer can connect, each app asks you once, and your own work always comes first.</p>
+      <div id="app-api-details" hidden>
+        <p class="muted">Address: <code id="app-api-url"></code></p>
+        <p class="muted">App key: <code id="app-api-key"></code></p>
+        <div class="button-row"><button id="app-api-copy" class="secondary" type="button">Copy key</button><button id="app-api-new-key" class="secondary" type="button">Make a new key</button></div>
+      </div>
+      <p id="app-api-message" class="muted" role="status"></p>
+    </fieldset>
+
     <p id="running-model-note" class="status-box" hidden>Model files and the GGUF picker are managed from the launch screen. Close and reopen the app to change them. Your project files are kept.</p>
   </div>
 

@@ -35,9 +35,13 @@ Use Node.js 24.22.1 (`.nvmrc`). On other Node versions, `tests/portable-supervis
 
 ## Where the project is heading
 
-- **Long-term goal: a Rolling LM** (also "Rolling LLM"): our own model that keeps learning from its own work on a rolling schedule, overnight or even hourly, so it's always getting smarter. Forge supplies reviewed, verified experience; training produces small updates; Stellan-Run serves them; signed updates deliver them. Never train on unreviewed output, benchmark/holdout tasks or customer chats. See HANDOVER.md.
+- **The M1 principle.** Stellan-Run, the Stellan models and the stick are designed together, like Apple's M1. Stellan-Run should beat general engines on *our* models: pick the best CPU instructions at start-up, prepare weights in a Stellan-native layout when the stick is made, and specialise for our exact shapes. Always measure against the pinned llama.cpp and record losses too (EVIDENCE.md).
+- **Training** follows docs/TRAINING.md: Stellan models are made to work well with Stellan-Run, and Stellan-Run with Stellan models; EU bases only; benchmarks never in training data.
+- **RLM (Rolling Language Model) is the owner's own project.** Don't build it here unless the owner asks; options for connecting it (including as a trained add-on to Lite and Max) are in docs/TRAINING.md.
 - **Forge** (`experimental/stellan-forge`) is Stellan's public showcase and data loop: Lite and Max fix issues in open-source repositories that explicitly allow AI-assisted contributions and open pull requests as demos; we benchmark that work and train the next version on the reviewed data. Every PR is reviewed by a person first and discloses AI assistance; no bulk submissions.
 - **Vision: EU models only.** Lite and Max learn to see in the next training with Mistral Small 3.1's image encoder ("the eye", Apache-2.0) and a projector each; no non-EU vision models. Stellan-Run carries the eye now. Until then, images can be attached and copied into the project (`save_image`), but the models don't see them.
+- **Benchmarks to aim for:** Vibe Code Bench (Vals AI, now v1.1.1; specs are private, so Vals AI runs it) plus our own internal app-building suite with browser checks. See HANDOVER.md.
+- **Stellan builds apps that Stellan powers:** the opt-in local app API (`src/portable/app-api.ts`, docs/APPS.md) is off by default, approved per app, never reachable from other computers, and never bypasses the user's own approvals.
 - **About you** (Settings, `src/portable/personal.ts`) goes in the task message, never the system message (see the prompt-cache rule below).
 
 ## Rules that must not be broken

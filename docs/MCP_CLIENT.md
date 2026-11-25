@@ -1,18 +1,34 @@
-# Original MCP client — wire and initialization
+# Stellan-Link: our MCP client
 
-The `feat/stellan-mcp-client` branch starts replacing the SDK's generic wire-envelope validation with our own `parseMcpMessage` in `src/portable/mcp-wire.ts`. The existing original `McpRpc` lifecycle and supervised process transport use it before dispatch. It validates JSON-RPC requests, notifications, successful/error responses, IDs, metadata and exclusive envelope fields, with bounded nesting, node count and aggregate content. Stdio keeps its existing line-size and UTF-8 checks.
+Stellan-Link is the app's own MCP (Model Context Protocol) client: the part that starts MCP servers, talks to them and passes approved tool calls through. As of 25 November 2026 it runs with **no third-party MCP code at all**:
 
-This is a staged compatibility change, not a complete replacement SDK. Operation-specific result schemas, HTTP/SSE transports and type declarations still use `@modelcontextprotocol/sdk`; `cross-spawn` remains. No package dependency has been removed yet; whole-app RAM and speed improvements are not established. New protocol revisions require explicit compatibility review rather than silently changing the supported contract.
+| Piece | File | Notes |
+| --- | --- | --- |
+| Message checking | `mcp-wire.ts` | Validates every JSON-RPC message: IDs, envelopes, nesting, size |
+| Start-up handshake | `mcp-handshake.ts` | Checks protocol version, server identity and tool support |
+| Requests and replies | `mcp-rpc.ts` | Bounded in-flight work, cancellation, shutdown |
+| Tool results | `mcp-results.ts` | Validates tool results before Stellan sees them |
+| Local servers (stdio) | `mcp-process.ts`, `mcp-stdio-entry.ts`, `mcp-lines.ts` | Own process group, bounded line framing, strict UTF-8 |
+| Remote servers (HTTP) | `mcp-http.ts` | Streamable HTTP with the same limits |
+| Starting programs | `spawn-command.ts` | Replaces `cross-spawn` (below) |
 
-Independent valid/malformed fixtures are cross-checked against the pinned SDK's envelope schema in tests only. Existing packaged stdio, HTTP/SSE, Actuent, cancellation and approval integration tests still run. The wire layer rejects ambiguous envelopes, invalid metadata, non-JSON/cyclic objects, oversized content and excessive nesting. Tool calls retain their approvals, remote-origin/credential restrictions and process isolation behavior.
+The official `@modelcontextprotocol/sdk` is now only a **development** dependency: tests cross-check our validators against its schemas, and it is not shipped in the app. Supported protocol versions are explicit constants, checked against the pinned SDK in tests, so upgrades are a deliberate decision.
 
-Next: implement and verify original tool-result validation, then HTTP/SSE transport/session/authorization behavior for each supported protocol version. Remove the runtime SDK only after interoperability and malformed-input tests cover those responsibilities. See the [replacement roadmap](OWN_COMPONENTS.md).
+## Starting MCP programs safely (`spawn-command.ts`)
+
+On macOS and Linux an MCP program is started directly, with no shell. On Windows, commands like `npx` are batch files (`npx.cmd`), which Node won't start directly (CVE-2024-27980). Stellan-Link therefore:
+
+- finds the program through `PATH` and `PATHEXT` and **never searches the project folder**, so a project can't plant a fake `npx.cmd`;
+- starts `.exe` programs directly;
+- runs `.cmd`/`.bat` files through `cmd.exe /d /s /c` with every argument quoted the way Windows programs read it back, then escaped with carets **twice**. Batch shims such as `npx.cmd` hand their arguments to `cmd.exe` a second time, so one round of escaping isn't enough: an argument holding a quote could end the quoting early and let a later `&` run a command. The `cross-spawn` package only added the second round for `node_modules\.bin` shims.
+
+`tests/spawn-command.test.ts` checks the quoting rules everywhere and, on Windows CI, runs a real `.cmd` file with spaces, quotes, `&`, `|`, `%PATH%`, carets, parentheses, `!` and an empty argument, checking every one arrives unchanged and nothing runs.
 
 ## Original initialization core
 
 `mcp-handshake.ts` now validates the initialization fields our tool-only client uses and projects them into a small original result type. It verifies the selected protocol string, server identity, tool capability and optional list-change flag. Unsupported versions and servers without tools still close the connection. Unused capabilities/instructions are not enabled or forwarded to the model; this is a bounded tool-client contract rather than full SDK schema parity. Supported version constants are explicit and checked against the pinned SDK in tests, so upgrades require a deliberate decision.
 
-The RPC lifecycle and its wire/initialization helpers bundle without a runtime SDK or schema-library implementation. The complete app still needs SDK transports and tool-result schemas. At the initialization checkpoint, before the later in-flight guards, an isolated minified RPC bundle measured **115,293 → 5,204 bytes**; five alternating fresh Node 24.22.1 imports measured median import CPU **18.089 → 0.595 ms**, with median process RSS about **63.7 → 58.2 MB**. These historical component-only measurements are not whole-app savings or a size measurement of the later guarded core: the remaining app imports still load SDK code. [Bundle receipt](mcp-rpc-bundle.json) and [raw import trials](mcp-rpc-import.json) retain the scope and limitations. No forced GC or model loading was used.
+The RPC lifecycle and its wire/initialization helpers bundle without a runtime SDK or schema-library implementation. At the initialization checkpoint, before the later in-flight guards, an isolated minified RPC bundle measured **115,293 → 5,204 bytes**; five alternating fresh Node 24.22.1 imports measured median import CPU **18.089 → 0.595 ms**, with median process RSS about **63.7 → 58.2 MB**. These historical component-only measurements are not whole-app savings or a size measurement of the later guarded core: at that time the remaining app imports still loaded SDK code; they no longer do. [Bundle receipt](mcp-rpc-bundle.json) and [raw import trials](mcp-rpc-import.json) retain the scope and limitations. No forced GC or model loading was used.
 
 Tool discovery also now rejects any repeated pagination cursor, caps discovery at 1,000 pages and bounds the aggregate serialized tool/cursor payload to 4 MiB. This prevents an endless empty-catalog cycle and accumulation of many individually valid large pages. The byte limit is a serialized-payload budget, not an exact heap/RSS cap; tool calls retain their existing approval flow and do not gain an artificial execution deadline. Integration fixtures verify nonconsecutive cursor cycles and two individually permitted pages that exceed the aggregate budget.
 

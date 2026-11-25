@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 namespace stellan {
+bool accelerated_ssm_tokens(std::size_t states, std::size_t tokens, const float *input, const float *dt, const float *attenuation, const float *const *b, const float *const *c, float skip, float *state, float *output);
 bool accelerated_ssm(std::size_t width, std::size_t states, std::span<const float> input, float dt, float decay, float skip,
     std::span<const float> b, std::span<const float> c, std::span<float> state, std::span<float> output);
 namespace {
@@ -197,20 +198,71 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
     batch_attenuation_.resize(batch * heads_);
     // The convolution remains causal. The large recurrent state is traversed channel first,
     // keeping each channel's state hot while processing all tokens in this microbatch.
+    // The causal convolution is independent per channel, so channels are split across cores, each
+    // walking the tokens in order: the same arithmetic as prepare_mix, token by token, so results are
+    // bit-identical, but the work that ran on one core now runs on all of them.
+    const auto width = projection_.size();
+    executor_.parallel(conv, [&](std::size_t first, std::size_t last) {
+        if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+        for (auto channel = first; channel < last; ++channel) {
+            const auto history = channel * (kernel_ - 1);
+            const auto weights = channel * kernel_;
+            for (std::size_t t = 0; t < batch; ++t) {
+                auto value = layer.conv_bias[channel];
+                for (std::size_t j = 0; j < kernel_ - 1; ++j) { value += layer.history[history + j] * layer.conv_weight[weights + j]; }
+                const auto current = batch_projected_[t * width + inner_ + channel];
+                value += current * layer.conv_weight[weights + kernel_ - 1];
+                for (std::size_t j = 0; j < kernel_ - 2; ++j) { layer.history[history + j] = layer.history[history + j + 1]; }
+                layer.history[history + kernel_ - 2] = current;
+                batch_convolution_[t * conv + channel] = silu(value);
+            }
+        }
+    });
     for (std::size_t t = 0; t < batch; ++t) {
-        const auto values = std::span(batch_projected_).subspan(t * projection_.size(), projection_.size());
-        std::copy(values.begin(), values.end(), projection_.begin());
-        prepare_mix(layer, cancelled);
-        std::copy(convolution_.begin(), convolution_.end(), batch_convolution_.begin() + t * conv);
-        std::copy(delta_.begin(), delta_.end(), batch_delta_.begin() + t * heads_);
-        for (std::size_t h = 0; h < heads_; ++h) { batch_attenuation_[t * heads_ + h] = std::exp(delta_[h] * layer.decay[h]); }
+        for (std::size_t h = 0; h < heads_; ++h) {
+            const auto value = batch_projected_[t * width + inner_ + conv + h] + layer.dt_bias[h];
+            const auto delta = value > 20 ? value : std::log1p(std::exp(value));
+            if (!std::isfinite(delta) || delta < 0 || !std::isfinite(layer.decay[h]) || layer.decay[h] > 0) { throw std::runtime_error("Invalid Mamba2 time step or decay"); }
+            batch_delta_[t * heads_ + h] = delta;
+            batch_attenuation_[t * heads_ + h] = std::exp(delta * layer.decay[h]);
+        }
+    }
+    // Leave the single-token buffers as the token-by-token path would (the last token's values).
+    {
+        const auto last = batch - 1;
+        std::copy_n(batch_projected_.begin() + static_cast<std::ptrdiff_t>(last * width), width, projection_.begin());
+        std::copy_n(batch_convolution_.begin() + static_cast<std::ptrdiff_t>(last * conv), conv, convolution_.begin());
+        std::copy_n(batch_delta_.begin() + static_cast<std::ptrdiff_t>(last * heads_), heads_, delta_.begin());
+    }
+    // Per-token B and C rows for each group, gathered once and shared by every channel of the group.
+    std::array<std::array<const float *, prefill_batch_limit>, 64> b_rows {}, c_rows {};
+    const bool grouped = groups_ <= b_rows.size();
+    if (grouped) {
+        for (std::size_t g = 0; g < groups_; ++g) {
+            for (std::size_t t = 0; t < batch; ++t) {
+                b_rows[g][t] = batch_convolution_.data() + t * conv + inner_ + g * states_;
+                c_rows[g][t] = batch_convolution_.data() + t * conv + inner_ + groups_ * states_ + g * states_;
+            }
+        }
     }
     executor_.parallel(inner_, [&](std::size_t first, std::size_t last) {
+        std::array<float, prefill_batch_limit> inputs {}, deltas {}, attenuations {}, outputs {};
         for (auto channel = first; channel < last; ++channel) {
             if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
             const auto head = channel / (inner_ / heads_);
             const auto group = head / (heads_ / groups_);
             auto state = std::span(layer.state).subspan(channel * states_, states_);
+            if (grouped) {
+                for (std::size_t t = 0; t < batch; ++t) {
+                    inputs[t] = batch_convolution_[t * conv + channel];
+                    deltas[t] = batch_delta_[t * heads_ + head];
+                    attenuations[t] = batch_attenuation_[t * heads_ + head];
+                }
+                if (accelerated_ssm_tokens(states_, batch, inputs.data(), deltas.data(), attenuations.data(), b_rows[group].data(), c_rows[group].data(), layer.skip[head], state.data(), outputs.data())) {
+                    for (std::size_t t = 0; t < batch; ++t) { batch_mixed_[t * inner_ + channel] = outputs[t]; }
+                    continue;
+                }
+            }
             for (std::size_t t = 0; t < batch; ++t) {
                 const auto values = std::span(batch_convolution_).subspan(t * conv, conv);
                 const auto b = values.subspan(inner_ + group * states_, states_);
@@ -229,7 +281,9 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
             }
         }
     });
-    for (std::size_t t = 0; t < batch; ++t) {
+    // Gate and group norm are per token: shared across cores, same arithmetic.
+    executor_.parallel(batch, [&](std::size_t first_token, std::size_t last_token) {
+    for (auto t = first_token; t < last_token; ++t) {
         auto mixed = std::span(batch_mixed_).subspan(t * inner_, inner_);
         const auto projected = std::span(batch_projected_).subspan(t * projection_.size(), inner_);
         for (std::size_t i = 0; i < inner_; ++i) { mixed[i] *= silu(projected[i]); }
@@ -239,6 +293,7 @@ void Lite::mix_batch(Layer &layer, std::size_t batch, const std::function<bool()
             normalize(group, std::span(layer.gated_norm).subspan(g * group_width, group_width), group);
         }
     }
+    });
 }
 
 void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled) {
@@ -251,10 +306,11 @@ void Lite::multiply_batch(const Tensor *matrix, std::span<const float> input, st
     auto &quantized = batch_quantized_scratch_;
     std::array<std::span<const QuantizedInput>, prefill_batch_limit> views;
     if (fast) {
-        for (std::size_t t = 0; t < batch; ++t) {
-            quantize_input(input.subspan(t * columns, columns), quantized[t]);
-            views[t] = quantized[t];
-        }
+        // Each token is quantised on its own, so tokens are shared across cores (same results).
+        executor_.parallel(batch, [&](std::size_t first, std::size_t last) {
+            for (auto t = first; t < last; ++t) { quantize_input(input.subspan(t * columns, columns), quantized[t]); }
+        });
+        for (std::size_t t = 0; t < batch; ++t) { views[t] = quantized[t]; }
     }
     executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
         std::array<float, prefill_batch_limit> values;

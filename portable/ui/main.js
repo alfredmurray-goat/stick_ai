@@ -387,6 +387,7 @@ async function update() {
     else if (disk && disk.free < disk.comfortable) byId("disk-warning").textContent = `This computer has ${mb(disk.free)} free. Stick AI works, but new conversations start a little slower. With ${mb(disk.comfortable)} free it uses faster start-up caches.`;
     internetAllowed = state.internet !== false; maybeCheckUpdates();
     if (state.personal) savedPersonal = state.personal;
+    if (state.appApi) showAppApi(state.appApi);
     if (!tourChecked && state.phase === "ready") { tourChecked = true; if (!state.onboarded && !byId("settings-dialog").open) openTour(); }
     const context = state.contextUsage;
     const knownUsage = context && Number.isSafeInteger(context.used) && context.used >= 0 && context.capacity > 0;
@@ -413,6 +414,7 @@ async function update() {
         if (documents.length) message(`Attached: ${documents.map(file => file.name).join(", ")} · read locally as text`, "status");
         if (images.length) message(`Attached image${images.length === 1 ? "" : "s"}: ${images.map(file => file.label || file.name).join(", ")} · Stellan can add ${images.length === 1 ? "it" : "them"} to your project when you approve`, "status");
       }
+      if (event.kind === "restored") { message(event.text, "status"); streaming = undefined; }
       if (event.kind === "approval-resolved") { for (const card of byId("approvals").children) if (card.dataset.approval === event.data.id) card.remove(); }
       if (["answer", "thinking", "coding"].includes(event.kind)) { message(event.text, event.kind); }
       if (event.kind === "project") { projectEpoch++; expandedFolders.clear(); clearEditor(); filesLoaded = false; toolCards.clear(); byId("tool-activity").textContent = ""; byId("tool-count").textContent = "0"; byId("messages").textContent = ""; byId("approvals").textContent = ""; byId("thinking").textContent = ""; byId("coding").textContent = ""; streaming = undefined; lastTask = ""; lastTaskAttachments = []; pendingAttachments = []; renderAttachments(); if (event.text.startsWith("New conversation")) { byId("chat-empty").hidden = false; } else message(event.text, "status"); }
@@ -427,8 +429,8 @@ async function update() {
         const card = approvalCard(event.data); const actions = document.createElement("div"); actions.className = "approval-actions"; card.append(actions);
         const web = event.data.kind === "web", search = web && event.data.title === "Search the web";
         const shell = event.data.kind === "shell";
-        const image = event.data.kind === "image";
-        for (const [label, allow] of [[shell ? "Don’t run" : image ? "Don’t add" : web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [shell ? "Run it" : image ? "Add image" : web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
+        const image = event.data.kind === "image", app = event.data.kind === "app";
+        for (const [label, allow] of [[shell ? "Don’t run" : app ? "Don’t allow" : image ? "Don’t add" : web ? (search ? "Don’t search" : "Don’t open") : event.data.kind === "mcp" ? "Deny call" : "Keep my file", false], [shell ? "Run it" : app ? "Allow" : image ? "Add image" : web ? (search ? "Search" : "Read page") : event.data.kind === "mcp" ? "Allow tool call" : "Allow changes", true]]) {
           const button = document.createElement("button"); button.textContent = label; button.className = allow ? "primary" : "secondary";
           button.onclick = async () => { try { await api("/api/approve", { id: event.data.id, allow }); card.remove(); } catch { showError(); } }; actions.append(button);
         }
@@ -460,6 +462,10 @@ function approvalCard(data) {
     card.className = `approval-card${data.isolated ? "" : " unsandboxed"}`; title.textContent = "Run this command?"; sub.textContent = data.note;
     text.append(title, sub); head.append(icon("terminal"), text); card.append(head);
     const preview = document.createElement("pre"); preview.className = "command-preview"; preview.textContent = data.after; card.append(preview); return card;
+  }
+  if (data.kind === "app") {
+    title.textContent = `Let “${data.title}” use Stellan?`; sub.textContent = "An app on this computer wants Stellan to answer it. It gets text replies only: no files, tools or commands.";
+    text.append(title, sub); head.append(icon("plug"), text); card.append(head); return card;
   }
   if (data.kind === "image") {
     title.textContent = "Add this image to your project?"; sub.textContent = `${data.path}${data.replaces ? " · replaces the file that's there" : ""}`;
@@ -709,6 +715,21 @@ byId("personal-save").onclick = async () => {
   } catch (error) { byId("personal-message").textContent = error.message || "Couldn't save. Try again."; }
   finally { byId("personal-save").disabled = false; }
 };
+// "Stellan for your apps": off by default; shows the local address and key only while it's on.
+function showAppApi(view) {
+  if (document.activeElement !== byId("app-api-enabled")) byId("app-api-enabled").checked = Boolean(view.enabled);
+  byId("app-api-details").hidden = !view.enabled || !view.running;
+  byId("app-api-url").textContent = view.url || ""; byId("app-api-key").textContent = view.key || "";
+  if (view.problem && view.enabled) byId("app-api-message").textContent = view.problem;
+}
+byId("app-api-settings").hidden = Boolean(native);
+byId("app-api-enabled").onchange = async () => {
+  const enabled = byId("app-api-enabled").checked; byId("app-api-message").textContent = "";
+  try { const result = await api("/api/app-api", { enabled }); showAppApi(result.appApi); byId("app-api-message").textContent = enabled ? "On. Ask Stellan to build an app that uses Stellan." : "Off. Apps can no longer reach Stellan."; }
+  catch (error) { byId("app-api-enabled").checked = false; byId("app-api-message").textContent = error.message; }
+};
+byId("app-api-copy").onclick = async () => { try { await navigator.clipboard.writeText(byId("app-api-key").textContent); toast("App key copied"); } catch { toast("Select the key and copy it."); } };
+byId("app-api-new-key").onclick = async () => { try { const result = await api("/api/app-api/new-key", {}); showAppApi(result.appApi); toast("New key made. Apps using the old key must be updated."); } catch (error) { toast(error.message); } };
 byId("open-settings").onclick = () => openSettings("models");
 byId("open-github").onclick = () => openSettings("github");
 byId("open-updates").onclick = () => openSettings("updates");

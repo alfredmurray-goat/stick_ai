@@ -1,4 +1,4 @@
-import { nativeFileBackend } from "./native-files.js";
+import { nativeFileBackend, nativeHostExecutable } from "./native-files.js";
 import { createServer, type ServerResponse } from "node:http";
 import { readFile, mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -25,6 +25,7 @@ import { Ollama } from "../model/ollama.js";
 import { ChatMemory } from "./chat-memory.js";
 import { inputCapabilities, prepareAttachments, inputPrompt, imageLabel, InputError, type PreparedAttachment } from "../model/inputs.js";
 import { normalisePersonal, personalInstructions, personalStyles, personalLimits, emptyPersonal, type Personal } from "./personal.js";
+import { AppApi, appApiInstructions, newAppKey, defaultAppApiPort, type ChatMessage } from "./app-api.js";
 import { Tools } from "../tools/index.js";
 import { Sandbox } from "../sandbox/paths.js";
 import { ramStatus } from "../config/models.js";
@@ -66,11 +67,22 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   await mkdir(join(root, "app", "project"), { recursive: true });
   let box = await Sandbox.create(join(root, "app", "project"));
   let chatMemory: ChatMemory | undefined;
+  // Packages that ship Stellan-Host keep chat memory in Host's native state store (verified against the
+  // manifest's SHA-256); others keep the file-based store. Only one store is open at a time.
   const openChatMemory = async (): Promise<void> => {
-    chatMemory = undefined;
-    try { chatMemory = await ChatMemory.open(root, box.root); } catch (error) { log(error); }
+    const previous = chatMemory; chatMemory = undefined; await previous?.close().catch(log);
+    try { chatMemory = await ChatMemory.open(root, box.root, nativeHostExecutable(root)); } catch (error) { log(error); }
   };
-  await openChatMemory();
+  // After a restart the window shows the current chat again from its saved notes; the model gets the same
+  // notes through recall(), so what the person sees matches what Stellan remembers.
+  const unfinished: Record<string, string> = { cancelled: "This task was stopped before it finished.", failed: "This task didn’t finish.", blocked: "This task was blocked." };
+  const restoreChat = (): void => {
+    const turns = chatMemory?.saved() ?? [];
+    if (!turns.length) return;
+    publish("restored", `Earlier in this chat (${turns.length} saved turn${turns.length === 1 ? "" : "s"}; long answers are shortened)`);
+    for (const turn of turns) { publish("user", turn.task); publish("answer", turn.answer || unfinished[turn.status] || "No answer was saved."); }
+  };
+  await openChatMemory(); restoreChat();
   const makeTools = () => new Tools(box, (description, signal) => new Promise<boolean>((resolve) => {
     const id = randomUUID();
     const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
@@ -108,7 +120,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   // Long context mode keeps far more of the conversation word for word and gives both models bigger
   // windows, at the cost of slower re-reads; it is saved with the app's settings on the stick.
   let longContext = false, onboarded = false, internet = true; let personal: Personal = { ...emptyPersonal };
-  try { const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; personal = normalisePersonal(saved?.personal); } catch {}
+  let appApiEnabled = false, appKey = "";
+  try {
+    const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; personal = normalisePersonal(saved?.personal);
+    const apps = saved?.appApi as Record<string, unknown> | undefined; appApiEnabled = apps?.enabled === true; appKey = typeof apps?.key === "string" && /^stellan-app-[0-9a-f]{48}$/.test(apps.key) ? apps.key : "";
+  } catch {}
   // "Allow internet" (on by default) covers everything that reaches beyond this computer: web search,
   // GitHub, remote MCP servers and HTTP hooks. The models never need it. Activation is the one exception:
   // typing the printed code is an explicit request to go online once.
@@ -119,7 +135,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   let pendingModel: string | undefined;
   if (activation) { await activation.check().catch(log); }
   const needsActivation = (): boolean => Boolean(activation && !activation.active);
-  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet, personal }).catch(log);
+  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet, personal, appApi: { enabled: appApiEnabled, key: appKey } }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
   // Free space on this computer, for the window's warning (see diskMinimum in engine.ts).
   // Rounded to 50 MB so the long-polled state doesn't change every minute for nothing.
@@ -177,7 +193,36 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     await engine.stop(); resting = model; report("Resting to free memory. Your next message wakes the model.");
     for (const wake of waiters) { wake(); }
   };
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  // "Stellan for your apps" (app-api.ts): apps on this computer can ask Stellan for plain chat replies.
+  // A user task waits for an app reply to finish, and Lite's conversation cache is saved before and restored
+  // after, so an app never costs the user a slow re-read of their own conversation.
+  let appWork: Promise<unknown> | undefined;
+  const appApi = new AppApi({
+    busy: () => resting || !engine.active || ["choose", "error", "activate"].includes(phase) ? "Stellan is resting or not started. Open Stick AI, start it or send a message to wake it, then try again." : phase !== "ready" || active || loading || repositoryOperation ? "Stellan is busy with the user's own task. Try again in a moment." : undefined,
+    complete: (messages: ChatMessage[], maxTokens: number, signal: AbortSignal) => {
+      const run = (async () => {
+        const model = engine.active ?? "stellan-1-lite";
+        const saved = model === "stellan-1-lite" && await engine.saveLiteCache?.().catch(() => false);
+        try {
+          publish("status", "An app is using Stellan…");
+          const reply = await new Ollama(model, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, maxTokens }).complete(messages, signal, () => {});
+          return reply.content.trim();
+        } finally { if (saved) { await engine.restoreLiteCache?.().catch(log); } publish("status", ""); }
+      })();
+      appWork = run.catch(() => undefined); return run;
+    },
+    approve: (app: string, signal: AbortSignal) => new Promise<boolean>((resolve) => {
+      const id = randomUUID(); const finish = (allow: boolean): void => { publish("approval-resolved", undefined, { id, allow }); approvals.delete(id); signal.removeEventListener("abort", cancel); resolve(allow); };
+      const cancel = (): void => finish(false); approvals.set(id, finish); signal.addEventListener("abort", cancel, { once: true });
+      publish("approval", undefined, { id, kind: "app", title: app, file: app });
+      notifyHooks("Notification", { notification_type: "permission_prompt", message: `${app} wants to use Stellan. Allow it in Stick AI.` });
+    }),
+    log
+  }, appKey, Number(process.env.STICK_APP_API_PORT ?? defaultAppApiPort));
+  const startAppApi = async (): Promise<void> => { if (!appKey) { appKey = newAppKey(); appApi.setKey(appKey); await savePreferences(); } await appApi.start(); };
+  if (appApiEnabled) { await startAppApi().catch(log); }
+  const appApiView = () => ({ enabled: appApiEnabled, running: appApi.running, url: `http://127.0.0.1:${appApi.port}/v1/chat/completions`, key: appApiEnabled ? appKey : "", problem: appApi.problem });
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); restoreChat(); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
     tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
@@ -213,10 +258,13 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       }
       // "About you" goes with the first task of a conversation, again when it changes, and again if
       // compaction summarised it away; resending it every task would make Lite re-read it each time.
+      await appWork;
       const about = personalInstructions(personal);
       const aboutForLite = about && !history.some((message) => message.content.includes(about)) ? about : "";
+      const apps = appApiEnabled && appApi.running ? appApiInstructions(appApi.port, appKey) : "";
+      const appsForLite = apps && !history.some((message) => message.content.includes(apps)) ? apps : "";
       const extras = [skill.instructions, notes ? `Notes from the user's hooks:\n${notes}` : ""].filter(Boolean);
-      const taskInstructions = [aboutForLite, ...extras].filter(Boolean).join("\n\n");
+      const taskInstructions = [aboutForLite, appsForLite, ...extras].filter(Boolean).join("\n\n");
       const maxInstructions = [about, ...extras].filter(Boolean).join("\n\n");
       if (selected === "stellan-1-max") {
         const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (maxInstructions ? "\n" + maxInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
@@ -286,7 +334,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.method === "GET" && url.pathname === "/api/chat-memory") { send(response, 200, { ...(chatMemory?.view() ?? {}), notes: chatMemory?.notes() ?? "Chat memory is unavailable." }); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, personal, personalStyles, personalLimits, disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, personal, personalStyles, personalLimits, appApi: appApiView(), disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -351,7 +399,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       }
       if (url.pathname === "/api/session/reset" && !active && !loading && !repositoryOperation) {
         repositoryOperation = new AbortController();
-        try { await chatMemory?.newChat(); tokenCounts.clear(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); }
+        try { await chatMemory?.newChat(); tokenCounts.clear(); attachedImages.clear(); appApi.forgetApps(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "New conversation. Your project files are kept."); if (!resting) { warm(false); } sessionNotes = ""; notifyHooks("SessionStart", { source: "clear" }); send(response, 200, {}); }
         finally { repositoryOperation = undefined; }
         return;
       }
@@ -417,6 +465,13 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         internet = data.enabled; await applyInternet(); if (!internet) { signIn.cancel(); }
         await savePreferences(); send(response, 200, {}); return;
       }
+      if (url.pathname === "/api/app-api" && typeof data.enabled === "boolean") {
+        appApiEnabled = data.enabled;
+        try { if (appApiEnabled) { await startAppApi(); } else { await appApi.stop(); } }
+        catch { appApiEnabled = false; await appApi.stop(); }
+        await savePreferences(); send(response, appApi.problem && data.enabled ? 409 : 200, { appApi: appApiView(), ...(appApi.problem && data.enabled ? { error: appApi.problem } : {}) }); return;
+      }
+      if (url.pathname === "/api/app-api/new-key") { appKey = newAppKey(); appApi.setKey(appKey); await savePreferences(); send(response, 200, { appApi: appApiView() }); return; }
       if (url.pathname === "/api/personal") { personal = normalisePersonal(data); await savePreferences(); publish("status", "Saved. Stellan will use this from your next message."); send(response, 200, { personal }); return; }
       if (url.pathname === "/api/onboarded") { onboarded = true; await savePreferences(); send(response, 200, {}); return; }
       if (url.pathname === "/api/long-context" && typeof data.enabled === "boolean" && !active && !loading && !repositoryOperation) {
@@ -444,5 +499,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

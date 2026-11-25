@@ -215,3 +215,87 @@ Same setup as the previous section (rotating order, warmup, 3 rounds, Linux x64 
 Prompt reading is about 34% faster than the previous build on both prompts and uses about a quarter less CPU time. llama.cpp is still ahead: it reads these prompts about 1.3× as fast and decodes about 30% faster. Stellan-Run uses about 300 MiB less memory. Decode was not targeted by this change; its difference from the previous build is within this machine's run-to-run noise. Three rounds on a shared virtual machine: treat the numbers as directional. Raw receipt: [lite-vector-bookkeeping.json](evidence/lite-vector-bookkeeping.json).
 
 Where the time goes: in a timed build made before these two changes, the two big matrix multiplies per layer were about 88% of Lite's prompt time and the Mamba2 state update most of the rest; they are still the main cost, but that breakdown hasn't been re-measured on this build. Next candidates: repacking Q4_K weights once at load into an interleaved layout so each tile reads contiguous memory (llama.cpp's CPU "repack" path does this), and a faster decode path for single tokens.
+
+## The eye: Mistral Small 3.1's image encoder — 24 November 2026
+
+Stellan-Run now has an image encoder (`src/vision.cpp`, command `see`): Mistral Small 3.1's ~0.4B Pixtral-style vision transformer and Mistral 3's projector, read from llama.cpp-style `mmproj` GGUF files. It's the encoder Lite and Max will share once their projectors are trained (HANDOVER.md, "vision for Lite and Max").
+
+**Correctness.** `tests/vision.py` builds a small random encoder and checks every output against an independent reference written from Hugging Face's `PixtralVisionModel` and `Mistral3MultiModalProjector` (their weight layout, `rotate_half` 2D RoPE, unfold-ordered patch merging, exact GELU). It covers 1 and 3 threads, the portable non-AVX2 code, Q8_0 weights, no-merge files, resizing and bad input. Deliberately breaking the reference (swapping RoPE rows and columns, reordering the merge, using tanh GELU, or skipping llama.cpp's q/k row permutation) makes the test fail.
+
+**Real weights.** With ggml-org's Q8_0 `mmproj` for Mistral Small 3.1 (SHA-256 `6de5bee5…714fb4`), a 448×448 image becomes 256 tokens of width 5120, which is exactly Max's width. Compared with llama.cpp's own clip encoder (`bench/eye-parity.cpp`, pinned commit, `GGML_NATIVE=OFF`):
+
+| | Stellan-Run | llama.cpp |
+| --- | ---: | ---: |
+| Encode time, median of 3 alternating rounds (2 threads) | 12,885 ms | 12,163 ms |
+| Peak memory | 531 MiB | 561 MiB |
+| Output agreement (cosine, all tokens) | 0.99904 | — |
+| Per-token agreement, median / worst | 0.99974 / 0.96151 | — |
+
+Stellan-Run is about 6% slower here and uses about 5% less memory. It started at 45 s; the steps are in the receipt.
+
+**A finding about that file.** It was uploaded on 1 May 2025 with `clip.use_gelu = true`, copied from Mistral's original config. Mistral corrected the encoder's activation to SiLU on 9 May 2025 ("Updated `hidden_act` to `silu`", Hugging Face commit `73ce7c62b9`). llama.cpp follows the flag, so on the file as published its output differs substantially from the corrected model (cosine 0.66 against Stellan-Run). Stellan-Run always runs SiLU and reports `"file_says_gelu": true`. For the like-for-like numbers above, llama.cpp ran a copy with the key renamed to `clip.use_silu`.
+
+Not done yet: PNG/JPEG decoding inside Stellan-Run (`see` takes raw RGB), feeding image tokens into Lite or Max (that needs the trained projectors), and AVX-VNNI kernels for newer laptops. Raw receipt: [eye-mistral-small-3.1.json](evidence/eye-mistral-small-3.1.json).
+
+## VNNI kernels and vector lane totals — 24 November 2026
+
+Two changes, both giving bit-identical integer sums (generated IDs identical across all three engines):
+- **VNNI at start-up**: on CPUs with AVX-VNNI (Intel 12th gen+, AMD Zen 5) or AVX512-VNNI (Ice/Tiger Lake, AMD Zen 4), the Q4_K/Q6_K/Q8_0 kernels use `vpdpwssd`/`vpdpbusd` (multiply-and-add in one instruction). `STELLAN_RUNTIME_NO_VNNI=1` keeps AVX2; ctest `core-avx2` covers that path. Not compiled with MSVC yet.
+- **Lane totals**: per-block results stay in a float vector and are summed once per row, removing two horizontal sums per token per block (exact int32 to float, below 2^24).
+
+Same paired setup (3 rounds, 2 threads, real Lite, this VM has AVX-VNNI). This run was slower overall than the previous section's (shared VM), so compare within the table:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Peak RSS |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 12,177 | 5,319 | 4,545 MiB |
+| 112 tokens | previous Stellan-Run (main) | 18,068 | 7,236 | 4,247 MiB |
+| 112 tokens | this change | 17,073 | 6,885 | 4,247 MiB |
+| 130 tokens | llama.cpp | 13,870 | 5,354 | 4,549 MiB |
+| 130 tokens | previous Stellan-Run (main) | 20,888 | 7,093 | 4,247 MiB |
+| 130 tokens | this change | 17,698 | 6,767 | 4,247 MiB |
+
+About 5–15% faster prompts and 5% faster decode than main; llama.cpp still reads prompts about 1.3–1.4× as fast and decodes about 25% faster. The remaining gap is structural: llama.cpp's CPU path repacks Q4_K rows so one load serves eight rows. Next step (the M1 principle): store Lite's weights pre-interleaved for our kernels when the stick is made. Raw receipt: [lite-vnni-lane-totals.json](evidence/lite-vnni-lane-totals.json).
+
+## Stellan-native layout: measured before building — 25 November 2026
+
+The plan was to store Lite's weights pre-arranged ("repacked") for our kernels when the stick is made, as llama.cpp's CPU path rearranges Q4_K rows at load. Before building a new on-stick format, we measured whether it could pay off.
+
+**Where Lite's prompt time goes** (112-token prompt, 2 threads, VNNI build, timers in a separate copy of `lite.cpp`): big matrix multiplies 8.8 s, Mamba2 mixing 2.0 s (serial preparation 0.5 s, parallel scan 1.4 s), input quantisation 0.3 s, norms 0.04 s; total 11.2 s in that run.
+
+**How close the Q4_K kernel is to the chip's limit** (`stellan-batch-bench`, one thread, 4096-wide rows, 32-token batch): 54.6 GMAC/s with AVX-VNNI and 50.2 without, against a ceiling of about 74 GMAC/s at 2.3 GHz (two multiply-type instructions per 32 multiply-adds). That is about 74% of the limit; Q6_K reaches about 38%, but Lite uses Q6_K only for its output layer.
+
+**Conclusion:** Q4_K needs two multiply-type instructions per 32 products whether rows are interleaved or not (`maddubs` then a scale multiply), and llama.cpp's repacked AVX2 kernel needs the same two. So a repacked layout can only remove overhead (loads, nibble unpacking, scale decoding), worth perhaps 10–15% of the multiply time on x86. It is not the large win it first looked like. It is more promising on ARM, where the `i8mm` matrix instructions need rows interleaved in pairs (Apple M2 and later, recent Snapdragon), and for a future model trained for a simpler 4-bit format (docs/TRAINING.md, Rule 1).
+
+**Next targets, by size:** the Mamba2 mixing step (2.0 s, partly single-threaded), Q6_K for Max's mixed layers, and only then the repacked layout. Every step is measured against the pinned llama.cpp in a same-time paired run, because this shared VM's speed drifts during the day (the same build measured 16.0 s and 18.1 s hours apart).
+
+## Q4_K scale unpacking for word-by-word speed — 25 November 2026
+
+Decode (writing one word at a time) is limited by how fast weights stream from memory, not by arithmetic. Stellan-Run read about 7 GB/s against llama.cpp's 9.6 GB/s. The difference was per-block bookkeeping: unpacking the eight 6-bit scales and minima of each Q4_K block one value at a time. They are now unpacked as four 32-bit words with masks and shifts (`unpack_q4k`), and the minima go straight into a vector. Same integers, so generated IDs are unchanged.
+
+Same paired setup (3 rotating rounds, 2 threads, real Lite, AVX-VNNI VM), with the previous Stellan-Run build alongside:
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Process CPU ms |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 9,507 | 4,734 | 28,290 |
+| 112 tokens | previous Stellan-Run | 10,603 | 6,571 | 30,900 |
+| 112 tokens | this change | 10,231 | 4,809 | 27,268 |
+| 130 tokens | llama.cpp | 10,746 | 4,660 | 30,510 |
+| 130 tokens | previous Stellan-Run | 13,039 | 6,208 | 33,568 |
+| 130 tokens | this change | 11,468 | 5,066 | 30,520 |
+
+Decode is about 25% faster than before and now within 2–9% of llama.cpp; prompt reading is within 7–8%. On the 112-token prompt the whole run used less CPU time than llama.cpp. Peak memory is about 300 MB lower than llama.cpp (see the previous section). Generated IDs were identical across all three engines. Raw receipt: [lite-paired-q4k-unpack.json](evidence/lite-paired-q4k-unpack.json).
+
+**A loss, recorded:** a Q6_K kernel that feeds unsigned 6-bit weights through `maddubs` (32 products per instruction instead of 16) and corrects the offset once per block was exact (same checksums), but **slower** for batches on this Xeon: 32-token batch 2.9–3.4 ms against 2.1 ms (`stellan-batch-bench`, 4096-wide rows), with no change for single rows on Max's 137 MB `ffn_down` (memory-bound, 64 ms either way). Both versions use the same two multiply-port instructions per 32 values, and the old one's widening loads run on a different port for free. It was not merged. Q6_K speed-ups should come from fewer bytes moved, not fewer instructions.
+
+**Follow-up the same evening: per-token steps across cores.** Quantising each token's input before a batched multiply and the gate-and-normalise step after Mamba2 mixing ran on one core; both are per token, so tokens are now shared across cores (bit-identical; generated IDs identical across all three engines). A second paired run (3 rounds), with the build above as "previous":
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Process CPU ms |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 9,558 | 4,550 | 27,990 |
+| 112 tokens | previous Stellan-Run | 9,727 | 4,489 | 25,768 |
+| 112 tokens | this change | 9,340 | 5,056 | 26,841 |
+| 130 tokens | llama.cpp | 10,580 | 4,503 | 29,960 |
+| 130 tokens | previous Stellan-Run | 11,551 | 4,913 | 29,920 |
+| 130 tokens | this change | 11,729 | 4,939 | 30,891 |
+
+Honest reading: the change itself is **within noise** (−4% and +2% on prompts; decode does not use it, so the decode difference shows this VM's run-to-run spread of about 10%). It is kept because it is exact and removes serial work that matters more with more cores. The useful result is the comparison with llama.cpp: on the 112-token prompt Stellan-Run now **matches or beats llama.cpp on prompt reading and decode while using about 5–8% less CPU**; on the 130-token prompt it is still about 9–11% slower at reading the prompt. Raw receipt: [lite-paired-parallel-quantise.json](evidence/lite-paired-parallel-quantise.json).

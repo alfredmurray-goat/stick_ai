@@ -39,6 +39,7 @@ Ask Stellan to explore, explain, fix or build code. It reads your files, plans t
 - **Hooks.** Like Claude Code's hooks: run your own command, or notify another app on your computer, when you send a message, before or after Stellan uses a tool, when it needs your approval, or when it finishes. A hook can stop a message or tool call, or add notes for Stellan, but it can never approve anything for you. See [HOOKS.md](docs/HOOKS.md).
 - **Signed app updates.** The app checks for signed updates and installs them without re-downloading your models.
 - **It gets to know you.** Settings → About you: tell Stellan your name, what you do, how you'd like it to talk (normal, short, explanatory or beginner-friendly) and anything else to keep in mind. It's saved on your stick and shapes every new conversation.
+- **Apps powered by Stellan.** Ask for "a game where the characters talk" and Stellan builds it to use Stellan itself as its AI, offline on your computer. Turn it on in Settings → Models → **Stellan for your apps**; each app asks you once. See [APPS.md](docs/APPS.md).
 - **Add your logo and pictures.** Attach a PNG, JPEG, GIF, WebP, ICO, BMP or AVIF and ask Stellan to use it. It picks the right folder, shows you a preview and the exact path, and copies the image into your project only when you press **Add image**. Stellan can't see what's in a picture yet; that needs the vision encoder planned for the next training.
 
 <table>
