@@ -21,6 +21,8 @@ export async function runAgentOnHost(host: string, options: {
   activity?: (event: Activity) => void; specialist?: { totalBytes: number; noSwap: boolean };
   context?: { source: ContextSource; maxBytes?: number }; signal: AbortSignal;
   emit: (text: string, thinking: boolean) => void; log: (text: string) => void; save: (batch: Message[]) => Promise<void>;
+  /** When given, Host calls Stellan-Run itself with this request (no model replies pass through Node). */
+  engine?: { port: number; key: string; options: Record<string, unknown>; historyBytes: number; onThinking?: () => void; onUsage?: (tokens: number) => void };
 }): Promise<"finished" | "limit"> {
   const { messages, model, tools, signal, hooks } = options;
   const project = options.context ? await taskContextParts(options.task, options.context.source, options.context.maxBytes, signal) : { list: "", named: "" };
@@ -41,7 +43,7 @@ export async function runAgentOnHost(host: string, options: {
   let outcome: "finished" | "limit" | undefined;
   try {
     write({ task: first, messages, maxSteps: Number.isFinite(options.maxSteps) ? options.maxSteps : 1e15, taskInstructions: "", historyBytes: budget,
-      tools: toolNames, totalBytes: options.specialist?.totalBytes ?? 0, recommendedBytes: maxRecommendedBytes, noSwap: options.specialist?.noSwap ?? false });
+      tools: toolNames, ...(options.engine ? { engine: { port: options.engine.port, key: options.engine.key, system: instructions, options: options.engine.options, historyBytes: options.engine.historyBytes } } : {}), totalBytes: options.specialist?.totalBytes ?? 0, recommendedBytes: maxRecommendedBytes, noSwap: options.specialist?.noSwap ?? false });
     for await (const line of createInterface({ input: child.stdout })) {
       signal.throwIfAborted();
       const event = JSON.parse(line) as Record<string, unknown>;
@@ -66,8 +68,10 @@ export async function runAgentOnHost(host: string, options: {
           } catch (error) { signal.throwIfAborted(); write({ error: error instanceof Error ? error.message : String(error) }); }
           break;
         }
-        // Host only emits the final summary; the stream already showed it when the model streamed it.
-        case "emit": if (!(summaryStreamed && event.thinking === false)) { options.emit(String(event.text), event.thinking === true); } break;
+        // Without an engine, Host only emits the final summary, which the stream already showed when it streamed.
+        case "emit": if (options.engine || !(summaryStreamed && event.thinking === false)) { options.emit(String(event.text), event.thinking === true); } break;
+        case "thinking": options.engine?.onThinking?.(); break;
+        case "usage": options.engine?.onUsage?.(Number(event.tokens)); break;
         case "log": options.log(String(event.text)); break;
         case "save": { const batch = event.batch as Message[]; await options.save(batch); messages.push(...batch); break; }
         case "activity": { const { event: _kind, ...activity } = event; options.activity?.(activity as unknown as Activity); break; }

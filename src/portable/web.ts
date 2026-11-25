@@ -282,7 +282,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       // Tasks run on Stellan-Host's native loop when it is in the package and matches its manifest; Lite+Max
       // pairing (delegation) still runs on the TypeScript loop until Max is ported.
       const hostExecutable = await taskHost;
-      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable && !taskOptions.specialist?.available ? runAgentOnHost(hostExecutable, taskOptions) : runAgent(taskOptions))({
+      const liteRequest = new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes, onUsage: () => undefined }).requestOptions();
+      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable && !taskOptions.specialist?.available
+        ? runAgentOnHost(hostExecutable, { ...taskOptions, engine: { port: Number(new URL(engine.baseUrl).port), key: engine.key, options: liteRequest, historyBytes: engine.plan.historyBytes, onThinking: () => progress.begin("thinking"), onUsage: (tokens) => engine.onUsage?.(selected, tokens) } })
+        : runAgent(taskOptions))({
         task: modelText, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,
         hooks: hooks.active ? {
           before: async (call, signal) => (await runHooks("PreToolUse", { tool_name: call.function.name, tool_input: toolInput(call.function.arguments) }, signal)).blocked,

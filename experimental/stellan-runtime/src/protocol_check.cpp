@@ -1,11 +1,13 @@
 #include "protocol.hpp"
 #include "json.hpp"
 #include "agent_core.hpp"
+#include "engine_client.hpp"
 
 #include <iostream>
 #include <stdexcept>
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace stellan {
 namespace {
@@ -98,7 +100,26 @@ int agent_mode() {
         return json::parse(reply);
     };
     agent::LoopIO io;
+    // With "engine", Host asks Stellan-Run itself and streams the words to the app; otherwise the app answers.
+    std::optional<engine::Client> client;
+    if (const auto *e = request.find("engine")) {
+        client.emplace();
+        client->port = static_cast<int>(std::get<double>(e->find("port")->data));
+        client->key = e->find("key")->string();
+        client->system = e->find("system")->string();
+        client->options = *e->find("options");
+        client->history_bytes = std::get<double>(e->find("historyBytes")->data);
+        client->tools = tools;
+    }
+    bool summary_streamed = false;
     io.complete = [&](const std::vector<agent::Message> &sent) {
+        if (client) {
+            send("thinking", {});
+            const auto reply = client->complete(sent, [&](std::string_view text, bool thinking) { send("emit", {{"text", str(std::string(text))}, {"thinking", json::Value {thinking}}}); },
+                                                [&](double tokens) { send("usage", {{"tokens", json::Value {tokens}}}); });
+            summary_streamed = reply.summary_streamed;
+            return reply.content;
+        }
         send("complete", {{"messages", message_list(sent)}});
         const auto reply = answer();
         if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
@@ -110,7 +131,7 @@ int agent_mode() {
         if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
         return reply.find("result")->string();
     };
-    io.emit = [&](const std::string &text, bool thinking) { send("emit", {{"text", str(text)}, {"thinking", json::Value {thinking}}}); };
+    io.emit = [&](const std::string &text, bool thinking) { if (client && summary_streamed && !thinking) { return; } send("emit", {{"text", str(text)}, {"thinking", json::Value {thinking}}}); };
     io.log = [&](const std::string &text) { send("log", {{"text", str(text)}}); };
     io.save = [&](const std::vector<agent::Message> &batch) { send("save", {{"batch", message_list(batch)}}); };
     io.activity = [&](const agent::Activity &a) {
@@ -124,6 +145,18 @@ int agent_mode() {
         request.find("taskInstructions")->string(), std::get<double>(request.find("historyBytes")->data), tools,
         agent::Specialist {std::get<double>(request.find("totalBytes")->data), std::get<double>(request.find("recommendedBytes")->data), std::get<bool>(request.find("noSwap")->data)}, io);
     send("done", {{"outcome", str(outcome)}, {"messages", message_list(messages)}});
+    return 0;
+}
+// stellan-host --history-check: one {"messages","limit"} per line; prints boundedToolHistory's result.
+int history_check() {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        const auto request = json::parse(line);
+        std::vector<agent::Message> messages;
+        for (const auto &m : request.find("messages")->array()) { messages.push_back({m.find("role")->string(), m.find("content")->string()}); }
+        std::cout << json::stringify(message_list(engine::bounded_tool_history(messages, std::get<double>(request.find("limit")->data)))) << '\n';
+    }
+    std::cout.flush();
     return 0;
 }
 // stellan-host --compact-check: one {"messages":[{role,content}], "budget"} per line; prints the compacted history.

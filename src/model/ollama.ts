@@ -11,13 +11,18 @@ export class Ollama implements Model {
   constructor(private model: string, baseUrl: string, remote = false, ram: RamStatus = ramStatus(), private options: { apiKey?: string; specialist?: boolean; maxTokens?: number; historyBytes?: number; onUsage?: (tokens: number) => void } = {}) {
     assertModelAllowed(model, ram); this.url = endpoint(baseUrl, remote);
   }
+  /** Everything in the request body except the messages (Stellan-Host sends the same body; see host-loop.ts). */
+  requestOptions(): Record<string, unknown> {
+    return { model: this.model, stream: true, ...(this.options.onUsage ? {stream_options:{include_usage:true}} : {}), ...(this.options.apiKey ? { return_progress: true } : {}), ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) };
+  }
   async complete(messages: Message[], signal: AbortSignal, emit: (text: string, thinking: boolean) => void): Promise<Reply> {
     try {
       let response: Response;
       // return_progress makes the bundled llama.cpp server stream prompt-progress chunks while it
       // reads a long prompt. Without them a slow computer can spend over five minutes before the
       // first token, and Node's fetch drops a response that is silent for 300 s ("fetch failed").
-      const body = JSON.stringify({ model: this.model, messages: modelMessages(boundedToolHistory(messages, this.options.historyBytes)), stream: true, ...(this.options.onUsage ? {stream_options:{include_usage:true}} : {}), ...(this.options.apiKey ? { return_progress: true } : {}), ...(this.model === "stellan-1-lite" && this.options.apiKey && !this.options.specialist ? { grammar: stellanGrammar, temperature: 0.2, cache_prompt: true } : {}), ...(this.options.maxTokens ? { max_tokens: this.options.maxTokens } : {}) });
+      const { model, ...rest } = this.requestOptions();
+      const body = JSON.stringify({ model, messages: modelMessages(boundedToolHistory(messages, this.options.historyBytes)), ...rest });
       try {
         response = await fetch(this.url, {
           method: "POST",
