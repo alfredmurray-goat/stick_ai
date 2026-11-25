@@ -91,3 +91,20 @@ The app uses Host for every task when the package has a Stellan-Host whose hash 
 use the TypeScript loop: Lite paired with Max (delegation is not ported yet), and `STICK_TASKS_ON_NODE=1`, a
 temporary escape hatch. Next: the model call goes straight from Host to Stellan-Run, then the settings, GitHub,
 updates and activation routes move, then Node leaves the stick.
+
+## Model calls and settings on Host
+
+- **Model calls:** with the task, the app gives Host the engine's port, key and request options
+  (`Ollama.requestOptions()`). Host then calls Stellan-Run itself (`src/engine_client.cpp`): same request body, same
+  history trimming (`tests/host-history.test.ts`), same stream handling, and the words go straight to the window
+  events. `tests/host-engine.test.ts` runs whole tasks against a fake engine both ways and compares every request.
+- **Settings:** preferences, hooks, MCP servers and skills are saved in Host's state store (one record per settings
+  file, at most 64 KiB each). Older settings files are copied over once and left untouched
+  (`tests/settings-host.test.ts`). Chat history already lived there.
+
+## What blocks GitHub, updates and activation
+
+All three talk to the internet over HTTPS (github.com, the R2 update host, the activation website). Host has no TLS
+yet. Moving them needs a TLS library compiled into Host, or each system's own (Schannel on Windows, Network.framework
+on macOS, OpenSSL on Linux). The recommended option is Mbed TLS (Apache-2.0), pinned and built from source like
+llama.cpp, with the same certificate checks the app does now. The GitHub token would still stay in Host's memory only.
