@@ -13,7 +13,7 @@ import { McpServers, McpError, actuent, offlineMessage } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
 import { contextPlan, diskComfortable, diskMinimum, freeBytes } from "./engine.js";
 import { tmpdir } from "node:os";
-import { readExtensionJson, writeExtensionJson } from "./extension-store.js";
+import { readExtensionJson, writeExtensionJson, useHostSettings, closeHostSettings } from "./extension-store.js";
 import { compactWebResult } from "./web-search.js";
 import { Skills, SkillError, parseSkill } from "./skills.js";
 import { Hooks, HookError, hookEvents, type HookEvent } from "./hooks.js";
@@ -21,6 +21,8 @@ import { workspaceToolSchemas } from "../tools/schema.js";
 import { ProgressTracker } from "./progress.js";
 import { coderSystem } from "../agent/delegate.js";
 import { agentInstructions, runAgent } from "../agent/index.js";
+import { runAgentOnHost } from "../agent/host-loop.js";
+import { hashFile } from "./integrity.js";
 import { Ollama } from "../model/ollama.js";
 import { ChatMemory } from "./chat-memory.js";
 import { inputCapabilities, prepareAttachments, inputPrompt, imageLabel, InputError, type PreparedAttachment } from "../model/inputs.js";
@@ -64,6 +66,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     if (events.length > 2000) { events.splice(0, events.length - 2000); }
     for (const wake of waiters) { wake(); }
   };
+  const taskHost = (async () => {
+    const host = nativeHostExecutable(root);
+    if (!host || process.env.STICK_TASKS_ON_NODE === "1") return undefined;
+    return (await hashFile(host.executable)).sha256 === host.sha256 ? host.executable : undefined;
+  })().catch((error: unknown) => { log(error); return undefined; });
   await mkdir(join(root, "app", "project"), { recursive: true });
   let box = await Sandbox.create(join(root, "app", "project"));
   let chatMemory: ChatMemory | undefined;
@@ -115,6 +122,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   // Images attached in this conversation, by name, so save_image can copy one into the project after approval.
   const attachedImages = new Map<string, PreparedAttachment>();
   let extensionStatus = ""; let extensionProblem = "";
+  try { useHostSettings(root, nativeHostExecutable(root), log); } catch (error) { log(error); }
   const mcp = new McpServers(root, box.root, (name, text) => { extensionStatus = `MCP · ${name}: ${text}`; publish("status", extensionStatus); });
   const skills = new Skills(root, box.root);
   const hooks = new Hooks(root, box.root, log);
@@ -272,7 +280,13 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (maxInstructions ? "\n" + maxInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
         if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: modelText }, { role: "assistant", content: result.content }); return;
       }
-      await runAgent({
+      // Tasks run on Stellan-Host's native loop when it is in the package and matches its manifest; Lite+Max
+      // pairing (delegation) still runs on the TypeScript loop until Max is ported.
+      const hostExecutable = await taskHost;
+      const liteRequest = new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes, onUsage: () => undefined }).requestOptions();
+      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable && !taskOptions.specialist?.available
+        ? runAgentOnHost(hostExecutable, { ...taskOptions, engine: { port: Number(new URL(engine.baseUrl).port), key: engine.key, options: liteRequest, historyBytes: engine.plan.historyBytes, onThinking: () => progress.begin("thinking"), onUsage: (tokens) => engine.onUsage?.(selected, tokens) } })
+        : runAgent(taskOptions))({
         task: modelText, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,
         hooks: hooks.active ? {
           before: async (call, signal) => (await runHooks("PreToolUse", { tool_name: call.function.name, tool_input: toolInput(call.function.arguments) }, signal)).blocked,
@@ -501,5 +515,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); await closeHostSettings(root).catch(log); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }

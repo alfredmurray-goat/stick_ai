@@ -78,3 +78,44 @@ Each request is `ID state_get UUID` or `ID state_put UUID EXPECTED_REVISION HEX_
 Writes reuse the workspace service's temporary-file/flush/atomic-replacement path and cancellation-before-commit checks. These are opaque UTF-8 snapshots, not yet the app's structured ChatMemory schema, an encrypted vault, a multi-process database, or a promise of complete power-loss durability. The service does not validate that stored text is JSON. It does not train weights or turn memory into instructions/approval. Since 25 November 2026, packages that ship Host (`nativeHost: true`) keep **chat memory** in this store. `experimental/stellan-runtime/state.mjs` is the owner client: it checks the Host executable against the package manifest's SHA-256 before launch, serialises requests, and reports a second Stick AI window holding the same project's memory as such. `ChatMemory` stores the index under a fixed UUID and each chat under its own UUID, with the same JSON schema and validation as before; saves are compare-and-swap, and a conflict re-reads once. On the first start with Host, existing file-based notes (`index.json`, `<chat>.json`) are carried over once and the files are left in place. The readable notes view is built on demand rather than stored twice. Packages without Host keep the file store. Tests: `tests/state.test.mjs` runs the client against the real binary in CTest on every platform (hash check, CAS conflicts, ordering, bounds, second owner, persistence), and `tests/chat-memory-host.test.ts` covers carry-over, saving, conflict recovery, forgetting, reopening and refusing malformed records.
 
 `tests/state.py` checks exclusive ownership, restart persistence, revision conflicts, empty/missing distinction, UUID traversal rejection and UTF-8/size bounds on every native CTest platform.
+
+## Tasks run on Host (stage: agent loop)
+
+`stellan-host --agent` runs a whole task with the native agent loop. The app hands it the task, then answers two
+kinds of question over stdin/stdout: "what does the model say next?" and "run this tool" (which still goes through the
+approval cards, hooks and sandbox). `src/agent/host-loop.ts` is the app's side; `tests/host-loop.test.ts` checks that
+a task on Host produces exactly the same messages, events and saved history as the TypeScript loop, including hooks,
+refused commands and compaction.
+
+The app uses Host for every task when the package has a Stellan-Host whose hash matches the manifest. Two cases still
+use the TypeScript loop: Lite paired with Max (delegation is not ported yet), and `STICK_TASKS_ON_NODE=1`, a
+temporary escape hatch. Next: the model call goes straight from Host to Stellan-Run, then the settings, GitHub,
+updates and activation routes move, then Node leaves the stick.
+
+## Model calls and settings on Host
+
+- **Model calls:** with the task, the app gives Host the engine's port, key and request options
+  (`Ollama.requestOptions()`). Host then calls Stellan-Run itself (`src/engine_client.cpp`): same request body, same
+  history trimming (`tests/host-history.test.ts`), same stream handling, and the words go straight to the window
+  events. `tests/host-engine.test.ts` runs whole tasks against a fake engine both ways and compares every request.
+- **Settings:** preferences, hooks, MCP servers and skills are saved in Host's state store (one record per settings
+  file, at most 64 KiB each). Older settings files are copied over once and left untouched
+  (`tests/settings-host.test.ts`). Chat history already lived there.
+
+## GitHub, updates and activation go online through Host
+
+Host has HTTPS built in: Mbed TLS v3.6.8 (Apache-2.0), pinned by commit and built from source with the app
+(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request per line, always checks the server's certificate and
+name against the trusted roots, refuses plain `http://`, never follows redirects (the app's callers already handle
+them), and streams the body to a file so large update downloads never sit in memory.
+
+In the app, `src/portable/net.ts` has `appFetch`, which GitHub sign-in, GitHub workspaces, updates, activation and
+HTTP hooks use. When the package's Stellan-Host matches its manifest, `appFetch` goes through Host; otherwise it uses
+Node as before. `STICK_NETWORK_ON_NODE=1` is a temporary escape hatch. The GitHub token still lives only in memory: it
+passes through Host's memory for one request and is never saved, logged or sent to the window.
+`tests/host-https.test.ts` covers trusted and untrusted certificates, wrong names, plain http, redirects, a 20 MB
+download and cancelling.
+
+Still on Node: the logic of these features (the routes, the sign-in state and the update steps), and the trusted
+roots file, which is written from Node's own list at start. Before Node leaves the stick, the build must ship that
+roots file in the package (listed in the manifest) and the routes must move into Host.

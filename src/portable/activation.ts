@@ -1,3 +1,4 @@
+import { appFetch } from "./net.js";
 // One-time activation. A sold stick is activated once with the code printed in its box: the app sends the
 // code and a fingerprint of the stick to the website, which ties the code to that stick and returns a
 // certificate signed with Ed25519. The certificate is saved on the stick and checked offline at every start
@@ -120,7 +121,7 @@ export function unwrapModelKey(wrapped: string, stick: string, code: string): Bu
 }
 export class Activation {
   #active = false; #identity: string | undefined; #keys = new Map<string, Buffer>();
-  constructor(private readonly root: string, private readonly publicKey = activationPublicKey, private readonly server = activationServer, private readonly identify: (root: string) => Promise<string> = stickIdentity, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly root: string, private readonly publicKey = activationPublicKey, private readonly server = activationServer, private readonly identify: (root: string) => Promise<string> = stickIdentity, private readonly fetcher: typeof fetch = appFetch) {}
   get required(): boolean { return Boolean(this.publicKey); }
   get active(): boolean { return !this.required || this.#active; }
   private get file(): string { return join(this.root, "logs", "activation.json"); }

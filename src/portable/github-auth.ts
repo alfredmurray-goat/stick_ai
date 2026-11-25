@@ -1,3 +1,4 @@
+import { appFetch } from "./net.js";
 // "Sign in with GitHub" through GitHub's device flow, for the Stick AI GitHub App. The app shows a short
 // code, the user enters it at github.com/login/device, and GitHub hands this app a user token. No client
 // secret or private key is involved (the client ID is public by design), and nothing passes through a
@@ -19,7 +20,7 @@ const record = (value: unknown): Record<string, unknown> => (value && typeof val
 export class GitHubSignIn {
   #token = ""; #expires = 0; #login = ""; #status: SignInStatus = "signed-out"; #message = "";
   #userCode = ""; #verificationUri = ""; #polling: AbortController | undefined;
-  constructor(private readonly fetcher: typeof fetch = fetch, private readonly clientId = githubAppClientId, private readonly wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => { const timer = setTimeout(resolve, ms); signal.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true }); })) {}
+  constructor(private readonly fetcher: typeof fetch = appFetch, private readonly clientId = githubAppClientId, private readonly wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => { const timer = setTimeout(resolve, ms); signal.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true }); })) {}
 
   view(): SignInView {
     if (this.#status === "signed-in" && this.#expires && Date.now() >= this.#expires) { this.#forget("expired", "Your GitHub sign-in ended after 8 hours. Sign in again to keep publishing."); }

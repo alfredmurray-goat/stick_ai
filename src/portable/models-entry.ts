@@ -1,3 +1,4 @@
+import { appFetch } from "./net.js";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,7 +15,7 @@ async function lockStick(root: string): Promise<void> {
   const password = (process.env.STICK_LOCK_PASSWORD ?? await new Promise<string>((resolve) => { let text = ""; process.stdin.setEncoding("utf8"); process.stdin.on("data", (chunk) => { text += chunk; }); process.stdin.on("end", () => resolve(text)); })).trim();
   if (!password) { throw new LocalModelError("Enter the activation desk password."); }
   let reply: Response;
-  try { reply = await fetch(lockKeysUrl, { method: "POST", redirect: "error", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: password, action: "modelkeys" }), signal: AbortSignal.timeout(30000) }); }
+  try { reply = await appFetch(lockKeysUrl, { method: "POST", redirect: "error", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: password, action: "modelkeys" }), signal: AbortSignal.timeout(30000) }); }
   catch { throw new LocalModelError("Locking needs the internet to fetch the keys. Connect and try again."); }
   const body = await reply.json().catch(() => ({})) as { keys?: Record<string, string>; error?: string };
   if (!reply.ok || !body.keys) { throw new LocalModelError(reply.status === 403 ? "That password isn't right." : body.error ?? "The website didn't hand out the keys. Try again in a minute."); }

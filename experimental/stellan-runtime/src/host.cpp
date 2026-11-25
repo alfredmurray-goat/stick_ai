@@ -2,7 +2,8 @@
 #include "workspace.hpp"
 #include "mcp_bridge.hpp"
 #include "front_door.hpp"
-namespace stellan { int protocol_check(); int compact_check(); int loop_check(); }
+#include "https.hpp"
+namespace stellan { int protocol_check(); int compact_check(); int loop_check(); int agent_mode(); int history_check(); }
 #include "runtime.hpp"
 #include <atomic>
 #include <csignal>
@@ -23,6 +24,9 @@ int entry(int argc, char **argv) {
         if (argc >= 2 && std::string_view(argv[1]) == "--front-door") { return stellan::front_door(argc, argv); }
         if (argc == 2 && std::string_view(argv[1]) == "--protocol-check") { return stellan::protocol_check(); }
         if (argc == 2 && std::string_view(argv[1]) == "--compact-check") { return stellan::compact_check(); }
+        if (argc == 3 && std::string_view(argv[1]) == "--fetch") { return stellan::https::fetch_service(argv[2]); }
+        if (argc == 2 && std::string_view(argv[1]) == "--history-check") { return stellan::history_check(); }
+        if (argc == 2 && std::string_view(argv[1]) == "--agent") { return stellan::agent_mode(); }
         if (argc == 2 && std::string_view(argv[1]) == "--loop-check") { return stellan::loop_check(); }
         if (argc == 3 && (std::string_view(argv[1]) == "--workspace" || std::string_view(argv[1]) == "--state-store")) {
             const std::string root(argv[2]);

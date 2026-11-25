@@ -1,3 +1,4 @@
+import { enableHostNetwork } from "./net.js";
 import { createInterface } from "node:readline";
 import { appendFile, realpath } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
@@ -31,6 +32,7 @@ export async function updaterMain(): Promise<void> {
     catch { failed = true; await appendFile(join(work, "update.log"), "Update could not be applied. The previous version was restored where possible.\n"); }
     await relaunch(root, temporary, failed); return;
   }
+  await enableHostNetwork(root);
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   let token = "";
   for await (const line of input) {
