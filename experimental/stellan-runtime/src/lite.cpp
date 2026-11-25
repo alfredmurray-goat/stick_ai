@@ -338,8 +338,12 @@ const std::vector<float> &Lite::prefill(std::span<const std::int32_t> tokens, co
         if (token < 0 || static_cast<std::size_t>(token) >= logits_.size()) { throw std::runtime_error("Invalid input token"); }
     }
     const auto stride = row_bytes(embedding_->type, width_);
-    for (std::size_t offset = 0; offset < tokens.size(); offset += prefill_batch_limit) {
-        const auto batch = std::min<std::size_t>(prefill_batch_limit, tokens.size() - offset);
+    // Every batch streams all the weights once, so split evenly (130 tokens: 5 x 26, not 4 x 32 + 2): a tiny
+    // last batch would pay a whole pass over the weights for almost no work. Per-token results are unchanged.
+    const auto passes = (tokens.size() + prefill_batch_limit - 1) / prefill_batch_limit;
+    for (std::size_t offset = 0, pass = 0; offset < tokens.size(); ++pass) {
+        const auto remaining = tokens.size() - offset;
+        const auto batch = (remaining + (passes - pass) - 1) / (passes - pass);
         batch_hidden_.resize(batch * width_); batch_normalized_.resize(batch * width_);
         batch_projected_.resize(batch * projection_.size()); batch_mixed_.resize(batch * inner_); batch_update_.resize(batch * width_);
         for (std::size_t t = 0; t < batch; ++t) {
@@ -356,6 +360,7 @@ const std::vector<float> &Lite::prefill(std::span<const std::int32_t> tokens, co
         const auto last = std::span(batch_hidden_).subspan((batch - 1) * width_, width_);
         std::copy(last.begin(), last.end(), hidden_.begin());
         if (progress) { progress(offset + batch); }
+        offset += batch;
     }
     normalize(hidden_, final_norm_, normalized_);
     multiply(output_, normalized_, logits_, cancelled);
