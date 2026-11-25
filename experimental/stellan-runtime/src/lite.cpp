@@ -113,6 +113,7 @@ const std::vector<std::byte> *Lite::interleaved(const Tensor *matrix, std::size_
     executor_.parallel(rows / 8, [&](std::size_t first, std::size_t last) {
         for (auto g = first; g < last; ++g) { interleave_q4k(data.subspan(g * 8 * stride, 8 * stride), stride, std::span(packed).subspan(g * group_bytes, group_bytes)); }
     });
+    release_pages(data.first(rows * stride));
     return &interleaved_.emplace(matrix, std::move(packed)).first->second;
 }
 

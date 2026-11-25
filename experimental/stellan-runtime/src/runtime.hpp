@@ -82,6 +82,7 @@ void mamba2_step(std::size_t heads, std::size_t width, std::size_t states, std::
 std::string json_string(const std::string &value);
 std::string sha256(std::span<const std::byte> bytes);
 std::uint64_t ram_bytes();
+void release_pages(std::span<const std::byte> bytes);
 bool environment_set(const char *name);
 struct Usage { std::uint64_t peak_rss_bytes; double cpu_ms; };
 Usage usage();
