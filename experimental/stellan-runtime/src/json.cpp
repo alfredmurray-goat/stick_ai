@@ -97,14 +97,11 @@ struct Parser {
             if (at >= text.size() || !std::isdigit(static_cast<unsigned char>(text[at]))) { fail("Exponent part is missing a number"); }
             while (at < text.size() && std::isdigit(static_cast<unsigned char>(text[at]))) { ++at; }
         }
-        double value = 0;
-        const auto result = std::from_chars(text.data() + start, text.data() + at, value);
-        if (result.ec == std::errc::result_out_of_range) {
-            // JavaScript rounds overflow to Infinity and underflow to 0; from_chars reports them instead.
-            const std::string lexeme(text.substr(start, at - start));
-            value = std::strtod(lexeme.c_str(), nullptr);
-        } else if (result.ec != std::errc()) { fail("Bad number"); }
-        return value;
+        // strtod (not from_chars, which Apple's libc++ lacks for floating point) on the already-validated lexeme:
+        // correctly rounded, and like JavaScript it rounds overflow to Infinity and underflow to 0. Host never
+        // changes the C locale, so the decimal point is always '.'.
+        const std::string lexeme(text.substr(start, at - start));
+        return std::strtod(lexeme.c_str(), nullptr);
     }
     Value value() {
         space();
