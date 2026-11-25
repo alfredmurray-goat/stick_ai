@@ -69,3 +69,19 @@ it("refuses malformed records from the store instead of trusting them", async ()
     expect(host.counts().closed).toBe(1);
   } finally { await rm(root, { recursive: true, force: true }); await rm(project, { recursive: true, force: true }); }
 });
+it("saves the conversation in 64 KiB Host records under stable per-piece IDs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stick-memory-conv-")), project = await mkdtemp(join(tmpdir(), "stick-project-conv-"));
+  try {
+    const host = fakeHost(); const binary = { executable: "/stick/bin/stellan-host", sha256: "a".repeat(64) };
+    const memory = await ChatMemory.open(root, project, binary, host.opener as never);
+    const messages = Array.from({ length: 12 }, (_, n) => [{ role: "user" as const, content: `task ${n} ` + "x".repeat(30000) }, { role: "assistant" as const, content: `done ${n}` }]).flat();
+    await memory.saveConversation(messages);
+    const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+    expect([...host.records.keys()].every(key => uuid.test(key))).toBe(true);
+    expect([...host.records.values()].every(text => Buffer.byteLength(text) <= 65536)).toBe(true);
+    await memory.close();
+    const reopened = await ChatMemory.open(root, project, binary, host.opener as never);
+    expect(await reopened.loadConversation()).toEqual(messages);
+    await reopened.close();
+  } finally { await rm(root, { recursive: true, force: true }); await rm(project, { recursive: true, force: true }); }
+});
