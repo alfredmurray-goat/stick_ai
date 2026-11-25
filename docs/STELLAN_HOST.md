@@ -33,7 +33,7 @@ Paths are project-relative: no traversal, absolute paths, drive prefixes or acce
 ## Remaining migration gates
 
 1. Package and verify the host binary on every target; add a cancellable owner-pipe client and route existing file tool tests through it.
-2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. Next: durable sessions (the conversation itself), then approvals and the agent loop.
+2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. **Durable sessions: done (25 November 2026).** The model's conversation itself (messages and tool exchanges) is saved after every task in up to eight Host records (newest part kept, always starting at a task), validated on load and restored on start, so Lite carries on where it left off rather than from short notes. Next: approvals and the agent loop.
 3. Port MCP ownership, GitHub/hooks/update and activation services, preserving credentials and integrity checks.
 4. Move the authenticated app API and desktop lifecycle, then prove a complete packaged start/task/tool/update flow with no bundled or launched Node process.
 

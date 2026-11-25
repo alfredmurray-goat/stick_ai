@@ -30,7 +30,7 @@ async function reportMemory() {
   try {
     let detail = `smoke elapsed=${Math.round((Date.now() - started) / 1000)}s total=${totalmem()} free=${freemem()} model=${engine.active ?? "loading"}`;
     if (process.platform === "darwin") {
-      for (const [file, args] of [["/usr/bin/vm_stat", []], ...(engine.child?.pid ? [["/bin/ps", ["-o", "pid,rss,vsz,%cpu,stat", "-p", String(engine.child.pid)]]] : [])]) {
+      for (const [file, args] of [["/usr/bin/vm_stat", []], ["/bin/sh", ["-c", "ps -axm -o rss=,comm= | head -6"]], ...(engine.child?.pid ? [["/bin/ps", ["-o", "pid,rss,vsz,%cpu,stat", "-p", String(engine.child.pid)]]] : [])]) {
         try { detail += "\n" + (await promisify(execFile)(file, args, { timeout: 5000 })).stdout; } catch {}
       }
     }

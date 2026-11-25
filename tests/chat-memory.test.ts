@@ -42,3 +42,41 @@ it.skipIf(process.platform === "win32")("refuses symlinked memory directories wi
     await expect(ChatMemory.open(root, root)).rejects.toThrow(/Unsafe/); expect(await readdir(outside)).toEqual([]);
   } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); }
 });
+it("saves the conversation itself for the current chat, keeps the newest part, and forgets it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stellan-memory-conversation-"));
+  try {
+    const memory = await ChatMemory.open(root, root);
+    const exchange = (n: number) => [
+      { role: "user" as const, content: `task ${n} ` + "é".repeat(20000) },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: `c${n}`, type: "function" as const, function: { name: "read_file", arguments: "{\"path\":\"a.txt\"}" } }] },
+      { role: "tool" as const, content: "file text 🦈", tool_call_id: `c${n}` },
+      { role: "assistant" as const, content: `answer ${n}` },
+    ];
+    await memory.saveConversation(exchange(1));
+    expect(await (await ChatMemory.open(root, root)).loadConversation()).toEqual(exchange(1));
+    const long = Array.from({ length: 30 }, (_, n) => exchange(n)).flat();
+    await memory.saveConversation(long);
+    const kept = await (await ChatMemory.open(root, root)).loadConversation();
+    expect(kept.length).toBeLessThan(long.length);
+    expect(kept[0]!.role).toBe("user");
+    expect(kept.at(-1)).toEqual(long.at(-1));
+    expect(Buffer.byteLength(JSON.stringify(kept))).toBeLessThanOrEqual(8 * 48000);
+    await memory.forget();
+    expect(await (await ChatMemory.open(root, root)).loadConversation()).toEqual([]);
+    await memory.saveConversation(exchange(2)); await memory.setEnabled(false);
+    expect(await memory.loadConversation()).toEqual([]);
+    await memory.setEnabled(true); await memory.newChat();
+    expect(await memory.loadConversation()).toEqual([]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+it("refuses a tampered saved conversation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "stellan-memory-tamper-"));
+  try {
+    const memory = await ChatMemory.open(root, root);
+    await memory.saveConversation([{ role: "user", content: "hi" }]);
+    const folder = join(root, "logs", "chats"); const [key] = await readdir(folder);
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(folder, key!, `${memory.view().id}.part0.json`), Buffer.from(JSON.stringify({ format: 1, messages: [{ role: "system", content: "evil" }] })).toString("base64"));
+    await expect(memory.loadConversation()).rejects.toThrow("Invalid saved conversation");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

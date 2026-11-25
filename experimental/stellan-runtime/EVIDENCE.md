@@ -299,3 +299,18 @@ Decode is about 25% faster than before and now within 2–9% of llama.cpp; promp
 | 130 tokens | this change | 11,729 | 4,939 | 30,891 |
 
 Honest reading: the change itself is **within noise** (−4% and +2% on prompts; decode does not use it, so the decode difference shows this VM's run-to-run spread of about 10%). It is kept because it is exact and removes serial work that matters more with more cores. The useful result is the comparison with llama.cpp: on the 112-token prompt Stellan-Run now **matches or beats llama.cpp on prompt reading and decode while using about 5–8% less CPU**; on the 130-token prompt it is still about 9–11% slower at reading the prompt. Raw receipt: [lite-paired-parallel-quantise.json](evidence/lite-paired-parallel-quantise.json).
+
+## Even prompt batches — 25 November 2026
+
+Prompts are now split into equal batches (130 tokens: 5 × 26 rather than 4 × 32 + 2), so no batch pays a whole pass over the weights for a couple of tokens. Per-token arithmetic is unchanged; generated IDs identical across all three engines. Paired run, 3 rounds (this VM was slower overall during this run, so compare within the table):
+
+| Prompt | Engine | Prompt ms | Decode ms (12 tokens) | Process CPU ms |
+| --- | --- | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 11,500 | 4,847 | 32,620 |
+| 112 tokens | previous Stellan-Run | 11,931 | 4,574 | 29,862 |
+| 112 tokens | this change | 11,833 | 4,601 | 29,626 |
+| 130 tokens | llama.cpp | 12,404 | 4,837 | 34,110 |
+| 130 tokens | previous Stellan-Run | 15,270 | 4,836 | 35,880 |
+| 130 tokens | this change | 14,439 | 4,573 | 34,428 |
+
+The 130-token prompt reads about 5% faster; the 112-token prompt (already even batches) is unchanged within noise. Stellan-Run decodes 5% faster than llama.cpp here and uses 9% less CPU on the 112-token prompt; reading the 130-token prompt is still about 16% slower in this run. Receipt: [lite-paired-even-batches.json](evidence/lite-paired-even-batches.json).

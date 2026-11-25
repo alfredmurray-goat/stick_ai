@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { constants } from "node:fs";
 import { clipUtf8 } from "../agent/context.js";
 import { openNativeState, type NativeState } from "../../experimental/stellan-runtime/state.mjs";
+import type { Message } from "../model/types.js";
 interface Turn { task: string; answer: string; status: string; time: string }
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const statuses = new Set(["finished", "failed", "cancelled", "blocked"]);
@@ -44,11 +45,30 @@ class FileStore implements Store {
 // Revisions are tracked per record so each save is a compare-and-swap; a conflict (only possible if
 // something else wrote the record) re-reads once and saves over it, as the file store always did.
 export const hostIndexKey = "00000000-0000-4000-8000-000000000001";
+// Each saved conversation piece gets its own stable UUID derived from the chat ID and piece number.
+function partKey(chat: string, index: number): string {
+  const h = createHash("sha256").update(`${chat}:conversation:${index}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${"89ab"[parseInt(h[16]!, 16) % 4]}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+/** The conversation itself is saved in up to this many 64 KiB pieces, newest messages kept. */
+export const conversationParts = 8;
+const roles = new Set(["user", "assistant", "tool"]);
+function validMessage(value: unknown): value is Message {
+  if (!value || typeof value !== "object") return false;
+  const m = value as Record<string, unknown>;
+  if (typeof m.role !== "string" || !roles.has(m.role) || typeof m.content !== "string") return false;
+  if (m.tool_call_id !== undefined && typeof m.tool_call_id !== "string") return false;
+  if (m.tool_calls !== undefined && (!Array.isArray(m.tool_calls) || !m.tool_calls.every(c => c && typeof c === "object" && typeof c.id === "string" && c.type === "function" && c.function && typeof c.function.name === "string" && typeof c.function.arguments === "string"))) return false;
+  return true;
+}
 class HostStore implements Store {
   readonly kind = "host";
   private revisions = new Map<string, string>();
   constructor(private state: NativeState) {}
-  private key(name: string): string { const key = name === "index.json" ? hostIndexKey : name.replace(/\.json$/, ""); if (!uuid.test(key) && key !== hostIndexKey) throw Error("Invalid chat memory record."); return key; }
+  private key(name: string): string {
+    const part = /^([a-f0-9-]{36})\.part(\d)\.json$/.exec(name);
+    if (part) { return partKey(part[1]!, Number(part[2])); }
+    const key = name === "index.json" ? hostIndexKey : name.replace(/\.json$/, ""); if (!uuid.test(key) && key !== hostIndexKey) throw Error("Invalid chat memory record."); return key; }
   async get(name: string) { const record = await this.state.get(this.key(name)); this.revisions.set(this.key(name), record.revision); return record.exists && record.text ? record.text : undefined; }
   async put(name: string, text: string) {
     if (name.endsWith(".md")) return; // the readable notes are built on demand (notes()), not stored twice
@@ -134,10 +154,43 @@ export class ChatMemory {
     await this.store.put(`${this.id}.json`, JSON.stringify({ format: 1, turns: this.turns }) + "\n");
     await this.store.put(`${this.id}.md`, this.notes()); await this.index();
   }
+  /** Saves the model's conversation for this chat so a restart can carry on with it (newest part kept). */
+  async saveConversation(messages: readonly Message[]): Promise<void> {
+    if (!this.enabled) return;
+    const budget = conversationParts * 48000 - 64; // the JSON wrapper adds under 64 bytes
+    let start = 0;
+    const size = (from: number) => Buffer.byteLength(JSON.stringify(messages.slice(from)));
+    while (start < messages.length && size(start) > budget) { start++; }
+    while (start < messages.length && messages[start]!.role !== "user") { start++; } // begin at a task, never mid-tool-exchange
+    const text = JSON.stringify({ format: 1, messages: messages.slice(start) });
+    const bytes = Buffer.from(text, "utf8");
+    for (let i = 0; i < conversationParts; i++) {
+      // Split on byte boundaries and store as hex-safe base64 so pieces never cut a character in half.
+      const piece = bytes.subarray(i * 48000, (i + 1) * 48000);
+      await this.store.put(`${this.id}.part${i}.json`, piece.length ? piece.toString("base64") : "");
+    }
+    await this.index();
+  }
+  /** The saved conversation for the current chat, or an empty list when none (or memory is off). */
+  async loadConversation(): Promise<Message[]> {
+    if (!this.enabled) return [];
+    const chunks: Buffer[] = [];
+    for (let i = 0; i < conversationParts; i++) {
+      const piece = await this.store.get(`${this.id}.part${i}.json`);
+      if (!piece) break;
+      if (!/^[A-Za-z0-9+/=]+$/.test(piece)) throw Error("Invalid saved conversation.");
+      chunks.push(Buffer.from(piece, "base64"));
+    }
+    if (!chunks.length) return [];
+    const value = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { format?: unknown; messages?: unknown };
+    if (value.format !== 1 || !Array.isArray(value.messages) || !value.messages.every(validMessage)) throw Error("Invalid saved conversation.");
+    return value.messages;
+  }
   async newChat(): Promise<void> { this.id = randomUUID(); this.turns = []; await this.index(); }
   async setEnabled(enabled: boolean): Promise<void> { this.enabled = enabled; await this.index(); }
   async forget(): Promise<void> {
     for (const extension of ["json", "md"]) { await this.store.remove(`${this.id}.${extension}`); }
+    for (let i = 0; i < conversationParts; i++) { await this.store.remove(`${this.id}.part${i}.json`); }
     this.turns = []; await this.index();
   }
 }

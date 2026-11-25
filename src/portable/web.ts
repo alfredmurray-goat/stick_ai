@@ -72,6 +72,8 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   const openChatMemory = async (): Promise<void> => {
     const previous = chatMemory; chatMemory = undefined; await previous?.close().catch(log);
     try { chatMemory = await ChatMemory.open(root, box.root, nativeHostExecutable(root)); } catch (error) { log(error); }
+    // Durable session: Lite carries on with the saved conversation itself, not only short notes.
+    try { const saved = await chatMemory?.loadConversation() ?? []; history.length = 0; history.push(...saved); } catch (error) { log(error); }
   };
   // After a restart the window shows the current chat again from its saved notes; the model gets the same
   // notes through recall(), so what the person sees matches what Stellan remembers.
@@ -222,7 +224,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   const startAppApi = async (): Promise<void> => { if (!appKey) { appKey = newAppKey(); appApi.setKey(appKey); await savePreferences(); } await appApi.start(); };
   if (appApiEnabled) { await startAppApi().catch(log); }
   const appApiView = () => ({ enabled: appApiEnabled, running: appApi.running, url: `http://127.0.0.1:${appApi.port}/v1/chat/completions`, key: appApiEnabled ? appKey : "", problem: appApi.problem });
-  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); await openChatMemory(); tools = makeTools(); attachedImages.clear(); history.length = 0; maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); restoreChat(); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
+  const switchProject = async (next: Sandbox): Promise<void> => { await mcp.setProject(next.root); skills.setProject(next.root); hooks.setProject(next.root); await tools.close(); box = next; tokenCounts.clear(); history.length = 0; await openChatMemory(); tools = makeTools(); attachedImages.clear(); maxHistory.length = 0; events.length = 0; restSaved = false; publish("project", "Workspace changed. Start a new task for this project."); restoreChat(); warm(false); sessionNotes = ""; notifyHooks("SessionStart", { source: "project" }); };
   const launch = async (model: string): Promise<void> => {
     tokenCounts.delete(model as ModelName);
     loading = new AbortController(); phase = "starting"; problem = undefined; failure = "";
@@ -313,7 +315,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       });
     } catch (error) { if (status !== "blocked") { status = active?.signal.aborted ? "cancelled" : "failed"; } log(error); fail(error); }
     finally {
-      try { await chatMemory?.record(text, answer, status); } catch (error) { log(error); publish("status", "This chat’s memory could not be saved. Your current conversation is still available."); }
+      try { await chatMemory?.record(text, answer, status); await chatMemory?.saveConversation(history); } catch (error) { log(error); publish("status", "This chat’s memory could not be saved. Your current conversation is still available."); }
       if (status !== "blocked") { notifyHooks("Stop", { status, prompt: text, last_assistant_message: answer.slice(0, 8000) }); }
       publish("task-complete"); extensionStatus = ""; active = undefined; phase = engine.active ? "ready" : "error"; report("Running privately on this computer. Use Stop or quit the desktop app to stop."); scheduleRest(); }
   };
