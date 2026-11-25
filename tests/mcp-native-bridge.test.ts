@@ -28,7 +28,7 @@ it.skipIf(!existsSync(host))('runs stdio MCP servers under the native Host bridg
   expect(await mcp.call(id,'echo',{text:'ok'},signal,async()=>true)).toBe('[redacted] ok');
   if(process.platform!=='win32'){
    const processes=execFileSync('ps',['-ax','-o','args=']).toString();
-   expect(processes).toMatch(/stellan-host --mcp-bridge/);
+   expect(processes).toMatch(/stellan-host --mcp-client/);
    expect(processes).not.toMatch(/stick-mcp\.cjs/);
   }
   await mcp.disconnect(id);

@@ -7,6 +7,7 @@ import {homedir} from 'node:os';
 import {McpProcessTransport} from './mcp-process.js';
 import {McpProgress} from './mcp-progress.js';
 import {McpRpc,McpError} from './mcp-rpc.js';
+import {HostMcpRpc} from './mcp-host-rpc.js';
 import {readExtensionJson,writeExtensionJson} from './extension-store.js';
 import {targetFor,executableName} from './platform.js';
 import {nativeHostExecutable} from './native-files.js';
@@ -28,7 +29,7 @@ export interface McpServerConfig {id:string;name:string;transport:'stdio'|'http'
 export const actuentUrl='https://agents.actuent.ai/api/mcp';
 export const actuent:McpServerConfig={id:'actuent',name:'Actuent web search',transport:'http',url:actuentUrl,builtin:true};
 interface Secrets {headers:Record<string,string>;env:Record<string,string>}
-interface Connection {progress:McpProgress;rpc:McpRpc;tools:Tool[];stale:boolean;diagnostic:string}
+interface Connection {progress:McpProgress;rpc:Pick<McpRpc,'connect'|'request'|'close'|'closed'|'ready'>;tools:Tool[];stale:boolean;diagnostic:string}
 function record(value:unknown):value is Record<string,unknown>{return Boolean(value&&typeof value==='object'&&!Array.isArray(value));}
 function stringMap(value:unknown):Record<string,string>{if(value===undefined)return {};if(!record(value)||Object.keys(value).length>64||Object.entries(value).some(([key,v])=>typeof v!=='string'||!key||/[\x00-\x1f]/.test(key)||String(v).includes('\0'))||Buffer.byteLength(JSON.stringify(value))>16384)throw new McpError('Enter a JSON object of string values, under 16 KiB.');return value as Record<string,string>;}
 function config(input:unknown,id:string):McpServerConfig {
@@ -86,7 +87,7 @@ export class McpServers {
   })();
  }
  async connect(id:string,signal:AbortSignal){
-  const selected=this.get(id);await this.disconnect(id);this.errors.delete(id);const secret=this.secrets.get(id)??{headers:{},env:{}};let transport:Transport;
+  const selected=this.get(id);await this.disconnect(id);this.errors.delete(id);const secret=this.secrets.get(id)??{headers:{},env:{}};let transport:Transport;let hostBin:string|undefined,hostArgs:string[]|undefined,hostEnv:Record<string,string>|undefined,hostDiagnostic:((bytes:Buffer)=>void)|undefined;
   if(selected.transport==='stdio'){
    const target=targetFor(process.platform,process.arch),bin=join(this.root,'bin',target),node=join(bin,executableName(target,true));
    const args=(selected.args??[]).map(arg=>arg.replaceAll('${project}',this.project).replaceAll('${app}',this.root));const command=selected.command==='node'?node:selected.command!;
@@ -96,14 +97,17 @@ export class McpServers {
    // On macOS and Linux, packages with Stellan-Host supervise MCP programs natively (about 3.5 MB instead of a 47 MB Node bridge).
    const host=await this.nativeBridge();
    const bridgeArgs=host?nativeBridgeArgs(this.project,command,args,{...env,...secret.env}):undefined;
+   // With Stellan-Host, Host also speaks MCP to the program (Link in Host); otherwise Node does, through a bridge.
+   if(host&&bridgeArgs){hostArgs=['--mcp-client',...bridgeArgs.slice(1)];hostBin=host;}
    transport=host&&bridgeArgs?new McpProcessTransport(host,bridgeArgs,{...env,...secret.env},diagnostic,true)
     :new McpProcessTransport(node,[join(this.root,'app/stick-mcp.cjs'),spec],{...env,STICK_MCP_ENV_JSON:JSON.stringify(secret.env)},diagnostic);
+   if(hostArgs){hostEnv={...env,...secret.env};hostDiagnostic=diagnostic;}
   }else{
    const url=new URL(selected.url!);const headers=new Headers(secret.headers);for(const name of ['host','content-length','connection','proxy-authorization','cookie'])if(headers.has(name))throw new McpError('Use API authentication headers, without host, cookie, or transport headers.');
    transport=new McpHttpTransport(url,selected.transport,headers);
   }
   const progress=new McpProgress(text=>{if(!connection.rpc.closed)this.progress(selected.name,text);});
-  const connection:Connection={progress,rpc:new McpRpc(transport,(method,params)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')progress.push(this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
+  const connection:Connection={progress,rpc:hostArgs?new HostMcpRpc(hostBin!,hostArgs,hostEnv!,hostDiagnostic!,(method:string,params:Record<string,unknown>)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')progress.push(this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}):new McpRpc(transport,(method:string,params:Record<string,unknown>)=>{if(method==='notifications/tools/list_changed')connection.stale=true;if(method==='notifications/progress')progress.push(this.redact(id,typeof params.message==='string'?params.message.slice(0,1000):typeof params.progress==='number'?`${params.progress}${typeof params.total==='number'?' / '+params.total:''}`:'Working…'));}),tools:[],stale:false,diagnostic:''};
   this.connections.set(id,connection);
   try{await connection.rpc.connect(signal);await this.refresh(id,signal);}catch(error){progress.close();await connection.rpc.close();this.connections.delete(id);const message=signal.aborted?'MCP connection cancelled.':id===actuent.id?'Web search needs an internet connection. Everything else in Stick AI works offline.':'Could not connect. Check the command, endpoint and session credentials. OAuth-only servers need a provider-issued access token.';this.errors.set(id,message);throw new McpError(message);}
  }
