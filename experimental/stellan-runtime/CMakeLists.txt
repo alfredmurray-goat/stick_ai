@@ -22,7 +22,7 @@ endif()
 add_executable(stellan-runtime src/main.cpp)
 set_target_properties(stellan-runtime PROPERTIES OUTPUT_NAME stellan-run)
 target_link_libraries(stellan-runtime PRIVATE stellan-core)
-add_executable(stellan-host src/host.cpp src/workspace.cpp)
+add_executable(stellan-host src/host.cpp src/workspace.cpp src/mcp_bridge.cpp)
 target_link_libraries(stellan-host PRIVATE stellan-core)
 add_executable(stellan-runtime-tests tests/core.cpp)
 target_link_libraries(stellan-runtime-tests PRIVATE stellan-core)
@@ -57,6 +57,7 @@ add_test(NAME native-workspace COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOU
 
 if(STELLAN_NODE)
   add_test(NAME native-workspace-client COMMAND ${CMAKE_COMMAND} -E env "STELLAN_TEST_HOST=$<TARGET_FILE:stellan-host>" ${STELLAN_NODE} --test ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace.test.mjs)
+  add_test(NAME native-mcp-bridge COMMAND ${CMAKE_COMMAND} -E env "STELLAN_TEST_HOST=$<TARGET_FILE:stellan-host>" ${STELLAN_NODE} --test ${CMAKE_CURRENT_SOURCE_DIR}/tests/mcp-bridge.test.mjs)
   add_test(NAME native-state-client COMMAND ${CMAKE_COMMAND} -E env "STELLAN_TEST_HOST=$<TARGET_FILE:stellan-host>" ${STELLAN_NODE} --test ${CMAKE_CURRENT_SOURCE_DIR}/tests/state.test.mjs)
 endif()
 

@@ -14,6 +14,10 @@ Stellan-Link is the app's own MCP (Model Context Protocol) client: the part that
 
 The official `@modelcontextprotocol/sdk` is now only a **development** dependency: tests cross-check our validators against its schemas, and it is not shipped in the app. Supported protocol versions are explicit constants, checked against the pinned SDK in tests, so upgrades are a deliberate decision.
 
+## Native MCP bridge (Stellan-Host, macOS and Linux)
+
+Each local (stdio) MCP server used to run under its own **Node bridge process (about 47.5 MB each)**, which gave the program its own process group and cleaned up after it. In packages that ship Stellan-Host, macOS and Linux now use **`stellan-host --mcp-bridge` instead: about 3.5 MB**, measured on the same machine. The program inherits the app's pipes directly, so no bytes are copied through the bridge; a fourth pipe is the app's "lifeline", and when the app closes it (or exits) the bridge ends the program and everything it started. When the program exits, its leftover descendants are ended too. Host is checked against the package manifest's SHA-256 before its first use. Windows keeps the Node bridge until a native version with job objects is written. Tests: `tests/mcp-bridge.test.mjs` (real processes, in CTest) and `tests/mcp-native-bridge.test.ts` (the app's MCP manager connecting through Host).
+
 ## Starting MCP programs safely (`spawn-command.ts`)
 
 On macOS and Linux an MCP program is started directly, with no shell. On Windows, commands like `npx` are batch files (`npx.cmd`), which Node won't start directly (CVE-2024-27980). Stellan-Link therefore:
