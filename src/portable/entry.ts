@@ -1,3 +1,4 @@
+import { openFrontDoor, type FrontDoor } from "./front-door.js";
 import { liteMinimumBytes } from "../config/models.js";
 import { spawn } from "node:child_process";
 import { openSync, appendFileSync, closeSync } from "node:fs";
@@ -51,13 +52,14 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
   const fd = openSync(logPath, "a", 0o600);
   const log = (error: unknown): void => { try { appendFileSync(logPath, `${new Date().toISOString()} ${error instanceof Error ? error.stack : String(error)}\n`); } catch {} };
   let temp: string | undefined; let engine: ManagedEngine | undefined;
-  let app: Awaited<ReturnType<typeof webApp>> | undefined; let stopping = false;
+  let app: Awaited<ReturnType<typeof webApp>> | undefined; let stopping = false; let front: FrontDoor | undefined;
+  const windowUrl = (): string => front?.url ?? app!.url;
   const lifetime = new AbortController();
   const report = (text: string): void => { if (process.connected) { process.send?.({ text }); } notify({ kind: "progress", text }); };
   const stop = async (): Promise<void> => {
     if (stopping) { return; } stopping = true; lifetime.abort();
     if (engine) { engine.disposing = true; }
-    for (const cleanup of [() => app?.close(), () => engine?.stop(), () => temp ? rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) : undefined]) {
+    for (const cleanup of [() => front?.close(), () => app?.close(), () => engine?.stop(), () => temp ? rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) : undefined]) {
       try { await cleanup(); } catch (error) { log(error); report("The assistant could not close completely; restart your computer before unplugging the stick."); process.exitCode = 1; }
     }
     closeSync(fd); notify({ kind: "stopped" }); controls?.close(); process.stdin.destroy(); if (process.connected) { process.disconnect?.(); }
@@ -95,6 +97,8 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       engine.modelKey = (model) => activation.modelKey(model);
       if (engine.coder) { engine.coder.modelKey = engine.modelKey; }
       app = await webApp({ root, engine, activation, bytes: totalmem(), choices, noSwap, desktop, faster, report, log, stop });
+      // Host answers the window when the package ships it; Node stays behind it for routes not yet moved.
+      try { front = await openFrontDoor(root, app.url, log); } catch (error) { log(error); front = undefined; }
     };
     if (desktop) {
       await launchDesktop({
@@ -103,13 +107,13 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         startLite: async () => { await app!.start(initialModel); },
         // An unactivated stick opens the workspace straight away so the code can be entered there.
         waitHealthy: async () => { if (!app!.awaitingActivation && engine?.active !== initialModel) { throw new UserError("loading"); } },
-        openChat: async () => { notify({ kind: "ready", url: app!.url }); },
+        openChat: async () => { notify({ kind: "ready", url: windowUrl() }); },
         stop: async () => { await engine?.stop(); },
         cleanup: async () => {}
       }, lifetime.signal);
     } else {
       await verifyStick(root, true, lifetime.signal, false, true); await prepare();
-      await openBrowser(app!.url).catch(() => { throw new UserError("browser"); });
+      await openBrowser(windowUrl()).catch(() => { throw new UserError("browser"); });
     }
     report("Running privately on this computer. Close this window to stop.");
   } catch (error) { if (stopping) { return; } log(error); notify({ kind: "error", error: friendlyError(error) }); report(userMessage(error)); process.exitCode = 1; await stop(); }

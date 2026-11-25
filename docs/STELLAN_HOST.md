@@ -2,6 +2,18 @@
 
 Stellan-Host is an original C++20 service host. It currently provides inference control, the workspace file service and the session-state store, which now holds the app's **chat memory** in packages that ship Host. It is **not yet a full Node.js replacement for the application**. The desktop HTTP API, agent orchestration, GitHub, hooks, extension management, activation and updating still run in Node. Do not remove Node from app packages until those services have native implementations and pass their existing integration tests.
 
+## Replacing Node: the plan (owner decision, 25 November 2026)
+
+The owner decided Host replaces Node completely. It is done in stages so the app works at every step:
+
+1. **Front door (done):** `stellan-host --front-door UI_FOLDER BACKEND_PORT` answers the window on its own 127.0.0.1 port, serves the window's files itself with the same security headers and Host check, and forwards every API request to the Node backend, which still checks the session key. Packages with Host open the window on Host's address (`src/portable/front-door.ts`); without Host, or if it fails to start, the Node address is used as before.
+2. **Move routes one by one** into Host (state and long-poll, settings, files, approvals, chat memory, MCP, skills, hooks), each with the existing tests pointed at Host.
+3. **Move the agent loop** (prompting Lite through Stellan-Run, tool calls, approvals, compaction).
+4. **Move the rest:** GitHub, updates, activation, the app API.
+5. **Stop shipping Node** once nothing is forwarded.
+
+Tests: `tests/front-door.test.ts` starts the real Node app with Host in front and checks the window, the session key, foreign origins, a wrong Host header, request bodies and the 8-second long-poll.
+
 ## MCP bridge (all platforms)
 
 `stellan-host --mcp-bridge CWD -- PROGRAM [ARGS...]` (Windows: `--cmdline APPLICATION COMMAND_LINE`, with a job object) supervises one local MCP server in place of a Node bridge process (about 3.5 MB instead of 47.5 MB per server). See `docs/MCP_CLIENT.md`. 

@@ -1,6 +1,7 @@
 #include "session.hpp"
 #include "workspace.hpp"
 #include "mcp_bridge.hpp"
+#include "front_door.hpp"
 #include "runtime.hpp"
 #include <atomic>
 #include <csignal>
@@ -18,6 +19,7 @@ int entry(int argc, char **argv) {
         // A disconnected owner must not leave inference running with nowhere to send it.
         std::cout.exceptions(std::ios::badbit | std::ios::failbit);
         if (argc >= 2 && std::string_view(argv[1]) == "--mcp-bridge") { return stellan::mcp_bridge(argc, argv); }
+        if (argc >= 2 && std::string_view(argv[1]) == "--front-door") { return stellan::front_door(argc, argv); }
         if (argc == 3 && (std::string_view(argv[1]) == "--workspace" || std::string_view(argv[1]) == "--state-store")) {
             const std::string root(argv[2]);
             const auto service = std::string_view(argv[1]) == "--state-store" ? stellan::state_store_service : stellan::workspace_service;
