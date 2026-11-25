@@ -14,6 +14,17 @@ Stellan-Link is the app's own MCP (Model Context Protocol) client: the part that
 
 The official `@modelcontextprotocol/sdk` is now only a **development** dependency: tests cross-check our validators against its schemas, and it is not shipped in the app. Supported protocol versions are explicit constants, checked against the pinned SDK in tests, so upgrades are a deliberate decision.
 
+## Link in Host
+
+In packages that ship Stellan-Host, Host now speaks MCP to local (stdio) servers itself: `stellan-host --mcp-client`
+starts the program in its own process group (POSIX) or job object (Windows), frames and checks every message with the
+same rules as `mcp-wire.ts`, `mcp-handshake.ts` and `mcp-results.ts` (`src/mcp_wire.cpp`), answers pings, keeps the same
+64-request and 4 MiB in-flight limits, and matches replies (`src/mcp_client.cpp`). The app talks to it through
+`HostMcpRpc` (`src/portable/mcp-host-rpc.ts`), which has McpRpc's interface, so approvals, hooks and catalog limits
+are unchanged. `tests/mcp-wire-native.test.ts` compares the checks on 4,000 generated messages and
+`tests/mcp-host-client.test.ts` runs the same session against both clients. Remote (HTTP) servers still use the app's
+client.
+
 ## Native MCP bridge (Stellan-Host, all platforms)
 
 Each local (stdio) MCP server used to run under its own **Node bridge process (about 47.5 MB each)**, which gave the program its own process group and cleaned up after it. In packages that ship Stellan-Host, every platform now uses **`stellan-host --mcp-bridge` instead: about 3.5 MB**, measured on the same machine. The program inherits the app's pipes directly, so no bytes are copied through the bridge; a fourth pipe is the app's "lifeline", and when the app closes it (or exits) the bridge ends the program and everything it started. When the program exits, its leftover descendants are ended too. Host is checked against the package manifest's SHA-256 before its first use. On Windows the bridge runs the program inside a **job object** that ends with the bridge, the program or the lifeline; the app resolves the program through PATH/PATHEXT (never the project folder) and passes the exact command line, with the same batch-file escaping it uses itself. A program that cannot be resolved keeps the Node bridge, as before. Tests: `tests/mcp-bridge.test.mjs` (real processes, in CTest) and `tests/mcp-native-bridge.test.ts` (the app's MCP manager connecting through Host).

@@ -3,6 +3,8 @@
 #include "protocol.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <stdexcept>
 #include <cmath>
 #include <cstdint>
 
@@ -198,7 +200,51 @@ std::size_t compact_history(std::vector<Message> &messages, double budget) {
 }
 
 namespace stellan::agent {
+
+namespace {
+bool word(std::uint32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'; }
+bool line_end(std::uint32_t c) { return c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029; }
+// /function\s+\w+|(?:const|let)\s+\w+\s*=.*=>|def\s+\w+|func\s+\w+|fn\s+\w+/ from createDelegate, on code points.
+bool looks_like_function(std::string_view text) {
+    const auto u = decode(text);
+    const auto at = [&](std::size_t i, std::string_view w) {
+        if (i + w.size() > u.size()) { return false; }
+        for (std::size_t k = 0; k < w.size(); ++k) { if (u[i + k].code != static_cast<unsigned char>(w[k])) { return false; } }
+        return true;
+    };
+    const auto spaces_then_word = [&](std::size_t i) {
+        std::size_t j = i;
+        while (j < u.size() && js_space(u[j].code)) { ++j; }
+        return j > i && j < u.size() && word(u[j].code);
+    };
+    for (std::size_t i = 0; i < u.size(); ++i) {
+        for (const auto *keyword : {"function", "def", "func", "fn"}) {
+            const std::string_view k(keyword);
+            if (at(i, k) && spaces_then_word(i + k.size())) { return true; }
+        }
+        for (const auto *keyword : {"const", "let"}) {
+            const std::string_view k(keyword);
+            if (!at(i, k)) { continue; }
+            std::size_t j = i + k.size(), start = j;
+            while (j < u.size() && js_space(u[j].code)) { ++j; }
+            if (j == start) { continue; }
+            start = j;
+            while (j < u.size() && word(u[j].code)) { ++j; }
+            if (j == start) { continue; }
+            while (j < u.size() && js_space(u[j].code)) { ++j; }
+            if (j >= u.size() || u[j].code != '=') { continue; }
+            for (std::size_t q = j + 1; q + 1 < u.size() && !line_end(u[q].code); ++q) {
+                if (u[q].code == '=' && u[q + 1].code == '>') { return true; }
+            }
+        }
+    }
+    return false;
+}
+std::size_t lines(std::string_view s) { return static_cast<std::size_t>(std::count(s.begin(), s.end(), '\n')) + 1; }
+}
 std::string run_agent(const std::string &task, std::vector<Message> &messages, std::size_t max_steps, const std::string &task_instructions, double history_bytes, const std::vector<std::string> &tool_names, const Specialist &specialist, LoopIO &io) {
+    std::size_t max_calls = 0;
+    bool max_failed = false, approved_code = false;
     const auto commit = [&](const std::vector<Message> &batch) { io.save(batch); messages.insert(messages.end(), batch.begin(), batch.end()); };
     if (const auto compacted = compact_history(messages, history_bytes)) {
         io.log("Summarised " + std::to_string(compacted) + " earlier task" + (compacted == 1 ? "" : "s") + " to keep the conversation within its memory.");
@@ -229,12 +275,46 @@ std::string run_agent(const std::string &task, std::vector<Message> &messages, s
             io.activity(activity);
             io.log("→ " + name + " " + arguments);
             try {
-                // Without a loaded Max, delegation answers with the same message as createDelegate and runs nothing.
-                if (name == "delegate_code") {
-                    result = specialist.total_bytes < specialist.recommended_bytes ? "Code specialist needs a computer with 24 GB of memory to help automatically. Writing the code here instead."
-                           : specialist.no_swap ? "Code specialist is disabled by --no-swap. Write the code here instead."
-                           : "Code specialist is not available in this session. Write the code here instead.";
-                } else { result = io.execute(name, arguments); }
+                // createDelegate: Lite must ask Max before new files or functions while Max can help.
+                bool must_delegate = false;
+                if (specialist.available && !specialist.no_swap && specialist.total_bytes >= specialist.recommended_bytes && !max_failed && !approved_code) {
+                    if (name == "write_file") { must_delegate = true; }
+                    else if (name == "edit_file") {
+                        const auto args = json::parse(arguments);
+                        const auto *added = args.find("new"), *removed = args.find("old");
+                        const std::string text = added && added->is_string() ? added->string() : "";
+                        const std::string old = removed && removed->is_string() ? removed->string() : "";
+                        must_delegate = std::max(lines(text), lines(old)) > 20 || looks_like_function(text);
+                    }
+                }
+                const std::optional<std::string> blocked = must_delegate || !io.before ? std::nullopt : io.before(name, arguments);
+                if (must_delegate) { result = "Call delegate_code before creating a file, adding a function or making a change longer than 20 lines; then review and apply the returned code."; }
+                else if (blocked) { result = "Error: A hook blocked this tool call: " + *blocked; }
+                else {
+                    if (name == "delegate_code") {
+                        if (specialist.total_bytes < specialist.recommended_bytes) { result = "Code specialist needs a computer with 24 GB of memory to help automatically. Writing the code here instead."; }
+                        else if (specialist.no_swap) { result = "Code specialist is disabled by --no-swap. Write the code here instead."; }
+                        else if (!specialist.available || !io.code) { result = "Code specialist is not available in this session. Write the code here instead."; }
+                        else if (max_failed) { result = "Max failed in this task. Write the remaining code here with Lite."; }
+                        else {
+                            const auto args = json::parse(arguments);
+                            const auto *task_arg = args.is_object() ? args.find("task") : nullptr, *context_arg = args.is_object() ? args.find("context") : nullptr;
+                            if (!task_arg || !task_arg->is_string() || js_trim(task_arg->string()).empty() || !context_arg || !context_arg->is_string()) { throw std::runtime_error("delegate_code requires task and context strings"); }
+                            io.log("Code specialist call " + std::to_string(++max_calls) + ".");
+                            try {
+                                result = io.code(task_arg->string(), context_arg->string());
+                                if (js_trim(result).empty()) { throw std::runtime_error("The coding model returned no code"); }
+                                approved_code = true;
+                            } catch (const std::exception &error) {
+                                max_failed = true;
+                                result = std::string("Code specialist failed: ") + error.what() + ". Max is unavailable for this task; write the remaining code here with Lite.";
+                                io.log(result);
+                            }
+                        }
+                    } else { result = io.execute(name, arguments); }
+                    if ((name == "write_file" || name == "edit_file") && starts_with(result, "Wrote ")) { approved_code = false; }
+                    if (io.after) { const auto notes = io.after(name, arguments, result); if (!notes.empty()) { result += "\n[Hook feedback]\n" + notes; } }
+                }
             } catch (const std::exception &error) { result = std::string("Error: ") + error.what(); }
             activity.phase = "finish";
             activity.result = js_slice(result, 0, 2000);

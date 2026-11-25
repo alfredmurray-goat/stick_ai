@@ -280,11 +280,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (maxInstructions ? "\n" + maxInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
         if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: modelText }, { role: "assistant", content: result.content }); return;
       }
-      // Tasks run on Stellan-Host's native loop when it is in the package and matches its manifest; Lite+Max
-      // pairing (delegation) still runs on the TypeScript loop until Max is ported.
+      // Tasks run on Stellan-Host's native loop when it is in the package and matches its manifest.
       const hostExecutable = await taskHost;
       const liteRequest = new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, historyBytes: engine.plan.historyBytes, onUsage: () => undefined }).requestOptions();
-      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable && !taskOptions.specialist?.available
+      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable
         ? runAgentOnHost(hostExecutable, { ...taskOptions, engine: { port: Number(new URL(engine.baseUrl).port), key: engine.key, options: liteRequest, historyBytes: engine.plan.historyBytes, onThinking: () => progress.begin("thinking"), onUsage: (tokens) => engine.onUsage?.(selected, tokens) } })
         : runAgent(taskOptions))({
         task: modelText, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,

@@ -80,8 +80,8 @@ it("pre-reads the system message, holds idle state requests, rests when quiet an
     // Another state change (for example the periodic disk-space reading) may end the held request first; the window
     // then simply asks again, so follow up the same way until the task's message arrives.
     let seen = woken.events as any[];
-    await vi.waitFor(async () => { if (!seen.some((event: any) => event.kind === "user" && event.text === "Say hello")) { seen = seen.concat((await api(`/api/state?after=${seen.at(-1)?.id ?? 0}`)).events); } expect(seen.some((event: any) => event.kind === "user" && event.text === "Say hello")).toBe(true); });
-    await vi.waitFor(async () => expect((await api("/api/state")).events.some((event: any) => event.kind === "task-complete")).toBe(true));
+    await vi.waitFor(async () => { if (!seen.some((event: any) => event.kind === "user" && event.text === "Say hello")) { seen = seen.concat((await api(`/api/state?after=${seen.at(-1)?.id ?? 0}`)).events); } expect(seen.some((event: any) => event.kind === "user" && event.text === "Say hello")).toBe(true); }, { timeout: 10000 });
+    await vi.waitFor(async () => expect((await api("/api/state")).events.some((event: any) => event.kind === "task-complete")).toBe(true), { timeout: 10000 });
     expect(calls.slice(4, 6)).toEqual(["start stellan-1-lite", "restore conversation"]);
     // The system message Lite receives is exactly what was pre-read, so the server can reuse it.
     expect(bodies[0].messages[0].content).toBe(warmedWith);

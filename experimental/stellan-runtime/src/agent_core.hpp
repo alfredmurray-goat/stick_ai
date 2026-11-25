@@ -16,10 +16,14 @@ struct LoopIO {
     std::function<void(const std::string &)> log;
     std::function<void(const std::vector<Message> &)> save;
     std::function<void(const Activity &)> activity;
+    // Optional: hooks around each tool run (src/portable/hooks.ts) and Max's code for delegate_code.
+    std::function<std::optional<std::string>(const std::string &name, const std::string &arguments)> before;
+    std::function<std::string(const std::string &name, const std::string &arguments, const std::string &result)> after;
+    std::function<std::string(const std::string &task, const std::string &context)> code;
 };
-/** What the app knows about Max for this session (src/agent/delegate.ts); this port runs without a loaded Max. */
-struct Specialist { double total_bytes = 0, recommended_bytes = 0; bool no_swap = false; };
-/** The agent loop (src/agent/index.ts runAgent) for a session without Max, project context or hooks yet. */
+/** What the app knows about Max for this session (src/agent/delegate.ts). */
+struct Specialist { double total_bytes = 0, recommended_bytes = 0; bool no_swap = false, available = false; };
+/** The agent loop (src/agent/index.ts runAgent), including hooks and Max delegation (src/agent/delegate.ts). */
 std::string run_agent(const std::string &task, std::vector<Message> &messages, std::size_t max_steps, const std::string &task_instructions, double history_bytes, const std::vector<std::string> &tool_names, const Specialist &specialist, LoopIO &io);
 /** Smart compaction (src/agent/index.ts compactHistory): returns how many earlier tasks were summarised. */
 std::size_t compact_history(std::vector<Message> &messages, double budget);

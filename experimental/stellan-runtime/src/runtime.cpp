@@ -226,6 +226,19 @@ Mapping::~Mapping() {
 
 std::span<const std::byte> Mapping::bytes() const { return {data_, size_}; }
 
+void release_pages(std::span<const std::byte> bytes) {
+    // Tells the system these mapped model pages are no longer needed (they were copied into Stellan's layout).
+    // They are clean file pages, so dropping them loses nothing; a later read would load them again.
+#ifdef _WIN32
+    (void)bytes;
+#else
+    const auto page = static_cast<std::uintptr_t>(sysconf(_SC_PAGESIZE));
+    auto first = (reinterpret_cast<std::uintptr_t>(bytes.data()) + page - 1) / page * page;
+    const auto last = (reinterpret_cast<std::uintptr_t>(bytes.data()) + bytes.size()) / page * page;
+    if (last > first) { madvise(reinterpret_cast<void *>(first), last - first, MADV_DONTNEED); }
+#endif
+}
+
 std::uint64_t ram_bytes() {
 #ifdef _WIN32
     MEMORYSTATUSEX memory {};

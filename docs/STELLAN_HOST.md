@@ -87,9 +87,10 @@ approval cards, hooks and sandbox). `src/agent/host-loop.ts` is the app's side; 
 a task on Host produces exactly the same messages, events and saved history as the TypeScript loop, including hooks,
 refused commands and compaction.
 
-The app uses Host for every task when the package has a Stellan-Host whose hash matches the manifest. Two cases still
-use the TypeScript loop: Lite paired with Max (delegation is not ported yet), and `STICK_TASKS_ON_NODE=1`, a
-temporary escape hatch. Next: the model call goes straight from Host to Stellan-Run, then the settings, GitHub,
+The app uses Host for every task, including Lite paired with Max, when the package has a Stellan-Host whose hash
+matches the manifest (`STICK_TASKS_ON_NODE=1` is a temporary escape hatch). Host decides when Lite must ask Max
+(createDelegate's rules), stops asking after Max fails once, and runs hooks around every tool in the same order as
+the TypeScript loop; the app only runs Max's model and the hook commands when Host asks. Next: the model call goes straight from Host to Stellan-Run, then the settings, GitHub,
 updates and activation routes move, then Node leaves the stick.
 
 ## Model calls and settings on Host
@@ -116,6 +117,5 @@ passes through Host's memory for one request and is never saved, logged or sent 
 `tests/host-https.test.ts` covers trusted and untrusted certificates, wrong names, plain http, redirects, a 20 MB
 download and cancelling.
 
-Still on Node: the logic of these features (the routes, the sign-in state and the update steps), and the trusted
-roots file, which is written from Node's own list at start. Before Node leaves the stick, the build must ship that
-roots file in the package (listed in the manifest) and the routes must move into Host.
+The package ships its trusted roots as `app/trusted-roots.pem` (in the manifest, so `verifyStick` checks it). Still on
+Node: the logic of these features (the routes, the sign-in state and the update steps).
