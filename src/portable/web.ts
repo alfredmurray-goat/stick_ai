@@ -21,6 +21,8 @@ import { workspaceToolSchemas } from "../tools/schema.js";
 import { ProgressTracker } from "./progress.js";
 import { coderSystem } from "../agent/delegate.js";
 import { agentInstructions, runAgent } from "../agent/index.js";
+import { runAgentOnHost } from "../agent/host-loop.js";
+import { hashFile } from "./integrity.js";
 import { Ollama } from "../model/ollama.js";
 import { ChatMemory } from "./chat-memory.js";
 import { inputCapabilities, prepareAttachments, inputPrompt, imageLabel, InputError, type PreparedAttachment } from "../model/inputs.js";
@@ -64,6 +66,11 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     if (events.length > 2000) { events.splice(0, events.length - 2000); }
     for (const wake of waiters) { wake(); }
   };
+  const taskHost = (async () => {
+    const host = nativeHostExecutable(root);
+    if (!host || process.env.STICK_TASKS_ON_NODE === "1") return undefined;
+    return (await hashFile(host.executable)).sha256 === host.sha256 ? host.executable : undefined;
+  })().catch((error: unknown) => { log(error); return undefined; });
   await mkdir(join(root, "app", "project"), { recursive: true });
   let box = await Sandbox.create(join(root, "app", "project"));
   let chatMemory: ChatMemory | undefined;
@@ -272,7 +279,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
         const result = await new Ollama(selected, engine.baseUrl, false, ramStatus(options.bytes), { apiKey: engine.key, specialist: true, onUsage: (tokens) => engine.onUsage?.(selected, tokens) }).complete([{ role: "system", content: coderSystem + (maxInstructions ? "\n" + maxInstructions : "") }, ...maxHistory, { role: "user", content: modelText }], active.signal, (value, thinking) => { progress.output(); if (!thinking) { answer += value; } publish(thinking ? "thinking" : "answer", value); });
         if (!result.content) { throw new UserError("general"); } maxHistory.push({ role: "user", content: modelText }, { role: "assistant", content: result.content }); return;
       }
-      await runAgent({
+      // Tasks run on Stellan-Host's native loop when it is in the package and matches its manifest; Lite+Max
+      // pairing (delegation) still runs on the TypeScript loop until Max is ported.
+      const hostExecutable = await taskHost;
+      await ((taskOptions: Parameters<typeof runAgent>[0]) => hostExecutable && !taskOptions.specialist?.available ? runAgentOnHost(hostExecutable, taskOptions) : runAgent(taskOptions))({
         task: modelText, messages: history, context: { source: projectContext(box), maxBytes: faster ? 2048 : engine.plan.projectBytes }, historyBytes: engine.plan.historyBytes, extraInstructions: sessionInstructions(), taskInstructions,
         hooks: hooks.active ? {
           before: async (call, signal) => (await runHooks("PreToolUse", { tool_name: call.function.name, tool_input: toolInput(call.function.arguments) }, signal)).blocked,

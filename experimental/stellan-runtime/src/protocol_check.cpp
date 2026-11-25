@@ -72,6 +72,60 @@ int loop_check() {
     std::cout.flush();
     return 0;
 }
+// stellan-host --agent: runs one task with the native agent loop. The first stdin line is the task
+// {"task","messages","maxSteps","taskInstructions","historyBytes","tools","totalBytes","recommendedBytes","noSwap"}.
+// The loop asks its owner for each model reply ({"event":"complete"} -> {"content"}) and each tool run
+// ({"event":"tool"} -> {"result"} or {"error"}), so the app keeps its approval cards and engine. Other events are
+// one-way. The last line is {"event":"done","outcome","messages"}.
+int agent_mode() {
+    std::string line;
+    if (!std::getline(std::cin, line)) { throw std::runtime_error("No task given"); }
+    const auto request = json::parse(line);
+    std::vector<agent::Message> messages;
+    for (const auto &m : request.find("messages")->array()) { messages.push_back({m.find("role")->string(), m.find("content")->string()}); }
+    std::vector<std::string> tools;
+    for (const auto &t : request.find("tools")->array()) { tools.push_back(t.string()); }
+    const auto send = [](const char *type, std::vector<std::pair<std::string, json::Value>> fields) {
+        auto o = std::make_shared<json::Object>();
+        o->emplace_back("event", str(type));
+        for (auto &f : fields) { o->push_back(std::move(f)); }
+        std::cout << json::stringify(json::Value {o}) << '\n';
+        std::cout.flush();
+    };
+    const auto answer = []() {
+        std::string reply;
+        if (!std::getline(std::cin, reply)) { throw std::runtime_error("The app stopped answering"); }
+        return json::parse(reply);
+    };
+    agent::LoopIO io;
+    io.complete = [&](const std::vector<agent::Message> &sent) {
+        send("complete", {{"messages", message_list(sent)}});
+        const auto reply = answer();
+        if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
+        return reply.find("content")->string();
+    };
+    io.execute = [&](const std::string &name, const std::string &arguments) -> std::string {
+        send("tool", {{"name", str(name)}, {"arguments", str(arguments)}});
+        const auto reply = answer();
+        if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
+        return reply.find("result")->string();
+    };
+    io.emit = [&](const std::string &text, bool thinking) { send("emit", {{"text", str(text)}, {"thinking", json::Value {thinking}}}); };
+    io.log = [&](const std::string &text) { send("log", {{"text", str(text)}}); };
+    io.save = [&](const std::vector<agent::Message> &batch) { send("save", {{"batch", message_list(batch)}}); };
+    io.activity = [&](const agent::Activity &a) {
+        std::vector<std::pair<std::string, json::Value>> fields {{"step", json::Value {static_cast<double>(a.step)}}, {"tool", str(a.tool)}, {"phase", str(a.phase)}};
+        if (a.path) { fields.emplace_back("path", str(*a.path)); }
+        if (a.detail) { fields.emplace_back("detail", str(*a.detail)); }
+        if (a.result) { fields.emplace_back("result", str(*a.result)); }
+        send("activity", std::move(fields));
+    };
+    const auto outcome = agent::run_agent(request.find("task")->string(), messages, static_cast<std::size_t>(std::get<double>(request.find("maxSteps")->data)),
+        request.find("taskInstructions")->string(), std::get<double>(request.find("historyBytes")->data), tools,
+        agent::Specialist {std::get<double>(request.find("totalBytes")->data), std::get<double>(request.find("recommendedBytes")->data), std::get<bool>(request.find("noSwap")->data)}, io);
+    send("done", {{"outcome", str(outcome)}, {"messages", message_list(messages)}});
+    return 0;
+}
 // stellan-host --compact-check: one {"messages":[{role,content}], "budget"} per line; prints the compacted history.
 int compact_check() {
     std::string line;
