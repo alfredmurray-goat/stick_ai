@@ -1,5 +1,6 @@
 #include "agent_core.hpp"
 #include "json.hpp"
+#include "protocol.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -193,5 +194,58 @@ std::size_t compact_history(std::vector<Message> &messages, double budget) {
                 {"assistant", "<done>Noted. I'll re-read files when I need their exact contents.</done>"}};
     messages.insert(messages.end(), rest.begin(), rest.end());
     return turns.size();
+}
+}
+
+namespace stellan::agent {
+std::string run_agent(const std::string &task, std::vector<Message> &messages, std::size_t max_steps, const std::string &task_instructions, double history_bytes, const std::vector<std::string> &tool_names, const Specialist &specialist, LoopIO &io) {
+    const auto commit = [&](const std::vector<Message> &batch) { io.save(batch); messages.insert(messages.end(), batch.begin(), batch.end()); };
+    if (const auto compacted = compact_history(messages, history_bytes)) {
+        io.log("Summarised " + std::to_string(compacted) + " earlier task" + (compacted == 1 ? "" : "s") + " to keep the conversation within its memory.");
+    }
+    const auto instructions = js_trim(task_instructions);
+    commit({{"user", task + (instructions.empty() ? "" : "\n\n" + instructions)}});
+    for (std::size_t step = 0; step < max_steps; ++step) {
+        const auto reply = io.complete(messages);
+        const auto parsed = protocol::parse_step(reply, tool_names);
+        std::vector<Message> batch {{"assistant", parsed.content}};
+        if (parsed.step.kind == protocol::Step::Kind::done) { commit(batch); io.emit(parsed.step.summary, false); return "finished"; }
+        std::string result;
+        if (parsed.step.kind == protocol::Step::Kind::error) { result = "Error: " + parsed.step.error; io.log(result); }
+        else {
+            const auto &name = parsed.step.name, &arguments = parsed.step.arguments;
+            json::Value view;
+            try { view = json::parse(arguments); } catch (const std::exception &) {}
+            const auto text = [&](const char *key) -> const std::string * { const auto *v = view.find(key); return v && v->is_string() ? &v->string() : nullptr; };
+            Activity activity {step, "start", name, std::nullopt, std::nullopt, std::nullopt};
+            if (const auto *path = text("path")) { activity.path = js_slice(*path, 0, 2000); }
+            if (const auto *server = text("server")) {
+                const auto *tool = view.find("tool");
+                activity.detail = *server + " · " + (tool && !tool->is_null() ? js_string(tool) : "tool discovery");
+            } else if (text("name") && name == "use_skill") { activity.detail = *text("name"); }
+            else if (const auto *command = text("command")) { activity.detail = js_slice(*command, 0, 500); }
+            else if (const auto *query = text("query")) { activity.detail = js_slice(*query, 0, 500); }
+            else if (const auto *delegated = text("task")) { activity.detail = js_slice(*delegated, 0, 500); }
+            io.activity(activity);
+            io.log("→ " + name + " " + arguments);
+            try {
+                // Without a loaded Max, delegation answers with the same message as createDelegate and runs nothing.
+                if (name == "delegate_code") {
+                    result = specialist.total_bytes < specialist.recommended_bytes ? "Code specialist needs a computer with 24 GB of memory to help automatically. Writing the code here instead."
+                           : specialist.no_swap ? "Code specialist is disabled by --no-swap. Write the code here instead."
+                           : "Code specialist is not available in this session. Write the code here instead.";
+                } else { result = io.execute(name, arguments); }
+            } catch (const std::exception &error) { result = std::string("Error: ") + error.what(); }
+            activity.phase = "finish";
+            activity.result = js_slice(result, 0, 2000);
+            io.activity(activity);
+        }
+        if (js_length(result) > 32768) { result = js_slice(result, 0, 32720) + "\n[tool result truncated at 32 KiB]"; }
+        io.log("← " + result);
+        batch.push_back({"user", "<tool_result>" + result + "</tool_result>"});
+        commit(batch);
+    }
+    io.log("Maximum of " + std::to_string(max_steps) + " model steps reached; resume with another task.");
+    return "limit";
 }
 }
