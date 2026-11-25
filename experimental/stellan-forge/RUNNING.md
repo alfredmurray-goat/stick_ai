@@ -50,7 +50,23 @@ node scripts/fetch-platform-assets.mjs linux-arm64
 6. Have at most one open PR per project. Answer maintainers' comments yourself, or with Stellan's help and your review.
 7. Record the outcome (merged, changes requested or closed). Approved records become training data.
 
+## Opening the PR (step 5)
+
+Commit the fix on a branch of the bot's fork with an `Assisted-by: Stellan Lite` trailer, push it, write the PR
+description in a file, then:
+
+```bash
+FORGE_GITHUB_TOKEN=... python3 experimental/stellan-forge/pr.py --repo go-gitea/gitea --branch fix-1234 \
+  --title "Fix ..." --body pr.md --model Lite --reviewer "Your Name" --allowlist ~/forge/allowlist.json
+```
+
+`allowlist.json` is your own list: `[{"repo": "go-gitea/gitea", "policy_url": "https://...", "policy_checked":
+"2026-11-25"}]`. The script refuses projects not on it, policies not checked in the last 7 days, and projects where
+the bot already has an open PR. It shows the changed files, adds the AI disclosure, and opens the PR only after you
+type `OPEN`. Set the token from your secret storage (Kaggle secrets or the VM's environment), never by pasting it into
+a chat.
+
 ## Not built yet
 
-The Stellan adapter (step 2) and the PR opener (step 5) are the next pieces. Until they land, steps 2 and 5 are
-done by hand with Stellan in the app.
+The Stellan adapter (step 2: Forge asking Stellan for the fix automatically). Until it lands, write the fix with
+Stellan in the app.
