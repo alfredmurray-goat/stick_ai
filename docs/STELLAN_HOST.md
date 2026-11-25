@@ -102,9 +102,20 @@ updates and activation routes move, then Node leaves the stick.
   file, at most 64 KiB each). Older settings files are copied over once and left untouched
   (`tests/settings-host.test.ts`). Chat history already lived there.
 
-## What blocks GitHub, updates and activation
+## GitHub, updates and activation go online through Host
 
-All three talk to the internet over HTTPS (github.com, the R2 update host, the activation website). Host has no TLS
-yet. Moving them needs a TLS library compiled into Host, or each system's own (Schannel on Windows, Network.framework
-on macOS, OpenSSL on Linux). The recommended option is Mbed TLS (Apache-2.0), pinned and built from source like
-llama.cpp, with the same certificate checks the app does now. The GitHub token would still stay in Host's memory only.
+Host has HTTPS built in: Mbed TLS v3.6.8 (Apache-2.0), pinned by commit and built from source with the app
+(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request per line, always checks the server's certificate and
+name against the trusted roots, refuses plain `http://`, never follows redirects (the app's callers already handle
+them), and streams the body to a file so large update downloads never sit in memory.
+
+In the app, `src/portable/net.ts` has `appFetch`, which GitHub sign-in, GitHub workspaces, updates, activation and
+HTTP hooks use. When the package's Stellan-Host matches its manifest, `appFetch` goes through Host; otherwise it uses
+Node as before. `STICK_NETWORK_ON_NODE=1` is a temporary escape hatch. The GitHub token still lives only in memory: it
+passes through Host's memory for one request and is never saved, logged or sent to the window.
+`tests/host-https.test.ts` covers trusted and untrusted certificates, wrong names, plain http, redirects, a 20 MB
+download and cancelling.
+
+Still on Node: the logic of these features (the routes, the sign-in state and the update steps), and the trusted
+roots file, which is written from Node's own list at start. Before Node leaves the stick, the build must ship that
+roots file in the package (listed in the manifest) and the routes must move into Host.

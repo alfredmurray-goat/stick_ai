@@ -1,3 +1,4 @@
+import { appFetch } from "./net.js";
 export interface GitHubRepo { id: number; owner: string; name: string; fullName: string; defaultBranch: string; private: boolean; canPush: boolean | null }
 export interface GitHubBase { branch: string; commit: string; tree: string }
 export interface GitHubTreeEntry { path: string; mode: string; type: "blob" | "tree" | "commit"; sha: string; size?: number }
@@ -22,7 +23,7 @@ function pathFor(repo: Pick<GitHubRepo, "fullName">): string { const parsed = pa
 function validBranch(value: string): boolean { return value.length > 0 && value.length <= 200 && !/[\x00-\x20\x7f~^:?*\[\\]/.test(value) && !value.includes("..") && !value.includes("@{") && !value.includes("//") && !/[/.]$/.test(value) && !value.endsWith(".lock"); }
 export class GitHubClient {
   #token: string;
-  constructor(token = "", private readonly fetcher: typeof fetch = fetch) {
+  constructor(token = "", private readonly fetcher: typeof fetch = appFetch) {
     this.#token = token.trim();
     if (this.#token && (!/^[\x21-\x7e]+$/.test(this.#token) || this.#token.length > 2048)) { throw new GitHubError("Enter a valid GitHub access token."); }
   }

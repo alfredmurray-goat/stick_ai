@@ -1,3 +1,4 @@
+import { enableHostNetwork } from "./net.js";
 import { openFrontDoor, type FrontDoor } from "./front-door.js";
 import { liteMinimumBytes } from "../config/models.js";
 import { spawn } from "node:child_process";
@@ -93,6 +94,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         engine.coder = new ManagedEngine(root, target, coderPort.port, coderTemp, fd, log);
         engine.coder.onProcess = (pid) => notify({ kind: "model_pid", role: "coder", pid });
       }
+      await enableHostNetwork(root, log);
       const activation = new Activation(root);
       engine.modelKey = (model) => activation.modelKey(model);
       if (engine.coder) { engine.coder.modelKey = engine.modelKey; }

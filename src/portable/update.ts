@@ -1,3 +1,4 @@
+import { appFetch } from "./net.js";
 import { lockedModelPaths } from "./locked-models.js";
 import { createHash } from "node:crypto";
 import { open, readFile, mkdir, mkdtemp, rm, rename, lstat, realpath, writeFile } from "node:fs/promises";
@@ -18,7 +19,7 @@ export async function githubResponse(url: string, token: string, signal: AbortSi
   let next = new URL(url);
   for (let redirects = 0; redirects <= 5; redirects++) {
     if (!validUrl(next)) { throw new Error("Untrusted update download host"); }
-    const response = await fetch(next, { redirect: "manual", signal, headers: { Accept: accept, "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "stick-ai-updater", ...(token && next.hostname === "api.github.com" ? { Authorization: `Bearer ${token}` } : {}) } });
+    const response = await appFetch(next, { redirect: "manual", signal, headers: { Accept: accept, "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "stick-ai-updater", ...(token && next.hostname === "api.github.com" ? { Authorization: `Bearer ${token}` } : {}) } });
     if (![301, 302, 303, 307, 308].includes(response.status)) { return response; }
     const location = response.headers.get("location"); await response.body?.cancel();
     if (!location) { throw new Error("Missing update redirect"); } next = new URL(location, next);
@@ -30,7 +31,7 @@ export async function hostedResponse(url: string, signal: AbortSignal): Promise<
   const origin = new URL(url).origin; let next = new URL(url);
   for (let redirects = 0; redirects <= 3; redirects++) {
     if (next.protocol !== "https:" || next.origin !== origin || next.username || next.password) { throw new Error("Untrusted update download host"); }
-    const response = await fetch(next, { redirect: "manual", signal, headers: { "User-Agent": "stick-ai-updater", "Cache-Control": "no-cache" } });
+    const response = await appFetch(next, { redirect: "manual", signal, headers: { "User-Agent": "stick-ai-updater", "Cache-Control": "no-cache" } });
     if (![301, 302, 303, 307, 308].includes(response.status)) { return response; }
     const location = response.headers.get("location"); await response.body?.cancel();
     if (!location) { throw new Error("Missing update redirect"); } next = new URL(location, next);
