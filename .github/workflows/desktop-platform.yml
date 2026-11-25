@@ -107,7 +107,7 @@ jobs:
         run: |
           sudo mdutil -a -i off >/dev/null 2>&1 || true
           sync; sudo purge || true
-          ps -axm -o rss=,comm= | head -12
+          ps -axm -o rss=,comm= | head -12 || true
       - name: Verify native startup and real Lite tool exchange
         run: node scripts/smoke-platform.mjs "dist/Stick AI"
       - name: Archive the Mac app for the universal all-devices build
