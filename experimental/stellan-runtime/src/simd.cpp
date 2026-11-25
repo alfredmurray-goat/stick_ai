@@ -11,7 +11,11 @@
 #include <immintrin.h>
 #ifdef _MSC_VER
 #include <intrin.h>
+// MSVC compiles every intrinsic without per-function targets; the CPU checks below decide what runs.
 #define STELLAN_AVX2
+#define STELLAN_HAS_VNNI 1
+#define STELLAN_VNNI
+#define STELLAN_VNNI512
 #else
 #define STELLAN_AVX2 __attribute__((target("avx2,fma,f16c")))
 #include <cpuid.h>
@@ -761,6 +765,16 @@ Vnni vnni() {
     static const Vnni level = [] {
         if (environment_set("STELLAN_RUNTIME_NO_VNNI") || !available()) { return Vnni::none; }
         unsigned a = 0, b = 0, c = 0, d = 0;
+#ifdef _MSC_VER
+        int registers[4];
+        __cpuidex(registers, 7, 1);
+        if ((static_cast<unsigned>(registers[0]) & (1U << 4)) != 0) { return Vnni::avx; }
+        __cpuidex(registers, 7, 0);
+        b = static_cast<unsigned>(registers[1]); c = static_cast<unsigned>(registers[2]);
+        // AVX-512 state must also be enabled by the operating system (XCR0 opmask and upper ZMM bits).
+        if ((c & (1U << 11)) != 0 && (b & (1U << 31)) != 0 && (b & (1U << 16)) != 0 && (_xgetbv(0) & 0xE6) == 0xE6) { return Vnni::avx512; }
+        (void)a; (void)d;
+#else
         if (__get_cpuid_count(7, 1, &a, &b, &c, &d) && (a & (1U << 4)) != 0) { return Vnni::avx; }
         if (__get_cpuid_count(7, 0, &a, &b, &c, &d) && (c & (1U << 11)) != 0 && (b & (1U << 31)) != 0 && (b & (1U << 16)) != 0) {
             // AVX-512 state must also be enabled by the operating system (XCR0 opmask and upper ZMM bits).
@@ -768,6 +782,7 @@ Vnni vnni() {
             __asm__("xgetbv" : "=a"(low), "=d"(high) : "c"(0));
             if ((low & 0xE6) == 0xE6) { return Vnni::avx512; }
         }
+#endif
         return Vnni::none;
     }();
     return level;
