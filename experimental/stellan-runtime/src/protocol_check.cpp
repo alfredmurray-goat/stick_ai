@@ -1,11 +1,35 @@
 #include "protocol.hpp"
 #include "json.hpp"
+#include "agent_core.hpp"
 
 #include <iostream>
 #include <memory>
 #include <string>
 
 namespace stellan {
+// stellan-host --compact-check: one {"messages":[{role,content}], "budget"} per line; prints the compacted history.
+int compact_check() {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        const auto request = json::parse(line);
+        std::vector<agent::Message> messages;
+        for (const auto &m : request.find("messages")->array()) { messages.push_back({m.find("role")->string(), m.find("content")->string()}); }
+        const auto compacted = agent::compact_history(messages, std::get<double>(request.find("budget")->data));
+        auto list = std::make_shared<json::Array>();
+        for (const auto &m : messages) {
+            auto o = std::make_shared<json::Object>();
+            o->emplace_back("role", json::Value {m.role});
+            o->emplace_back("content", json::Value {m.content});
+            list->push_back(json::Value {o});
+        }
+        auto out = std::make_shared<json::Object>();
+        out->emplace_back("compacted", json::Value {static_cast<double>(compacted)});
+        out->emplace_back("messages", json::Value {list});
+        std::cout << json::stringify(json::Value {out}) << '\n';
+    }
+    std::cout.flush();
+    return 0;
+}
 // stellan-host --protocol-check: one JSON request per stdin line {"content", "tools", "chunks"?}; prints what the
 // native parser makes of it, so tests can compare it with the TypeScript parser on the same inputs.
 int protocol_check() {
