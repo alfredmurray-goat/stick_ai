@@ -99,6 +99,15 @@ jobs:
           node scripts/package-platform.ts --out "dist/Stick AI" --app "src-tauri/target/${{ inputs.target }}/release/${{ inputs.app }}" --node release-assets/node-v24.22.1-${{ inputs.node }}/${{ inputs.executable }} --node-license release-assets/node-v24.22.1-${{ inputs.node }}/LICENSE --server release-assets/stellan-build/${{ inputs.server }} --server-license LICENSE --lite release-assets/stellan-1-lite-q4_k_m.gguf --desktop-licenses release-assets/desktop-licenses --max-release --native-host
       - name: Remove copied inputs before archiving
         run: rm -f release-assets/stellan-1-lite-q4_k_m.gguf release-assets/node-*.tar.gz release-assets/node-*.zip
+      - name: Give Lite the runner's memory (macOS)
+        # The 7.5 GB Apple Silicon runner leaves less file cache than Lite's 4.15 GB when other processes
+        # hold memory, and the model is then re-read from disk for every word. Stop Spotlight indexing the
+        # freshly built files, release cached memory, and show what still holds memory.
+        if: runner.os == 'macOS'
+        run: |
+          sudo mdutil -a -i off >/dev/null 2>&1 || true
+          sync; sudo purge || true
+          ps -axm -o rss=,comm= | head -12
       - name: Verify native startup and real Lite tool exchange
         run: node scripts/smoke-platform.mjs "dist/Stick AI"
       - name: Archive the Mac app for the universal all-devices build
