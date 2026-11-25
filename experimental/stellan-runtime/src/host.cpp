@@ -2,6 +2,7 @@
 #include "workspace.hpp"
 #include "mcp_bridge.hpp"
 #include "front_door.hpp"
+namespace stellan { int protocol_check(); int compact_check(); int loop_check(); }
 #include "runtime.hpp"
 #include <atomic>
 #include <csignal>
@@ -20,6 +21,9 @@ int entry(int argc, char **argv) {
         std::cout.exceptions(std::ios::badbit | std::ios::failbit);
         if (argc >= 2 && std::string_view(argv[1]) == "--mcp-bridge") { return stellan::mcp_bridge(argc, argv); }
         if (argc >= 2 && std::string_view(argv[1]) == "--front-door") { return stellan::front_door(argc, argv); }
+        if (argc == 2 && std::string_view(argv[1]) == "--protocol-check") { return stellan::protocol_check(); }
+        if (argc == 2 && std::string_view(argv[1]) == "--compact-check") { return stellan::compact_check(); }
+        if (argc == 2 && std::string_view(argv[1]) == "--loop-check") { return stellan::loop_check(); }
         if (argc == 3 && (std::string_view(argv[1]) == "--workspace" || std::string_view(argv[1]) == "--state-store")) {
             const std::string root(argv[2]);
             const auto service = std::string_view(argv[1]) == "--state-store" ? stellan::state_store_service : stellan::workspace_service;

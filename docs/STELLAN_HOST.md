@@ -8,7 +8,7 @@ The owner decided Host replaces Node completely. It is done in stages so the app
 
 1. **Front door (done):** `stellan-host --front-door UI_FOLDER BACKEND_PORT` answers the window on its own 127.0.0.1 port, serves the window's files itself with the same security headers and Host check, and forwards every API request to the Node backend, which still checks the session key. Packages with Host open the window on Host's address (`src/portable/front-door.ts`); without Host, or if it fails to start, the Node address is used as before.
 2. **Move routes one by one** into Host (state and long-poll, settings, files, approvals, chat memory, MCP, skills, hooks), each with the existing tests pointed at Host.
-3. **Move the agent loop** (prompting Lite through Stellan-Run, tool calls, approvals, compaction).
+3. **Move the agent loop** (started 25 November 2026: Host has a JavaScript-exact JSON reader/writer, `src/json.cpp`, and Lite's tagged reply parser, `src/protocol.cpp`; `tests/protocol-native.test.ts` feeds 3,000 generated replies to both parsers and requires identical results: 496 tool calls, 956 final answers, 1,548 errors). Still to move:  (prompting Lite through Stellan-Run, tool calls, approvals, compaction).
 4. **Move the rest:** GitHub, updates, activation, the app API.
 5. **Stop shipping Node** once nothing is forwarded.
 
