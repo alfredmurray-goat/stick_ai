@@ -28,7 +28,9 @@ test('native MCP bridge passes stdio straight through and runs the program in it
  try{
   child.stdin.write('{"jsonrpc":"2.0","id":1}\n');
   assert.ok(await until(()=>output().includes('echo:{"jsonrpc":"2.0","id":1}')));
-  assert.equal(await readFile(join(dir,'cwd'),'utf8'),await (await import('node:fs/promises')).realpath(dir));
+  // Windows may report the short (8.3) form of the same folder; compare fully resolved names.
+  const {realpathSync}=await import('node:fs');
+  assert.equal(realpathSync.native(await readFile(join(dir,'cwd'),'utf8')),realpathSync.native(dir));
  }finally{try{windows?child.kill():process.kill(-child.pid,'SIGKILL');}catch{} await rm(dir,{recursive:true,force:true});}
 });
 test('closing the lifeline ends the program and everything it started',{skip},async()=>{
