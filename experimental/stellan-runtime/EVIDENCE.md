@@ -314,3 +314,9 @@ Prompts are now split into equal batches (130 tokens: 5 × 26 rather than 4 × 3
 | 130 tokens | this change | 14,439 | 4,573 | 34,428 |
 
 The 130-token prompt reads about 5% faster; the 112-token prompt (already even batches) is unchanged within noise. Stellan-Run decodes 5% faster than llama.cpp here and uses 9% less CPU on the 112-token prompt; reading the 130-token prompt is still about 16% slower in this run. Receipt: [lite-paired-even-batches.json](evidence/lite-paired-even-batches.json).
+
+## Where Lite's prompt time goes now, and a rejected idea — 25 November 2026
+
+Stage timers in a separate copy of `lite.cpp` (2 threads), 130-token prompt: input projection 7.9 s, output projection 3.5 s, Mamba2 mixing 1.9 s (convolution 0.6, scan 1.1, gate and norm 0.2), out of 13.4 s. About 85% is the two big quantised matrix multiplies, already at about 74% of this chip's multiply limit (see "Stellan-native layout" above).
+
+**Rejected:** doubling the prompt batch from 32 to 64 tokens (so the weights are streamed from memory half as often, as llama.cpp's 256-token batch does). Alternating single runs: 112-token prompt 11.7/12.3 s → 12.1/12.3 s, 130-token prompt 13.7/15.2 s → 13.4/13.5 s, within this VM's noise. Memory passes are not the limit; arithmetic is. The remaining gap to llama.cpp on longer prompts is in the multiply kernel itself, so the next attempts belong there (fewer instructions per 32 products, e.g. llama.cpp-style pre-interleaved Q4_K rows when the stick is made).
