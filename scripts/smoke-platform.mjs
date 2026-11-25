@@ -14,6 +14,7 @@ import { reservePort } from "../dist/portable/ports.js";
 import { Ollama } from "../dist/model/ollama.js";
 import { ramStatus } from "../dist/config/models.js";
 import { targetFor } from "../dist/portable/platform.js";
+import { openFrontDoor } from "../dist/portable/front-door.js";
 import { parseStep } from "../dist/model/protocol.js";
 const target = targetFor(process.platform, process.arch);
 const native = target.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-ai" : target === "windows-x64" ? "Stick AI.exe" : "stick-ai";
@@ -53,6 +54,23 @@ try {
       const { stdout } = await promisify(execFile)("ldd", [join(root, file)]);
       if (stdout.includes("not found")) { throw new Error(`Missing Linux runtime library: ${stdout}`); }
     }
+  }
+  // The packaged Host must answer the window and forward API requests (stage 1 of replacing Node).
+  {
+    const { createServer } = await import("node:http");
+    const backend = createServer((request, response) => { response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ forwarded: request.url, host: request.headers.host })); });
+    await new Promise((done) => backend.listen(0, "127.0.0.1", done));
+    const backendPort = backend.address().port;
+    const front = await openFrontDoor(root, `http://127.0.0.1:${backendPort}/#${"a".repeat(64)}`);
+    if (!front) throw new Error("The release package is missing Stellan-Host's front door");
+    try {
+      const origin = new URL(front.url).origin;
+      const page = await fetch(origin + "/"); const html = await page.text();
+      if (page.status !== 200 || !html.includes("Start chatting")) throw new Error("Stellan-Host did not serve the app window");
+      const api = await fetch(origin + "/api/state?x=1"); const body = await api.json();
+      if (body.forwarded !== "/api/state?x=1" || body.host !== `127.0.0.1:${backendPort}`) throw new Error("Stellan-Host did not forward an API request");
+      console.log(`${target} Stellan-Host front door served the window and forwarded an API request.`);
+    } finally { front.close(); backend.close(); }
   }
   await engine.start("stellan-1-lite", signal);
   if (!engine.nativeRuntime) throw new Error("The release must use Stellan-Run");
