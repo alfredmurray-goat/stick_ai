@@ -320,3 +320,30 @@ The 130-token prompt reads about 5% faster; the 112-token prompt (already even b
 Stage timers in a separate copy of `lite.cpp` (2 threads), 130-token prompt: input projection 7.9 s, output projection 3.5 s, Mamba2 mixing 1.9 s (convolution 0.6, scan 1.1, gate and norm 0.2), out of 13.4 s. About 85% is the two big quantised matrix multiplies, already at about 74% of this chip's multiply limit (see "Stellan-native layout" above).
 
 **Rejected:** doubling the prompt batch from 32 to 64 tokens (so the weights are streamed from memory half as often, as llama.cpp's 256-token batch does). Alternating single runs: 112-token prompt 11.7/12.3 s → 12.1/12.3 s, 130-token prompt 13.7/15.2 s → 13.4/13.5 s, within this VM's noise. Memory passes are not the limit; arithmetic is. The remaining gap to llama.cpp on longer prompts is in the multiply kernel itself, so the next attempts belong there (fewer instructions per 32 products, e.g. llama.cpp-style pre-interleaved Q4_K rows when the stick is made).
+
+## Stellan-native interleaved Q4_K rows — 25 November 2026
+
+Lite's Q4_K matrices are copied, on first use, into Stellan's own layout: eight rows side by side per 256-value block
+(`interleave_q4k`), so one AVX-VNNI `dpbusd` multiplies 4 weights of all 8 rows by the same 4 activation bytes. That
+is one instruction per 32 products instead of `maddubs` + `dpwssd` per row, and each group's scales are applied once
+for 8 rows. Decode uses the same layout. The mapped original pages are released once copied (`release_pages`), so
+memory rises only by the layout's extra headers. On by default with AVX-VNNI or AVX512-VNNI and at least 16 GiB of
+RAM (`STELLAN_RUNTIME_INTERLEAVE=1` forces it, `STELLAN_RUNTIME_NO_INTERLEAVE=1` turns it off); this 15 GiB VM forced it.
+
+Paired run, 2 threads, 3 rounds with warm-up, medians, same VM (Intel Xeon with AVX-VNNI):
+
+| Prompt | Arm | Prompt ms | Decode ms (12 tokens) | Peak memory | CPU ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 112 tokens | llama.cpp | 12,452 | 5,018 | — | 34,290 |
+| 112 tokens | previous Stellan | 13,460 | 4,817 | 4.15 GiB | 32,612 |
+| 112 tokens | interleaved | 8,462 | 3,343 | 4.39 GiB | 21,528 |
+| 130 tokens | llama.cpp | 13,201 | 5,183 | — | 36,200 |
+| 130 tokens | previous Stellan | 15,254 | 4,871 | 4.15 GiB | 35,619 |
+| 130 tokens | interleaved | 10,105 | 3,377 | 4.39 GiB | 24,470 |
+
+Prompts read 34–37% faster than the previous build and now about 1.3–1.5× as fast as llama.cpp; decode is 31% faster
+and about 1.5× llama.cpp; generated tokens are identical across all three. Short prompts (22–23 tokens): 21–26%
+faster prompts, 30% faster decode ([short receipt](evidence/lite-paired-interleaved-short.json),
+[long receipt](evidence/lite-paired-interleaved-long.json)). The first prompt after start also pays for the copy
+(about 6 s here). Not yet measured: Max, Windows (no VNNI path in MSVC builds yet), AMD Zen 4 (AVX512-VNNI branch) and
+8 GB computers. Next: write the layout into the stick when it is made, so even 8 GB computers get it without a copy.
