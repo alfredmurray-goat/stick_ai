@@ -13,7 +13,7 @@ import { McpServers, McpError, actuent, offlineMessage } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
 import { contextPlan, diskComfortable, diskMinimum, freeBytes } from "./engine.js";
 import { tmpdir } from "node:os";
-import { readExtensionJson, writeExtensionJson } from "./extension-store.js";
+import { readExtensionJson, writeExtensionJson, useHostSettings, closeHostSettings } from "./extension-store.js";
 import { compactWebResult } from "./web-search.js";
 import { Skills, SkillError, parseSkill } from "./skills.js";
 import { Hooks, HookError, hookEvents, type HookEvent } from "./hooks.js";
@@ -122,6 +122,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   // Images attached in this conversation, by name, so save_image can copy one into the project after approval.
   const attachedImages = new Map<string, PreparedAttachment>();
   let extensionStatus = ""; let extensionProblem = "";
+  try { useHostSettings(root, nativeHostExecutable(root), log); } catch (error) { log(error); }
   const mcp = new McpServers(root, box.root, (name, text) => { extensionStatus = `MCP · ${name}: ${text}`; publish("status", extensionStatus); });
   const skills = new Skills(root, box.root);
   const hooks = new Hooks(root, box.root, log);
@@ -514,5 +515,5 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
     polling = true;
     void Promise.resolve(engine.status?.()).then((status) => { progressView = approvals.size ? { message: "Waiting for your approval", elapsedSeconds: null, reassurance: "Review the proposed file change in the conversation." } : extensionStatus ? {message:extensionStatus,elapsedSeconds:null,reassurance:null} : progress.view(status); report(progressView.message); }).finally(() => { polling = false; });
   }, 500);
-  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
+  return { get awaitingActivation() { return needsActivation(); }, async start(model = "stellan-1-lite") { if (!options.choices.includes(model)) { throw new Error("The selected model is unavailable on this computer"); } if (needsActivation()) { pendingModel = model; phase = "activate"; return; } await launch(model); if (phase !== "ready") { throw lastError; } }, url: `${origin}/#${token}`, async close() { clearInterval(progressTimer); clearInterval(diskTimer); hookLife.abort(); active?.abort(); loading?.abort(); repositoryOperation?.abort(); await repositoryDone; await work; await appApi.stop(); await chatMemory?.close().catch(log); await tools.close(); await mcp.close(); await closeHostSettings(root).catch(log); for (const resolve of approvals.values()) { resolve(false); } server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); } };
 }
