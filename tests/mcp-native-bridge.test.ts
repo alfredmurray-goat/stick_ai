@@ -18,7 +18,7 @@ async function stick(tamper=false){
  const record=await hashFile(join(root,path));
  await writeFile(join(root,'manifest.json'),JSON.stringify({nativeHost:true,files:[{path,...record,sha256:tamper?'0'.repeat(64):record.sha256,executable:true}]}));
  await writeFile(join(project,'server.cjs'),server);
- return {root,project,close:()=>rm(root,{recursive:true,force:true})};
+ return {root,project,close:()=>rm(root,{recursive:true,force:true,maxRetries:20,retryDelay:100})};
 }
 it.skipIf(!existsSync(host))('runs stdio MCP servers under the native Host bridge instead of a Node bridge',async()=>{
  const f=await stick();const mcp=new McpServers(f.root,f.project);

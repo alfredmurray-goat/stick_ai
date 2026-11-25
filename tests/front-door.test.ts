@@ -31,11 +31,11 @@ it.skipIf(!existsSync(host))('Host answers the window and forwards API requests 
   r=await fetch(origin+'/api/session/reset',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:'{}'});await r.text();expect(r.status).toBe(200);
   const raw=await new Promise<string>(done=>{const socket=connect(Number(url.port),'127.0.0.1',()=>socket.end('GET / HTTP/1.1\r\nHost: evil.example\r\n\r\n'));let data='';socket.on('data',c=>{data+=c;});socket.on('end',()=>done(data));});
   expect(raw.startsWith('HTTP/1.1 403')).toBe(true);
- }finally{front?.close();await app.close();await rm(root,{recursive:true,force:true});}
+ }finally{front?.close();await app.close();await rm(root,{recursive:true,force:true,maxRetries:20,retryDelay:100});}
 },30000);
 it.skipIf(!existsSync(host))('refuses a Host that does not match the package, and returns nothing without Host',async()=>{
  const root=await stick(true);
- try{await expect(openFrontDoor(root,'http://127.0.0.1:5000/#'+'a'.repeat(64))).rejects.toThrow(/does not match/);}finally{await rm(root,{recursive:true,force:true});}
+ try{await expect(openFrontDoor(root,'http://127.0.0.1:5000/#'+'a'.repeat(64))).rejects.toThrow(/does not match/);}finally{await rm(root,{recursive:true,force:true,maxRetries:20,retryDelay:100});}
  const plain=await mkdtemp(join(tmpdir(),'stick-front-plain-'));
- try{expect(await openFrontDoor(plain,'http://127.0.0.1:5000/#x')).toBeUndefined();}finally{await rm(plain,{recursive:true,force:true});}
+ try{expect(await openFrontDoor(plain,'http://127.0.0.1:5000/#x')).toBeUndefined();}finally{await rm(plain,{recursive:true,force:true,maxRetries:20,retryDelay:100});}
 },30000);
