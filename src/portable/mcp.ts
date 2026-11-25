@@ -9,6 +9,19 @@ import {McpProgress} from './mcp-progress.js';
 import {McpRpc,McpError} from './mcp-rpc.js';
 import {readExtensionJson,writeExtensionJson} from './extension-store.js';
 import {targetFor,executableName} from './platform.js';
+import {nativeHostExecutable} from './native-files.js';
+import {hashFile} from './integrity.js';
+import {planCommand,quoteWindowsArgument} from './spawn-command.js';
+import {isAbsolute} from 'node:path';
+/** Arguments for `stellan-host --mcp-bridge`. On Windows the app resolves the program (PATH/PATHEXT, never the project
+ * folder) and builds the exact command line, batch-file escaping included; unresolved programs keep the Node bridge. */
+export function nativeBridgeArgs(cwd:string,command:string,args:readonly string[],env:NodeJS.ProcessEnv,platform:NodeJS.Platform=process.platform,exists?:(path:string)=>boolean):string[]|undefined{
+ if(platform!=='win32')return ['--mcp-bridge',cwd,'--',command,...args];
+ const plan=planCommand(command,args,env,platform,exists);
+ if(!isAbsolute(plan.file)&&!/^[A-Za-z]:\\/.test(plan.file))return undefined;
+ const line=[quoteWindowsArgument(plan.file),...(plan.verbatim?plan.args:plan.args.map(quoteWindowsArgument))].join(' ');
+ return ['--mcp-bridge',cwd,'--cmdline',plan.file,line];
+}
 export {McpError};
 export interface McpServerConfig {id:string;name:string;transport:'stdio'|'http'|'sse';command?:string;args?:string[];url?:string;builtin?:boolean}
 /** Actuent (live web search) is built in: free, no key, and connected on first use so offline starts stay quiet. */
@@ -62,6 +75,16 @@ export class McpServers {
  async add(input:unknown){if(this.configs.length>=20)throw new McpError('This app supports up to 20 configured MCP servers.');if(!record(input))throw new McpError('Invalid MCP settings.');const id='mcp-'+randomUUID(),next=config(input,id),secret={headers:stringMap(input.headers),env:stringMap(input.env)};this.configs.push(next);this.secrets.set(id,secret);try{await this.save();}catch(error){this.configs.pop();this.secrets.delete(id);throw error;}return id;}
  async remove(id:string){if(id===actuent.id)return this.setWebSearch(false);await this.disconnect(id);this.configs=this.configs.filter(c=>c.id!==id);this.secrets.delete(id);this.errors.delete(id);await this.save();}
  async setSecrets(id:string,input:unknown){this.get(id);if(!record(input))throw new McpError('Invalid secret fields.');const current=this.secrets.get(id)??{headers:{},env:{}};this.secrets.set(id,{headers:input.headers===undefined?current.headers:stringMap(input.headers),env:input.env===undefined?current.env:stringMap(input.env)});}
+ private bridgeCheck:Promise<string|undefined>|undefined;
+ /** Stellan-Host's MCP bridge, after checking the executable against the package manifest (once per app run). */
+ private nativeBridge(){
+  return this.bridgeCheck??=(async()=>{
+   const host=nativeHostExecutable(this.root);if(!host)return undefined;
+   const actual=await hashFile(host.executable);
+   if(actual.sha256!==host.sha256)throw new McpError('Stellan-Host does not match this package. Reinstall the app from the stick.');
+   return host.executable;
+  })();
+ }
  async connect(id:string,signal:AbortSignal){
   const selected=this.get(id);await this.disconnect(id);this.errors.delete(id);const secret=this.secrets.get(id)??{headers:{},env:{}};let transport:Transport;
   if(selected.transport==='stdio'){
@@ -69,7 +92,12 @@ export class McpServers {
    const args=(selected.args??[]).map(arg=>arg.replaceAll('${project}',this.project).replaceAll('${app}',this.root));const command=selected.command==='node'?node:selected.command!;
    const spec=Buffer.from(JSON.stringify({command,args,cwd:this.project})).toString('base64'),env=defaultMcpEnvironment();
    env.PATH=[bin,...(process.platform==='win32'?[join(homedir(),'AppData','Roaming','npm')]:['/opt/homebrew/bin','/usr/local/bin',join(homedir(),'.local','bin')]),env.PATH??''].join(delimiter);
-   transport=new McpProcessTransport(node,[join(this.root,'app/stick-mcp.cjs'),spec],{...env,STICK_MCP_ENV_JSON:JSON.stringify(secret.env)},bytes=>{const c=this.connections.get(id);if(c)c.diagnostic=this.redact(id,(c.diagnostic+bytes.toString('utf8')).slice(-4000));});
+   const diagnostic=(bytes:Buffer)=>{const c=this.connections.get(id);if(c)c.diagnostic=this.redact(id,(c.diagnostic+bytes.toString('utf8')).slice(-4000));};
+   // On macOS and Linux, packages with Stellan-Host supervise MCP programs natively (about 3.5 MB instead of a 47 MB Node bridge).
+   const host=await this.nativeBridge();
+   const bridgeArgs=host?nativeBridgeArgs(this.project,command,args,{...env,...secret.env}):undefined;
+   transport=host&&bridgeArgs?new McpProcessTransport(host,bridgeArgs,{...env,...secret.env},diagnostic,true)
+    :new McpProcessTransport(node,[join(this.root,'app/stick-mcp.cjs'),spec],{...env,STICK_MCP_ENV_JSON:JSON.stringify(secret.env)},diagnostic);
   }else{
    const url=new URL(selected.url!);const headers=new Headers(secret.headers);for(const name of ['host','content-length','connection','proxy-authorization','cookie'])if(headers.has(name))throw new McpError('Use API authentication headers, without host, cookie, or transport headers.');
    transport=new McpHttpTransport(url,selected.transport,headers);

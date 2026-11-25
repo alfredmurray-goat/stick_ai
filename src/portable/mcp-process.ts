@@ -10,12 +10,13 @@ export class McpProcessTransport implements Transport {
  onclose:(()=>void)|undefined;onerror:((error:Error)=>void)|undefined;onmessage:((message:JSONRPCMessage)=>void)|undefined;
  private decoder=new TextDecoder('utf-8',{fatal:true});
  private child:ChildProcess|undefined;private exited:Promise<void>=Promise.resolve();private lines=new McpLines();private closing:Promise<void>|undefined;private notified=false;
- constructor(private executable:string,private args:string[],private env:Record<string,string>,private diagnostic:(bytes:Buffer)=>void){}
+ // lifeline: a fourth pipe the native Host bridge watches; closing it (or the app exiting) ends the MCP process group.
+ constructor(private executable:string,private args:string[],private env:Record<string,string>,private diagnostic:(bytes:Buffer)=>void,private lifeline=false){}
  private closed(){this.lines.clear();if(this.notified)return;this.notified=true;this.onclose?.();}
  async start(){
   if(this.child)throw Error('MCP transport already started');
   await new Promise<void>((resolve,reject)=>{
-   const child=spawnCommand(this.executable,this.args,{env:this.env,stdio:['pipe','pipe','pipe'],detached:process.platform!=='win32',windowsHide:true});this.child=child;this.exited=new Promise(resolve=>{child.once('exit',()=>resolve());child.once('error',()=>resolve());});
+   const child=spawnCommand(this.executable,this.args,{env:this.env,stdio:this.lifeline?['pipe','pipe','pipe','pipe']:['pipe','pipe','pipe'],detached:process.platform!=='win32',windowsHide:true});this.child=child;this.exited=new Promise(resolve=>{child.once('exit',()=>resolve());child.once('error',()=>resolve());});
    child.once('spawn',resolve);child.once('error',error=>{reject(error);this.onerror?.(error);this.closed();});child.once('close',()=>this.closed());
    child.stdin?.on('error',error=>this.onerror?.(error));child.stderr?.on('data',this.diagnostic);
    child.stdout?.on('data',(chunk:Buffer)=>{if(this.closing||this.notified)return;try{

@@ -2,6 +2,22 @@
 
 Stellan-Host is an original C++20 service host. It currently provides inference control, the workspace file service and the session-state store, which now holds the app's **chat memory** in packages that ship Host. It is **not yet a full Node.js replacement for the application**. The desktop HTTP API, agent orchestration, GitHub, hooks, extension management, activation and updating still run in Node. Do not remove Node from app packages until those services have native implementations and pass their existing integration tests.
 
+## Replacing Node: the plan (owner decision, 25 November 2026)
+
+The owner decided Host replaces Node completely. It is done in stages so the app works at every step:
+
+1. **Front door (done):** `stellan-host --front-door UI_FOLDER BACKEND_PORT` answers the window on its own 127.0.0.1 port, serves the window's files itself with the same security headers and Host check, and forwards every API request to the Node backend, which still checks the session key. Packages with Host open the window on Host's address (`src/portable/front-door.ts`); without Host, or if it fails to start, the Node address is used as before.
+2. **Move routes one by one** into Host (state and long-poll, settings, files, approvals, chat memory, MCP, skills, hooks), each with the existing tests pointed at Host.
+3. **Move the agent loop** (prompting Lite through Stellan-Run, tool calls, approvals, compaction).
+4. **Move the rest:** GitHub, updates, activation, the app API.
+5. **Stop shipping Node** once nothing is forwarded.
+
+Tests: `tests/front-door.test.ts` starts the real Node app with Host in front and checks the window, the session key, foreign origins, a wrong Host header, request bodies and the 8-second long-poll.
+
+## MCP bridge (all platforms)
+
+`stellan-host --mcp-bridge CWD -- PROGRAM [ARGS...]` (Windows: `--cmdline APPLICATION COMMAND_LINE`, with a job object) supervises one local MCP server in place of a Node bridge process (about 3.5 MB instead of 47.5 MB per server). See `docs/MCP_CLIENT.md`. 
+
 ## Workspace service (development)
 
 Build `stellan-host` with the runtime CMake project, then run:
@@ -33,9 +49,11 @@ Paths are project-relative: no traversal, absolute paths, drive prefixes or acce
 ## Remaining migration gates
 
 1. Package and verify the host binary on every target; add a cancellable owner-pipe client and route existing file tool tests through it.
-2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. **Durable sessions: done (25 November 2026).** The model's conversation itself (messages and tool exchanges) is saved after every task in up to eight Host records (newest part kept, always starting at a task), validated on load and restored on start, so Lite carries on where it left off rather than from short notes. Next: approvals and the agent loop.
+2. Port agent orchestration, approvals, durable sessions and per-chat memory without losing cancellation or recovery behavior. **Per-chat memory: done (25 November 2026).** After a restart the window shows the current chat again from these saved notes (up to eight turns, long answers shortened), so what the person sees matches what Stellan remembers. **Durable sessions: done (25 November 2026).** The model's conversation itself (messages and tool exchanges) is saved after every task in up to eight Host records (newest part kept, always starting at a task), validated on load and restored on start, so Lite carries on where it left off rather than from short notes. Next: approvals and the agent loop. Gate 3 has started: local MCP servers run under Host instead of a Node bridge on every platform.
 3. Port MCP ownership, GitHub/hooks/update and activation services, preserving credentials and integrity checks.
 4. Move the authenticated app API and desktop lifecycle, then prove a complete packaged start/task/tool/update flow with no bundled or launched Node process.
+
+**Measured cost of what remains in Node (25 November 2026):** the app server idles at about **79 MB RSS** (about 10 MB of it JavaScript heap, the rest the Node runtime), and is about 5,600 lines of TypeScript serving 44 API routes plus the agent loop, GitHub, MCP RPC, hooks, updates and activation. A native rewrite would save roughly 70 MB (Lite uses about 4.4 GB) at the cost of weeks of work and a second implementation to maintain. Per-instance Node processes were the better target and are done (MCP bridges, 47.5 → 3.5 MB each). Recommended order from here: keep Node for the app server until the owner decides; port only pieces that are per-instance, run often, or are security-critical; and measure each one before starting.
 
 Only the fourth gate permits calling Host the full app backend replacement. The gates are implementation work, not a feature reduction or a renamed Node process.
 
