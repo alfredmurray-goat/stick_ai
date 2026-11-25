@@ -1,3 +1,4 @@
+import { rootCertificates } from "node:tls";
 import { lockedModels, lockedRecords } from "./locked-models.js";
 import { cp, mkdir, writeFile, chmod, lstat, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -40,6 +41,9 @@ export async function buildPlatform(project: string, output: string, target: Tar
       const host = join(staging, `bin/${target}/stellan-host${target === "windows-x64" ? ".exe" : ""}`);
       await cp(input.host, host); await chmod(host, 0o755);
     }
+    // Host's HTTPS trusts exactly these roots (the same list this Node release trusts), so the app needs no Node at
+    // run time to check certificates.
+    await writeFile(join(staging, "app/trusted-roots.pem"), rootCertificates.join("\n") + "\n");
     await cp(join(project, "portable/ui"), join(staging, "app/ui"), { recursive: true });
     await cp(input.app, join(staging, desktop), { recursive: true, preserveTimestamps: true });
     await cp(input.node, join(staging, node)); await cp(input.server, join(staging, server));

@@ -131,6 +131,29 @@ int agent_mode() {
         if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
         return reply.find("result")->string();
     };
+    // The app runs hooks and Max for Host when it says it has them; tokens and code stay in the app's processes.
+    if (const auto *h = request.find("hooks"); h && std::get<bool>(h->data)) {
+        io.before = [&](const std::string &name, const std::string &arguments) -> std::optional<std::string> {
+            send("before", {{"name", str(name)}, {"arguments", str(arguments)}});
+            const auto reply = answer();
+            if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
+            const auto *blocked = reply.find("blocked");
+            if (blocked && blocked->is_string() && !blocked->string().empty()) { return blocked->string(); }
+            return std::nullopt;
+        };
+        io.after = [&](const std::string &name, const std::string &arguments, const std::string &result) {
+            send("after", {{"name", str(name)}, {"arguments", str(arguments)}, {"result", str(result)}});
+            const auto reply = answer();
+            if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
+            return reply.find("notes")->string();
+        };
+    }
+    io.code = [&](const std::string &task, const std::string &context) {
+        send("code", {{"task", str(task)}, {"context", str(context)}});
+        const auto reply = answer();
+        if (const auto *error = reply.find("error")) { throw std::runtime_error(error->string()); }
+        return reply.find("result")->string();
+    };
     io.emit = [&](const std::string &text, bool thinking) { if (client && summary_streamed && !thinking) { return; } send("emit", {{"text", str(text)}, {"thinking", json::Value {thinking}}}); };
     io.log = [&](const std::string &text) { send("log", {{"text", str(text)}}); };
     io.save = [&](const std::vector<agent::Message> &batch) { send("save", {{"batch", message_list(batch)}}); };
@@ -143,7 +166,7 @@ int agent_mode() {
     };
     const auto outcome = agent::run_agent(request.find("task")->string(), messages, static_cast<std::size_t>(std::get<double>(request.find("maxSteps")->data)),
         request.find("taskInstructions")->string(), std::get<double>(request.find("historyBytes")->data), tools,
-        agent::Specialist {std::get<double>(request.find("totalBytes")->data), std::get<double>(request.find("recommendedBytes")->data), std::get<bool>(request.find("noSwap")->data)}, io);
+        agent::Specialist {std::get<double>(request.find("totalBytes")->data), std::get<double>(request.find("recommendedBytes")->data), std::get<bool>(request.find("noSwap")->data), [&] { const auto *a = request.find("available"); return a && std::get<bool>(a->data); }()}, io);
     send("done", {{"outcome", str(outcome)}, {"messages", message_list(messages)}});
     return 0;
 }

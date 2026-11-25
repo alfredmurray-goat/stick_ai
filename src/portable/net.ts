@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,7 +73,8 @@ export async function enableHostNetwork(root: string, log: (error: unknown) => v
     if (process.env.STICK_NETWORK_ON_NODE === "1") { return false; }
     const host = nativeHostExecutable(root);
     if (!host || (await hashFile(host.executable)).sha256 !== host.sha256) { return false; }
-    useHostNetwork(host.executable, await trustedRoots(undefined));
+    const packaged = join(root, "app", "trusted-roots.pem");
+    useHostNetwork(host.executable, await trustedRoots(existsSync(packaged) ? packaged : undefined));
     return true;
   } catch (error) { log(error); return false; }
 }
