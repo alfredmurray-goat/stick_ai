@@ -59,7 +59,8 @@ async function hostWindow(root: string, model: Model): Promise<Window> {
 // Values that legitimately differ between runs: temporary paths, random IDs, timings and free disk space.
 function normalise(value: unknown, root: string): unknown {
   if (typeof value === "string") {
-    return value.split(root).join("<root>").replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>").replace(/chats\/[0-9a-f]{24}\//g, "chats/<hash>/");
+    // Windows may report the temporary folder under its long or short (8.3) name, so match it by its unique folder name.
+    return value.split(root).join("<root>").replace(/(?:[A-Za-z]:)?[^\s"]*?stick-contract-[A-Za-z0-9]{6}/g, "<root>").replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>").replace(/chats([\\/])[0-9a-f]{24}[\\/]/g, "chats$1<hash>$1");
   }
   if (Array.isArray(value)) { return value.map((item) => normalise(item, root)); }
   if (value && typeof value === "object") {
