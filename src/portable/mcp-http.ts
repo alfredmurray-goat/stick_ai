@@ -1,3 +1,4 @@
+import {appFetch} from './net.js';
 import {McpLines} from './mcp-lines.js';
 import {parseMcpMessage} from './mcp-wire.js';
 import type {JSONRPCMessage,Transport,RpcId} from './mcp-types.js';
@@ -29,7 +30,7 @@ function isRequest(message:JSONRPCMessage):message is JSONRPCMessage&{id:RpcId;m
 export class McpHttpTransport implements Transport {
  onmessage?:Transport['onmessage'];onerror?:Transport['onerror'];onclose?:Transport['onclose'];
  private control=new AbortController();private started=false;private ended=false;private version:string|undefined;private session:string|undefined;private endpoint:URL|undefined;private listener:Promise<void>|undefined;private listening=false;
- constructor(private url:URL,private mode:'http'|'sse',private auth:Headers=new Headers(),private fetcher:typeof fetch=fetch){}
+ constructor(private url:URL,private mode:'http'|'sse',private auth:Headers=new Headers(),private fetcher:typeof fetch=appFetch){}
  setProtocolVersion(version:string){this.version=version;}
  private headers(accept:string){const h=new Headers(this.auth);h.set('Accept',accept);if(this.version)h.set('MCP-Protocol-Version',this.version);if(this.session)h.set('MCP-Session-Id',this.session);return h;}
  private async request(url:URL,init:RequestInit){

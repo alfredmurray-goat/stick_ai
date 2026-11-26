@@ -106,9 +106,10 @@ updates and activation routes move, then Node leaves the stick.
 ## GitHub, updates and activation go online through Host
 
 Host has HTTPS built in: Mbed TLS v3.6.8 (Apache-2.0), pinned by commit and built from source with the app
-(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request per line, always checks the server's certificate and
+(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request, always checks the server's certificate and
 name against the trusted roots, refuses plain `http://`, never follows redirects (the app's callers already handle
-them), and streams the body to a file so large update downloads never sit in memory.
+them), and streams the body to the app as it arrives (status and headers first, then the raw bytes), so large downloads never
+sit in memory and MCP event streams work.
 
 In the app, `src/portable/net.ts` has `appFetch`, which GitHub sign-in, GitHub workspaces, updates, activation and
 HTTP hooks use. When the package's Stellan-Host matches its manifest, `appFetch` goes through Host; otherwise it uses

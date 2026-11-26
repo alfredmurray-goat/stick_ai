@@ -9,6 +9,11 @@
 #include <mbedtls/x509_crt.h>
 
 #include <algorithm>
+#include <cstdio>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -50,7 +55,7 @@ struct Tls {
 std::string lower(std::string s) { for (auto &c : s) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); } return s; }
 }
 
-Response request(const Request &r, const std::function<void(const char *, std::size_t)> &sink) {
+Response request(const Request &r, const std::function<void(const char *, std::size_t)> &sink, const std::function<void(const Response &)> &on_headers) {
     const auto url = parse_url(r.url);
     for (const auto &[name, value] : r.headers) {
         for (const char c : name + value) { if (c == '\r' || c == '\n') { throw std::runtime_error("Invalid header"); } }
@@ -66,7 +71,7 @@ Response request(const Request &r, const std::function<void(const char *, std::s
     mbedtls_ssl_conf_ca_chain(&tls.conf, &tls.ca, nullptr);
     mbedtls_ssl_conf_rng(&tls.conf, mbedtls_ctr_drbg_random, &tls.drbg);
     mbedtls_ssl_conf_min_tls_version(&tls.conf, MBEDTLS_SSL_VERSION_TLS1_2);
-    mbedtls_ssl_conf_read_timeout(&tls.conf, static_cast<uint32_t>(r.timeout_ms));
+    mbedtls_ssl_conf_read_timeout(&tls.conf, static_cast<uint32_t>(r.timeout_ms > 0 ? r.timeout_ms : 0));
     if ((code = mbedtls_ssl_setup(&tls.ssl, &tls.conf)) != 0 || (code = mbedtls_ssl_set_hostname(&tls.ssl, url.host.c_str())) != 0) { throw std::runtime_error(tls_error("Cannot set up TLS", code)); }
     mbedtls_ssl_set_bio(&tls.ssl, &tls.net, mbedtls_net_send, nullptr, mbedtls_net_recv_timeout);
     while ((code = mbedtls_ssl_handshake(&tls.ssl)) != 0) {
@@ -154,6 +159,7 @@ Response request(const Request &r, const std::function<void(const char *, std::s
             if (k == "content-length") { expected = std::stoll(v); }
         }
         have_headers = true;
+        if (on_headers) { on_headers(response); }
         const auto rest = raw.substr(end + 4);
         raw.clear();
         if (r.method == "HEAD" || response.status == 204 || response.status == 304) { break; }
@@ -172,38 +178,56 @@ Response request(const Request &r, const std::function<void(const char *, std::s
 // line. The body is written to saveTo (a new file) as it arrives; prints {"status","headers":{}} or {"error"}.
 // Requests carry tokens, so nothing is logged.
 int fetch_service(const std::string &ca_file) {
+    // stellan-host --fetch ROOTS: one request {"method","url","headers":{},"body","maxBytes","timeoutMs"} on stdin.
+    // Prints one JSON line {"status","headers":{}} (or {"error"}) as soon as the headers arrive, then the body's raw
+    // bytes as they arrive, so event streams work. A failure after the headers exits with status 2 and a message on
+    // stderr. Requests carry tokens, so nothing is logged.
+#ifdef _WIN32
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
     std::string line;
-    while (std::getline(std::cin, line)) {
-        auto out = std::make_shared<json::Object>();
-        try {
-            const auto value = json::parse(line);
-            Request r;
-            r.ca_file = ca_file;
-            r.method = value.find("method")->string();
-            if (r.method != "GET" && r.method != "POST" && r.method != "PUT" && r.method != "DELETE" && r.method != "PATCH" && r.method != "HEAD") { throw std::runtime_error("Unsupported method"); }
-            r.url = value.find("url")->string();
-            if (const auto *h = value.find("headers")) { for (const auto &[k, v] : h->object()) { r.headers.emplace_back(k, v.string()); } }
-            if (const auto *b = value.find("body"); b && b->is_string()) { r.body = b->string(); }
-            if (const auto *m = value.find("maxBytes")) { r.max_bytes = static_cast<std::size_t>(std::get<double>(m->data)); }
-            if (const auto *t = value.find("timeoutMs")) { r.timeout_ms = static_cast<int>(std::get<double>(t->data)); }
-            const auto &target = value.find("saveTo")->string();
-            const auto path = std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(target.data()), target.size()));
-            if (std::filesystem::exists(std::filesystem::symlink_status(path))) { throw std::runtime_error("The download file already exists"); }
-            std::ofstream file(path, std::ios::binary);
-            if (!file) { throw std::runtime_error("Cannot write the download file"); }
-            const auto response = request(r, [&](const char *data, std::size_t size) { file.write(data, static_cast<std::streamsize>(size)); if (!file) { throw std::runtime_error("Cannot write the download file"); } });
-            file.close();
+    if (!std::getline(std::cin, line)) { return 1; }
+    bool started = false;
+    try {
+        const auto value = json::parse(line);
+        Request r;
+        r.ca_file = ca_file;
+        r.method = value.find("method")->string();
+        if (r.method != "GET" && r.method != "POST" && r.method != "PUT" && r.method != "DELETE" && r.method != "PATCH" && r.method != "HEAD") { throw std::runtime_error("Unsupported method"); }
+        r.url = value.find("url")->string();
+        if (const auto *h = value.find("headers")) { for (const auto &[k, v] : h->object()) { r.headers.emplace_back(k, v.string()); } }
+        if (const auto *b = value.find("body"); b && b->is_string()) { r.body = b->string(); }
+        if (const auto *m = value.find("maxBytes")) { r.max_bytes = static_cast<std::size_t>(std::get<double>(m->data)); }
+        r.timeout_ms = 0;
+        if (const auto *t = value.find("timeoutMs")) { r.timeout_ms = static_cast<int>(std::get<double>(t->data)); }
+        request(r, [&](const char *data, std::size_t size) {
+            std::fwrite(data, 1, size, stdout);
+            std::fflush(stdout);
+            if (std::ferror(stdout)) { throw std::runtime_error("The app stopped reading"); }
+        }, [&](const Response &response) {
             auto headers = std::make_shared<json::Object>();
-            for (const auto &[k, v] : response.headers) { headers->emplace_back(k, json::Value {v}); }
+            for (const auto &[k, v] : response.headers) {
+                if (auto *existing = [&]() -> json::Value * { for (auto &[name, item] : *headers) { if (name == k) { return &item; } } return nullptr; }()) {
+                    *existing = json::Value {existing->string() + (k == "set-cookie" ? "\n" : ", ") + v};
+                } else { headers->emplace_back(k, json::Value {v}); }
+            }
+            auto out = std::make_shared<json::Object>();
             out->emplace_back("status", json::Value {static_cast<double>(response.status)});
             out->emplace_back("headers", json::Value {headers});
-        } catch (const std::exception &error) {
-            out->clear();
-            out->emplace_back("error", json::Value {std::string(error.what())});
-        }
+            const auto text = json::stringify(json::Value {out}) + "\n";
+            std::fwrite(text.data(), 1, text.size(), stdout);
+            std::fflush(stdout);
+            started = true;
+        });
+        std::fflush(stdout);
+        return 0;
+    } catch (const std::exception &error) {
+        if (started) { std::cerr << error.what() << '\n'; return 2; }
+        auto out = std::make_shared<json::Object>();
+        out->emplace_back("error", json::Value {std::string(error.what())});
         std::cout << json::stringify(json::Value {out}) << '\n';
         std::cout.flush();
+        return 0;
     }
-    return 0;
 }
 }
