@@ -106,9 +106,10 @@ updates and activation routes move, then Node leaves the stick.
 ## GitHub, updates and activation go online through Host
 
 Host has HTTPS built in: Mbed TLS v3.6.8 (Apache-2.0), pinned by commit and built from source with the app
-(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request per line, always checks the server's certificate and
+(`src/https.cpp`). `stellan-host --fetch ROOTS` makes one request, always checks the server's certificate and
 name against the trusted roots, refuses plain `http://`, never follows redirects (the app's callers already handle
-them), and streams the body to a file so large update downloads never sit in memory.
+them), and streams the body to the app as it arrives (status and headers first, then the raw bytes), so large downloads never
+sit in memory and MCP event streams work.
 
 In the app, `src/portable/net.ts` has `appFetch`, which GitHub sign-in, GitHub workspaces, updates, activation and
 HTTP hooks use. When the package's Stellan-Host matches its manifest, `appFetch` goes through Host; otherwise it uses
@@ -119,3 +120,24 @@ download and cancelling.
 
 The package ships its trusted roots as `app/trusted-roots.pem` (in the manifest, so `verifyStick` checks it). Still on
 Node: the logic of these features (the routes, the sign-in state and the update steps).
+
+## Removing Node from sticks: the safe order
+
+Sold sticks update themselves, and the updater on each stick decides what a valid update looks like. Until November
+2026 that check required `bin/<platform>/node`, `app/launcher.cjs`, `app/stick-update.cjs` and
+`app/stick-engine.cjs` in every update, so a Node-free update would be rejected as incomplete on every stick in the
+field. Node therefore leaves in this order:
+
+1. **Updater accepts Host-only packages** (done). A manifest with `hostOnly: true` (which needs `nativeHost: true` and
+   `runtime: "stellan-run"`) may omit Node and the `.cjs` files but must carry `bin/<platform>/stellan-host` for every
+   platform. `verifyStick` accepts the same layout. This ships in normal, Node-carrying updates.
+2. **Wait** until sold sticks have taken an update containing step 1 (the update host's download counts show this).
+3. **Host does the remaining Node jobs**: the app server (`web.ts`), starting the engine, the updater itself
+   (`stick-update`; Host already has the gzip decoder, Ed25519 checks and HTTPS it needs) and the desktop shell's calls
+   into Node (`src-tauri/src/updates.rs` runs `node app/stick-update.cjs`).
+4. **First Host-only update**: built with `hostOnly: true`, without Node. A stick that missed step 1 keeps working on
+   its current version and can be updated by hand from the all-devices package.
+
+Native pieces ready for step 3 (each tested against the Node code it replaces): agent loop, engine client, Max
+hand-offs, settings and chat storage, file tools, MCP client and checks, HTTPS (streaming), Ed25519 and model-key
+unwrapping (`--crypto`), gzip (`--gunzip-check`).

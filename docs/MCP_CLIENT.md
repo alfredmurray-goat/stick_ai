@@ -22,8 +22,9 @@ same rules as `mcp-wire.ts`, `mcp-handshake.ts` and `mcp-results.ts` (`src/mcp_w
 64-request and 4 MiB in-flight limits, and matches replies (`src/mcp_client.cpp`). The app talks to it through
 `HostMcpRpc` (`src/portable/mcp-host-rpc.ts`), which has McpRpc's interface, so approvals, hooks and catalog limits
 are unchanged. `tests/mcp-wire-native.test.ts` compares the checks on 4,000 generated messages and
-`tests/mcp-host-client.test.ts` runs the same session against both clients. Remote (HTTP) servers still use the app's
-client.
+`tests/mcp-host-client.test.ts` runs the same session against both clients. Remote (HTTP) servers, including
+Actuent web search, keep the app's Streamable HTTP logic but go online through Host's HTTPS (`appFetch`), which passes
+event streams through as they arrive (`tests/mcp-http-host.test.ts`).
 
 ## Native MCP bridge (Stellan-Host, all platforms)
 
