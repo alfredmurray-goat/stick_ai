@@ -347,3 +347,19 @@ faster prompts, 30% faster decode ([short receipt](evidence/lite-paired-interlea
 [long receipt](evidence/lite-paired-interleaved-long.json)). The first prompt after start also pays for the copy
 (about 6 s here). Not yet measured: Max, Windows (no VNNI path in MSVC builds yet), AMD Zen 4 (AVX512-VNNI branch) and
 8 GB computers. Next: write the layout into the stick when it is made, so even 8 GB computers get it without a copy.
+
+## Max batched prefill (real Max weights)
+
+Max now reads prompts in batches of up to 32 tokens: each weight matrix is read once per batch rather than once per
+token, and attention stays causal token by token. Same 128-token prompt, real Max GGUF (Q4_K_M), 4 threads, Q8 context
+cache, a 4-core x86-64 cloud machine with 15 GB RAM (`--force-max`), one run each:
+
+| Prefill | Prompt time | Prompt tokens/s |
+| --- | --- | --- |
+| Token by token (`STELLAN_RUNTIME_MAX_SEQUENTIAL_PREFILL=1`) | 113.2 s | 1.13 |
+| Batched (default) | 28.5 s | 4.49 |
+
+**3.97x faster.** Both runs chose the same next token (id 1046) with identical top-10 logits to the printed precision,
+and the transformer fixtures match token-by-token evaluation within 1e-4 at 17, 32, 33 and 65 tokens
+(`tests/models.py`). Caveats: one run each, on a machine just below Max's 16 GB requirement, and not yet measured
+against the pinned llama.cpp on the same prompt.
