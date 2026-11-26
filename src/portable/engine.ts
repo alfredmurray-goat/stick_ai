@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { startStellanServer } from "../../portable/stellan-server.mjs";
 import { type Manifest } from "./integrity.js";
 import { lockedNames, ModelLockError, unlockModel } from "./model-lock.js";
@@ -131,6 +132,8 @@ export class ManagedEngine implements Switchable {
   /** Context sizes for this computer and mode; `faster` (the low-memory fallback) caps them at 4,096. */
   plan: ContextPlan = contextPlan(totalmem());
   faster = false;
+  /** CPU threads Stellan-Run uses: 2 keeps the computer light; Settings → Fast raises it (see fastThreads). */
+  threads = 2;
   /** Set when Max would not start with its speed settings; it then runs without them for the session. */
   plainFallback = false;
   activeContextSize = 0;
@@ -213,7 +216,7 @@ export class ManagedEngine implements Switchable {
       if (!primary) throw new UserError("damaged");
       delete env.LLAMA_SPLIT_DIR;
       try {
-        this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: 2, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
+        this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: this.threads, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
       } catch (error) { await this.stop(); throw error; }
       if (!this.child) throw new UserError("loading");
       child = this.child;
@@ -335,7 +338,7 @@ export class ManagedEngine implements Switchable {
     const coder = this.coder;
     if (!coder || coder.active === "stellan-1-max") { return coder; }
     report("Loading the coding model. It stays loaded, so later handoffs start at once...");
-    coder.faster = this.faster; coder.plan = this.plan;
+    coder.faster = this.faster; coder.plan = this.plan; coder.threads = this.threads;
     try { await coder.start("stellan-1-max", signal); return coder; }
     catch (error) {
       // Not enough memory after all, or another failure: swap the models for the rest of the session.
@@ -345,3 +348,6 @@ export class ManagedEngine implements Switchable {
     }
   }
 }
+
+/** Fast mode: every logical CPU up to 8 (prompt reading and replies scale with cores; the window stays responsive). */
+export function fastThreads(cpus = availableParallelism()): number { return Math.max(2, Math.min(8, cpus)); }

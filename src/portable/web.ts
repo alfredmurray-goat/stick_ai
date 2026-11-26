@@ -11,7 +11,7 @@ import { GitHubSignIn, githubAppInstallUrl } from "./github-auth.js";
 import { Activation, ActivationError } from "./activation.js";
 import { McpServers, McpError, actuent, offlineMessage } from "./mcp.js";
 import { maxRecommendedBytes, type ModelName } from "../config/models.js";
-import { contextPlan, diskComfortable, diskMinimum, freeBytes } from "./engine.js";
+import { contextPlan, diskComfortable, diskMinimum, fastThreads, freeBytes } from "./engine.js";
 import { tmpdir } from "node:os";
 import { readExtensionJson, writeExtensionJson, useHostSettings, closeHostSettings } from "./extension-store.js";
 import { compactWebResult } from "./web-search.js";
@@ -129,10 +129,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   for (const load of [() => mcp.load(), () => skills.load(), () => hooks.load()]) { try { await load(); } catch { extensionProblem = "Some extension settings could not be loaded. Review MCP, Skills and Hooks settings."; } }
   // Long context mode keeps far more of the conversation word for word and gives both models bigger
   // windows, at the cost of slower re-reads; it is saved with the app's settings on the stick.
-  let longContext = false, onboarded = false, internet = true; let personal: Personal = { ...emptyPersonal };
+  let longContext = false, fast = false, onboarded = false, internet = true; let personal: Personal = { ...emptyPersonal };
   let appApiEnabled = false, appKey = "";
   try {
-    const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; personal = normalisePersonal(saved?.personal);
+    const saved = await readExtensionJson(root, "preferences.json") as Record<string, unknown> | undefined; longContext = saved?.longContext === true; fast = saved?.fast === true; onboarded = saved?.onboarded === true; internet = saved?.internet !== false; personal = normalisePersonal(saved?.personal);
     const apps = saved?.appApi as Record<string, unknown> | undefined; appApiEnabled = apps?.enabled === true; appKey = typeof apps?.key === "string" && /^stellan-app-[0-9a-f]{48}$/.test(apps.key) ? apps.key : "";
   } catch {}
   // "Allow internet" (on by default) covers everything that reaches beyond this computer: web search,
@@ -145,8 +145,10 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
   let pendingModel: string | undefined;
   if (activation) { await activation.check().catch(log); }
   const needsActivation = (): boolean => Boolean(activation && !activation.active);
-  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, onboarded, internet, personal, appApi: { enabled: appApiEnabled, key: appKey } }).catch(log);
+  const savePreferences = (): Promise<void> => writeExtensionJson(root, "preferences.json", { format: 1, longContext, fast, onboarded, internet, personal, appApi: { enabled: appApiEnabled, key: appKey } }).catch(log);
   engine.plan = contextPlan(options.bytes, longContext);
+  const applySpeed = (): void => { engine.threads = fast ? fastThreads() : 2; if (engine.coder) { engine.coder.threads = engine.threads; } };
+  applySpeed();
   // Free space on this computer, for the window's warning (see diskMinimum in engine.ts).
   // Rounded to 50 MB so the long-polled state doesn't change every minute for nothing.
   const roundedFree = async (): Promise<number | undefined> => { const free = await freeBytes(tmpdir()); return free === undefined ? undefined : Math.floor(free / (50 * 1024 ** 2)) * 50 * 1024 ** 2; };
@@ -349,7 +351,7 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (request.method === "GET" && url.pathname === "/api/chat-memory") { send(response, 200, { ...(chatMemory?.view() ?? {}), notes: chatMemory?.notes() ?? "Chat memory is unavailable." }); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
         const after = Number(url.searchParams.get("after") ?? 0);
-        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, onboarded, internet, personal, personalStyles, personalLimits, appApi: appApiView(), disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
+        const view = () => ({ contextUsage: { model: engine.active ?? resting ?? "stellan-1-lite", used: tokenCounts.get(engine.active ?? resting ?? "stellan-1-lite") ?? null, capacity: engine.activeContextSize || ((engine.active ?? resting) === "stellan-1-max" ? engine.plan.max : engine.plan.lite), source: "last reported reply" }, chatMemory: chatMemory?.view() ?? null, inputs: inputCapabilities, phase, failure, problem, desktop: options.desktop ?? false, activeModel: engine.active ?? resting ?? null, resting: Boolean(resting), progress: progressView, models: options.choices, project: { name: github.view()?.repository ?? "Local project", location: box.root }, repository: github.view(), repositoryBusy: Boolean(repositoryOperation), mcp: mcp.catalog(), skills: skills.view().filter(s=>s.enabled&&s.userInvocable).map(s=>({name:s.name,id:s.id,description:s.description})), paired: pairedFor(engine.active ?? resting ?? null), activation: { required: Boolean(activation?.required), active: !needsActivation() }, longContext, fast, onboarded, internet, personal, personalStyles, personalLimits, appApi: appApiView(), disk: diskFree === undefined ? null : { free: diskFree, minimum: diskMinimum, comfortable: diskComfortable }, contextTokens: { lite: engine.plan.lite, max: engine.plan.max } });
         let state = view(); let key = JSON.stringify(state);
         // With ?wait=<key> the request is held until something changes (or 8 s pass) instead of the page
         // asking twice a second: an idle window costs nothing, and streamed text arrives at once.
@@ -489,6 +491,14 @@ export async function webApp(options: { root: string; engine: ManagedEngine; act
       if (url.pathname === "/api/app-api/new-key") { appKey = newAppKey(); appApi.setKey(appKey); await savePreferences(); send(response, 200, { appApi: appApiView() }); return; }
       if (url.pathname === "/api/personal") { personal = normalisePersonal(data); await savePreferences(); publish("status", "Saved. Stellan will use this from your next message."); send(response, 200, { personal }); return; }
       if (url.pathname === "/api/onboarded") { onboarded = true; await savePreferences(); send(response, 200, {}); return; }
+      if (url.pathname === "/api/speed" && typeof data.fast === "boolean" && !active && !loading && !repositoryOperation) {
+        fast = data.fast; applySpeed();
+        await savePreferences();
+        // The thread count is fixed when a model starts, so restart whichever model is loaded.
+        const model = engine.active ?? resting;
+        if (model) { resting = undefined; restSaved = false; work = (async () => { await engine.stop(); await launch(model); })(); }
+        send(response, 200, { fast }); return;
+      }
       if (url.pathname === "/api/long-context" && typeof data.enabled === "boolean" && !active && !loading && !repositoryOperation) {
         longContext = data.enabled; engine.plan = contextPlan(options.bytes, longContext);
         await savePreferences();

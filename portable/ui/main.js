@@ -379,6 +379,7 @@ async function update() {
     byId("attach-files").disabled = state.phase !== "ready" || state.repositoryBusy || sendingTask || readingAttachments;
     byId("session-model").textContent = (state.activeModel === "stellan-1-max" ? "Stellan-1 Max · code only" : state.paired ? "Stellan-1 Lite + Max · Lite runs tools, Max writes code" : "Stellan-1 Lite") + (state.longContext ? " · long context" : "");
     if (document.activeElement !== byId("long-context")) byId("long-context").checked = Boolean(state.longContext);
+    if (document.activeElement !== byId("fast-speed")) byId("fast-speed").checked = Boolean(state.fast);
     if (document.activeElement !== byId("allow-internet")) byId("allow-internet").checked = state.internet !== false;
     // Stick AI needs very little space on the computer; below the comfortable amount it skips two speed caches.
     const disk = state.disk; const mb = (bytes) => `${Math.round(bytes / 1024 ** 2).toLocaleString()} MB`;
@@ -399,6 +400,7 @@ async function update() {
     byId("context-capacity").textContent = `${state.longContext ? "Long" : "Normal"} · ${(context?.capacity || 0).toLocaleString()} tokens`;
     byId("sidebar-memory-state").textContent = state.chatMemory?.enabled ? "on" : "off";
     byId("long-context").disabled = state.phase !== "ready" || state.repositoryBusy;
+    byId("fast-speed").disabled = state.phase !== "ready" || state.repositoryBusy;
     if (state.contextTokens) byId("long-context-size").textContent = `Now: Lite sees up to ${state.contextTokens.lite.toLocaleString()} tokens, Max up to ${state.contextTokens.max.toLocaleString()}${state.longContext ? "" : " (long context mode raises this)"}.`;
     renderRepository(state.repository, state.repositoryBusy || state.phase === "working" || state.phase === "starting");
     byId("start").disabled = false;
@@ -928,6 +930,11 @@ byId("allow-internet").onchange = async () => {
   const enabled = byId("allow-internet").checked;
   try { await api("/api/internet", { enabled }); toast(enabled ? "Internet extras are on: web search, GitHub and online MCP servers." : "Allow internet is off. Nothing leaves this computer."); }
   catch (error) { byId("allow-internet").checked = !enabled; toast(error.message); }
+};
+byId("fast-speed").onchange = async () => {
+  const fast = byId("fast-speed").checked;
+  try { await api("/api/speed", { fast }); toast(fast ? "Fast mode is on: Stellan uses more of the processor. Restarting the model…" : "Light mode is on: Stellan keeps the computer free. Restarting the model…"); }
+  catch (error) { byId("fast-speed").checked = !fast; toast(error.message); }
 };
 byId("long-context").onchange = async () => {
   const enabled = byId("long-context").checked;
