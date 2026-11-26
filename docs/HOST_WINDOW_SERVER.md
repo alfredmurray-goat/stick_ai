@@ -20,8 +20,12 @@ Host and Node disagreeing. The brain moves first, then the routes around it.
 
 ## Order
 
-1. **Contract first.** Run `tests/portable-web.test.ts` (and the other window tests) against either server,
-   selected by an environment variable, so every step is checked against the behaviour Node has today.
+1. **Contract first (done).** `tests/window-contract.test.ts` plays scripted sessions over HTTP only (guards, the
+   empty window, long-poll wake-up, a task with an approval the user refuses, cancelling a task) against a fake
+   model server, and records each as a transcript with run-to-run noise removed. Two Node runs must give identical
+   transcripts and identical model requests; with `STICK_TEST_WINDOW_HOST=<stellan-host>`, Host's
+   `--window ROOT --test-model URL --test-model-key KEY` must give exactly the same. New scenarios are added as
+   each step moves more routes.
 2. **Brain and long-poll in Host:** state, events, `/api/state?wait=` (8 s hold, 40 ms batching), `/api/dismiss`,
    `/api/stop`. Front door answers these; everything else still goes to Node.
 3. **Model lifecycle:** `/api/start`, warm-up, rest after `STICK_REST_MINUTES`, `/api/speed`, `/api/long-context`,
