@@ -223,3 +223,16 @@ it("updates sticks to releases that list locked models, whether the stick's mode
   expect(validateUpdateManifest(release, "universal").files).toHaveLength(allDevices.length + 4);
   expect(() => validateUpdateManifest(manifestWith([...allDevices, "models/other.gguf"], [...targets]), "universal")).toThrow("Unexpected model file");
 });
+it("accepts Host-only updates (no Node) only with Stellan-Host and Stellan-Run for every platform", async () => {
+  const f = await fixture();
+  const node = (path: string) => /\/node(\.exe)?$|\.cjs$/.test(path);
+  const files = f.manifest.files.filter((record: { path: string }) => !node(record.path));
+  const host = { path: "bin/linux-x64/stellan-host", sha256: "1".repeat(64), size: 1, executable: true };
+  const hostOnly = { ...f.manifest, runtime: "stellan-run", nativeHost: true, hostOnly: true, files: [...files, host, ...(files.some((r: { path: string }) => r.path === "bin/linux-x64/stellan-run") ? [] : [{ path: "bin/linux-x64/stellan-run", sha256: "2".repeat(64), size: 1, executable: true }])] };
+  expect(validateUpdateManifest(hostOnly, "linux-x64").hostOnly).toBe(true);
+  // Without the flag, the same Node-free files are an incomplete update, as on older sticks.
+  expect(() => validateUpdateManifest({ ...hostOnly, hostOnly: undefined }, "linux-x64")).toThrow("Incomplete");
+  expect(() => validateUpdateManifest({ ...hostOnly, files }, "linux-x64")).toThrow("Incomplete");
+  expect(() => validateUpdateManifest({ ...hostOnly, nativeHost: undefined }, "linux-x64")).toThrow("layout");
+  expect(() => validateUpdateManifest({ ...hostOnly, hostOnly: "yes" }, "linux-x64")).toThrow("layout");
+});

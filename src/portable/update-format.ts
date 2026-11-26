@@ -54,16 +54,22 @@ export function validateUpdateManifest(value: unknown, target: UpdateTarget): Ma
     if (!record.path.startsWith("models/")) { size += record.size; if (record.size > maxUpdateBytes || size > 2 * 1024 ** 3) { throw new Error("Update is too large"); } }
   }
   const platforms = target === "universal" ? [...targets] : [target];
-  const required = new Set(["README.txt", "app/update-config.json", "app/stick-update.cjs", "app/launcher.cjs", "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]);
+  // Host-only updates carry no Node: this updater accepts them so that sticks can later move off Node (an older
+  // updater would reject them as incomplete, which is why this check ships before any Node-free update).
+  if (manifest.hostOnly !== undefined && (manifest.hostOnly !== true || manifest.nativeHost !== true)) { throw new Error("Unknown update layout"); }
+  const hostOnly = manifest.hostOnly === true;
+  const required = new Set(["README.txt", "app/update-config.json", ...(hostOnly ? [] : ["app/stick-update.cjs", "app/launcher.cjs"]), "app/ui/index.html", "app/ui/main.js", "app/ui/style.css", "models/stellan-1-lite-q4_k_m.gguf"]);
   for (const platform of platforms) {
     const windows = platform === "windows-x64";
     required.add(platform.startsWith("macos-") ? "Stick AI.app/Contents/MacOS/stick-ai" : windows ? "Stick AI.exe" : "stick-ai");
     required.add(platform.startsWith("macos-") ? "Start.command" : windows ? "Start.bat" : "start.sh");
-    required.add(`bin/${platform}/node${windows ? ".exe" : ""}`); required.add(`bin/${platform}/llama-server${windows ? ".exe" : ""}`);
+    if (hostOnly) { required.add(`bin/${platform}/stellan-host${windows ? ".exe" : ""}`); }
+    else { required.add(`bin/${platform}/node${windows ? ".exe" : ""}`); required.add(`bin/${platform}/llama-server${windows ? ".exe" : ""}`); }
   }
   if (manifest.runtime !== undefined && manifest.runtime !== "stellan-run") throw new Error("Unknown update runtime");
+  if (hostOnly && manifest.runtime !== "stellan-run") throw new Error("Unknown update runtime");
   if (manifest.runtime === "stellan-run") {
-    required.add("app/stick-engine.cjs");
+    if (!hostOnly) required.add("app/stick-engine.cjs");
     for (const platform of platforms) required.add(`bin/${platform}/stellan-run${platform === "windows-x64" ? ".exe" : ""}`);
   }
   for (const path of required) {

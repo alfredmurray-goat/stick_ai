@@ -8,7 +8,7 @@ import { UserError, llamaRelease, nodeRelease, targets, type Target } from "./pl
 
 /** `locked`: an encrypted model split; its size is checked here and its decrypted sha256 when it's unlocked. */
 export interface FileRecord { path: string; sha256: string; size: number; executable: boolean; optional?: boolean; locked?: boolean }
-export interface Manifest { format: 1; llamaRelease: string; nodeRelease: string; runtime?: "stellan-run"; nativeHost?: true; targets?: Target[]; files: FileRecord[] }
+export interface Manifest { format: 1; llamaRelease: string; nodeRelease: string; runtime?: "stellan-run"; nativeHost?: true; hostOnly?: true; targets?: Target[]; files: FileRecord[] }
 export async function hashFile(path: string, signal?: AbortSignal): Promise<{ sha256: string; size: number }> {
   const hash = createHash("sha256"); let size = 0;
   for await (const chunk of createReadStream(path, signal ? { signal } : {})) { size += chunk.length; hash.update(chunk); }
@@ -81,8 +81,10 @@ export async function verifyStick(root: string, optionalMax = false, signal?: Ab
     }
     if (manifest.runtime !== undefined && manifest.runtime !== "stellan-run") issues.push("Unknown runtime");
     if (manifest.runtime === "stellan-run") {
-      for (const path of ["app/stick-engine.cjs", ...selected.map(target => `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`)]) if (!expected.has(path)) issues.push(`Missing Stellan-Run file: ${path}`);
+      for (const path of [...(manifest.hostOnly ? [] : ["app/stick-engine.cjs"]), ...selected.map(target => `bin/${target}/stellan-run${target === "windows-x64" ? ".exe" : ""}`)]) if (!expected.has(path)) issues.push(`Missing Stellan-Run file: ${path}`);
     }
+    // A Host-only package carries no Node at all; Stellan-Host does everything (docs/STELLAN_HOST.md, removal plan).
+    if (manifest.hostOnly !== undefined && (manifest.hostOnly !== true || manifest.nativeHost !== true)) issues.push("Unknown package layout");
     if (manifest.nativeHost !== undefined) {
       if (manifest.nativeHost !== true) issues.push("Unknown native host");
       for (const target of selected) {
