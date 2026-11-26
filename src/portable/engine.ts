@@ -1,5 +1,6 @@
 import { availableParallelism } from "node:os";
 import { startStellanServer } from "../../portable/stellan-server.mjs";
+import { startHostModelServer } from "./host-model-server.js";
 import { type Manifest } from "./integrity.js";
 import { lockedNames, ModelLockError, unlockModel } from "./model-lock.js";
 import { resolveLocalModel } from "./local-models.js";
@@ -148,7 +149,17 @@ export class ManagedEngine implements Switchable {
   modelKey: ((model: ModelName) => Buffer | undefined) | undefined;
   constructor(readonly root: string, readonly target: Target, readonly port: number, private temp: string, private logFd: number, private log: (error: unknown) => void) {}
   get baseUrl(): string { return `http://127.0.0.1:${this.port}`; }
-  private nativeServer: Awaited<ReturnType<typeof startStellanServer>> | undefined;
+  private nativeServer: { close(): Promise<void> } | undefined;
+  private hostModelServer: Promise<string | undefined> | undefined;
+  /** Stellan-Host serves Lite when the package has a Host matching its manifest (STICK_MODEL_ON_NODE=1 keeps Node). */
+  private hostServer(): Promise<string | undefined> {
+    return this.hostModelServer ??= (async () => {
+      if (process.env.STICK_MODEL_ON_NODE === "1") return undefined;
+      const [{ nativeHostExecutable }, { hashFile }] = await Promise.all([import("./native-files.js"), import("./integrity.js")]);
+      const host = nativeHostExecutable(this.root);
+      return host && (await hashFile(host.executable)).sha256 === host.sha256 ? host.executable : undefined;
+    })().catch(() => undefined);
+  }
   nativeRuntime = false;
   gpuFailed = false;
   detectVirtualMachine: () => boolean = isVirtualMac;
@@ -216,7 +227,9 @@ export class ManagedEngine implements Switchable {
       if (!primary) throw new UserError("damaged");
       delete env.LLAMA_SPLIT_DIR;
       try {
-        this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: this.threads, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
+        const hostExecutable = model === "stellan-1-lite" ? await this.hostServer() : undefined;
+        if (hostExecutable) this.nativeServer = await startHostModelServer({ host: hostExecutable, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, threads: this.threads, environment: env, temp: this.temp, signal, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
+        else this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: this.threads, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
       } catch (error) { await this.stop(); throw error; }
       if (!this.child) throw new UserError("loading");
       child = this.child;

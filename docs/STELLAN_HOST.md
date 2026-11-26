@@ -141,3 +141,13 @@ field. Node therefore leaves in this order:
 Native pieces ready for step 3 (each tested against the Node code it replaces): agent loop, engine client, Max
 hand-offs, settings and chat storage, file tools, MCP client and checks, HTTPS (streaming), Ed25519 and model-key
 unwrapping (`--crypto`), gzip (`--gunzip-check`).
+
+## Host serves Lite
+
+`stellan-host --serve-model` replaces `portable/stellan-server.mjs` for Lite: the same routes (`/health`,
+`/v1/models`, `/slots`, `/capabilities`, `/apply-template`, `/completion`, `/v1/chat/completions` with event streams),
+the same key check, limits and messages, and the same Lite chat template. It runs the model through Host's session mode
+with `--tagged`, using Host's native tokenizer, which matched `tokenizer.mjs` on 203 real Lite prompts (special tokens,
+emoji, other scripts). On the real Lite model, 12 of 13 checks against the Node server were identical, and the
+thirteenth differed only in timing figures. The app uses it whenever the package's Host matches its manifest
+(`STICK_MODEL_ON_NODE=1` keeps the Node server). Max still uses the Node server: its tokenizer is not native yet.
