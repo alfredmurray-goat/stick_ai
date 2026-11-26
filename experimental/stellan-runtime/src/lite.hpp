@@ -32,6 +32,9 @@ private:
     std::int32_t eos_;
     bool bpe_ = false;
     std::unordered_map<std::string, unsigned> byte_characters_;
+    std::unordered_map<std::string, std::int32_t> ranks_;
+    std::string byte_strings_[256];
+    void tekken(const std::string &text, std::vector<std::int32_t> &output) const;
     void ordinary(const std::string &text, std::vector<std::int32_t> &output, bool prefix) const;
 };
 

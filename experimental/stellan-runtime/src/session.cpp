@@ -125,7 +125,7 @@ struct LoadedSession {
         const auto boundary = model->number("tokenizer.ggml.eos_token_id");
         if (boundary < 0 || boundary >= static_cast<double>(model->vocabulary().size()) || std::floor(boundary) != boundary) throw std::runtime_error("Invalid end token");
         eos = static_cast<std::int32_t>(boundary);
-        if (options.text && (model->architecture() != "mamba2" || model->text("tokenizer.ggml.model") != "llama")) throw std::runtime_error("Native host text currently supports Lite SentencePiece; use --token-ids for Max");
+        if (options.text && !(model->architecture() == "mamba2" && model->text("tokenizer.ggml.model") == "llama") && !(model->architecture() == "llama" && model->text("tokenizer.ggml.model") == "gpt2")) throw std::runtime_error("Native host text supports the Lite and Max tokenizers only");
         if (options.host) tokenizer.emplace(*model);
         if (model->architecture() == "mamba2") { engine = std::make_unique<Lite>(*model, threads); }
         else if (model->architecture() == "llama") { engine = std::make_unique<Max>(*model, threads, context); }

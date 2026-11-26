@@ -142,7 +142,7 @@ Native pieces ready for step 3 (each tested against the Node code it replaces): 
 hand-offs, settings and chat storage, file tools, MCP client and checks, HTTPS (streaming), Ed25519 and model-key
 unwrapping (`--crypto`), gzip (`--gunzip-check`).
 
-## Host serves Lite
+## Host serves Lite and Max
 
 `stellan-host --serve-model` replaces `portable/stellan-server.mjs` for Lite: the same routes (`/health`,
 `/v1/models`, `/slots`, `/capabilities`, `/apply-template`, `/completion`, `/v1/chat/completions` with event streams),
@@ -150,4 +150,11 @@ the same key check, limits and messages, and the same Lite chat template. It run
 with `--tagged`, using Host's native tokenizer, which matched `tokenizer.mjs` on 203 real Lite prompts (special tokens,
 emoji, other scripts). On the real Lite model, 12 of 13 checks against the Node server were identical, and the
 thirteenth differed only in timing figures. The app uses it whenever the package's Host matches its manifest
-(`STICK_MODEL_ON_NODE=1` keeps the Node server). Max still uses the Node server: its tokenizer is not native yet.
+(`STICK_MODEL_ON_NODE=1` keeps the Node server).
+
+Max is served the same way. Host now has Max's "Tekken" tokenizer natively (`src/tokenizer.cpp`): the pre-tokenizer
+rules are hand-written to follow the JavaScript regex exactly, using Unicode class tables generated from Node
+(`src/unicode_classes.hpp`), then byte-level BPE merges in the same order as `tokenizer.mjs`. It matched
+`tokenizer.mjs` on all 203 standard prompts and on 3,000 random prompts mixing line breaks, slashes, accents,
+combining marks, digits, title-case letters and unusual spaces. Max keeps its own template (system text in
+`[SYSTEM_PROMPT]`), plain (untagged) completions and the 8-bit context cache, as before.

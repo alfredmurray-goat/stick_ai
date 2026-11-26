@@ -36,7 +36,7 @@ namespace { using socket_t = SOCKET; constexpr socket_t invalid_socket = INVALID
 namespace { using socket_t = int; constexpr socket_t invalid_socket = -1; void close_socket(socket_t s) { close(s); } }
 #endif
 
-// stellan-host --serve-model: Lite's local model server in Host, replacing portable/stellan-server.mjs for Lite.
+// stellan-host --serve-model: Lite's and Max's local model server in Host, replacing portable/stellan-server.mjs.
 // It answers the same routes with the same checks and messages, and runs the model through Host's own session mode
 // (`stellan-host MODEL SHA THREADS CONTEXT --tagged`), whose native tokenizer matches tokenizer.mjs.
 namespace stellan::model_server {
@@ -47,8 +47,8 @@ Value num(double d) { return Value {d}; }
 Value obj(std::vector<std::pair<std::string, Value>> fields) { auto o = std::make_shared<json::Object>(); for (auto &f : fields) { o->push_back(std::move(f)); } return Value {o}; }
 Value arr(std::vector<Value> items) { auto a = std::make_shared<json::Array>(); for (auto &i : items) { a->push_back(std::move(i)); } return Value {a}; }
 
-// chatPrompt in stellan-server.mjs, Lite branch.
-std::string chat_prompt(const Value *messages) {
+// chatPrompt in stellan-server.mjs: Max carries the system text in its own block, Lite in the first user turn.
+std::string chat_prompt(const Value *messages, bool max) {
     const auto fail = [] { throw std::runtime_error("Use bounded text messages with system, user or assistant roles"); };
     if (!messages || !messages->is_array() || messages->array().empty() || messages->array().size() > 1024) { fail(); }
     std::string system;
@@ -64,10 +64,10 @@ std::string chat_prompt(const Value *messages) {
         else { turns.push_back(&m); }
     }
     if (turns.empty() || turns[0]->find("role")->string() != "user") { throw std::runtime_error("A user message is required"); }
-    std::string prompt = "<s>";
+    std::string prompt = max ? "<s>[SYSTEM_PROMPT]" + system + "[/SYSTEM_PROMPT]" : "<s>";
     for (std::size_t i = 0; i < turns.size(); ++i) {
         const auto &content = turns[i]->find("content")->string();
-        if (turns[i]->find("role")->string() == "user") { prompt += "[INST] " + (i == 0 && !system.empty() ? system + "\n\n" : std::string()) + content + " [/INST]"; }
+        if (turns[i]->find("role")->string() == "user") { prompt += "[INST] " + (i == 0 && !max && !system.empty() ? system + "\n\n" : std::string()) + content + " [/INST]"; }
         else {
             // /^\s/: does the reply already start with JavaScript whitespace?
             const auto lead = content.empty() ? 0 : static_cast<unsigned char>(content[0]);
@@ -298,7 +298,7 @@ void Server::handle(socket_t client) {
     try { if (too_large) { throw std::runtime_error("large"); } input = json::parse(r.body); }
     catch (const std::exception &) { json_reply(client, 400, obj({{"error", str("Use a valid JSON request under 1 MiB")}})); close_socket(client); return; }
     if (r.path == "/apply-template") {
-        try { json_reply(client, 200, obj({{"prompt", str(chat_prompt(input.is_object() ? input.find("messages") : nullptr))}})); }
+        try { json_reply(client, 200, obj({{"prompt", str(chat_prompt(input.is_object() ? input.find("messages") : nullptr, name == "stellan-1-max"))}})); }
         catch (const std::exception &error) { json_reply(client, 400, obj({{"error", str(error.what())}})); }
         close_socket(client); return;
     }
@@ -309,7 +309,7 @@ void Server::handle(socket_t client) {
     try {
         if (!input.is_object()) { throw std::runtime_error("Use text and a token limit from 0 to 4096"); }
         if (const auto *m = input.find("model"); m && !(m->is_string() && m->string() == name)) { throw std::runtime_error("This model is not loaded"); }
-        const auto prompt = r.path == "/completion" ? (input.find("prompt") && input.find("prompt")->is_string() ? input.find("prompt")->string() : std::string("\x01invalid")) : chat_prompt(input.find("messages"));
+        const auto prompt = r.path == "/completion" ? (input.find("prompt") && input.find("prompt")->is_string() ? input.find("prompt")->string() : std::string("\x01invalid")) : chat_prompt(input.find("messages"), name == "stellan-1-max");
         const auto *limit = input.find("max_tokens"); if (!limit || limit->is_null()) { limit = input.find("n_predict"); }
         double max = 2048;
         if (limit && !limit->is_null()) { if (!std::holds_alternative<double>(limit->data)) { max = -1; } else { max = std::get<double>(limit->data); } }
@@ -340,7 +340,9 @@ void Server::handle(socket_t client) {
                 tokens.push_back(*e.find("id"));
                 const auto piece = decoder.push(unhex(e.find("bytes_hex")->string()), false);
                 text += piece;
-                if (r.path == "/v1/chat/completions" && !piece.empty()) {
+                if (r.path == "/v1/chat/completions" && !piece.empty() && name == "stellan-1-max") {
+                    event(obj({{"choices", arr({obj({{"delta", obj({{"content", str(piece)}})}})})}}));
+                } else if (r.path == "/v1/chat/completions" && !piece.empty()) {
                     if (!last_text.empty()) { event(obj({{"choices", arr({obj({{"delta", obj({{"content", str(last_text)}})}})})}})); }
                     last_text = piece;
                 }
@@ -376,8 +378,11 @@ int serve(int argc, char **argv) {
     std::string key((std::istreambuf_iterator<char>(key_file)), std::istreambuf_iterator<char>());
     while (!key.empty() && (key.back() == '\n' || key.back() == '\r' || key.back() == ' ')) { key.pop_back(); }
     if (key.size() < 32) { throw std::runtime_error("A private server key is required"); }
-    if (std::string(argv[9]) != "stellan-1-lite") { throw std::runtime_error("Host serves Lite only for now"); }
-    std::vector<std::string> args {argv[2], argv[3], argv[4], argv[5], argv[6], "--tagged"};
+    const std::string model_name = argv[9];
+    if (model_name != "stellan-1-lite" && model_name != "stellan-1-max") { throw std::runtime_error("Host serves Stellan-1 Lite and Max only"); }
+    // Tagged stopping follows Lite's tool protocol; Max runs plain completions, as in stellan-server.mjs.
+    std::vector<std::string> args {argv[2], argv[3], argv[4], argv[5], argv[6]};
+    if (model_name == "stellan-1-lite") { args.emplace_back("--tagged"); }
     for (int i = 10; i < argc; ++i) { args.emplace_back(argv[i]); }
     auto server = std::make_unique<Server>(key, argv[9], std::stod(argv[6]), args);
 #ifdef _WIN32

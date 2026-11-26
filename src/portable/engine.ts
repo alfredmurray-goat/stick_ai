@@ -227,8 +227,8 @@ export class ManagedEngine implements Switchable {
       if (!primary) throw new UserError("damaged");
       delete env.LLAMA_SPLIT_DIR;
       try {
-        const hostExecutable = model === "stellan-1-lite" ? await this.hostServer() : undefined;
-        if (hostExecutable) this.nativeServer = await startHostModelServer({ host: hostExecutable, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, threads: this.threads, environment: env, temp: this.temp, signal, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
+        const hostExecutable = await this.hostServer();
+        if (hostExecutable) this.nativeServer = await startHostModelServer({ host: hostExecutable, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, threads: this.threads, environment: model === "stellan-1-max" ? { ...env, STELLAN_RUNTIME_KV_Q8: "1" } : env, temp: this.temp, signal, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
         else this.nativeServer = await startStellanServer({ executable: join(this.root, enginePath), executableSha256: binary.sha256, model: modelPath, sha256: primary, modelName: model, key: this.key, port: this.port, context: contextSize, signal, threads: this.threads, kvCache: model === "stellan-1-max" ? "q8_0" : "f16", environment: env, ...(selected.locked ? { splitModel: selected.path, splitSha256: selected.locked.model.restSha256 } : {}), onProcess: process => { this.child = process; this.onProcess?.(process.pid ?? null); } });
       } catch (error) { await this.stop(); throw error; }
       if (!this.child) throw new UserError("loading");

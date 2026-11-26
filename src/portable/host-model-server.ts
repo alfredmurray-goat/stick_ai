@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 /**
- * Lite's local model server run by Stellan-Host (`stellan-host --serve-model`) instead of inside the app's Node
+ * Lite's and Max's local model server run by Stellan-Host (`stellan-host --serve-model`) instead of inside the app's Node
  * process: same routes, checks and replies as portable/stellan-server.mjs, with Host's own tokenizer and session.
  */
 export async function startHostModelServer(options: {
