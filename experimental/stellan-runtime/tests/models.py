@@ -217,17 +217,19 @@ class ExecutionTests(unittest.TestCase):
             for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
 
     def test_transformer_prefill_skips_intermediate_output_without_changing_logits(self):
-        fixture = Fixture("llama")
-        data = fixture.bytes(); self.file.write_bytes(data)
-        tokens = [1] + [68 + i % 8 for i in range(16)]
-        for token in tokens: logits = fixture.step(token)
-        result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "1", "3", "64"], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
-        events = [json.loads(line) for line in result.stdout.splitlines()]
-        progress = [event['completed'] for event in events if event['event'] == 'prompt_progress']
-        self.assertEqual(progress, list(range(1, len(tokens) + 1)))
-        event = next(event for event in events if event['event'] == 'token')
-        self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
-        for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
+        # Max reads prompts in batches of up to 32 tokens; logits must match token-by-token evaluation at every size.
+        for size in (17, 32, 33, 65):
+            fixture = Fixture("llama")
+            data = fixture.bytes(); self.file.write_bytes(data)
+            tokens = [1] + [68 + i % 8 for i in range(size - 1)]
+            for token in tokens: logits = fixture.step(token)
+            result = subprocess.run([EXECUTABLE, "decode", str(self.file), hashlib.sha256(data).hexdigest(), ','.join(map(str, tokens)), "1", "3", "128"], capture_output=True, text=True, encoding="utf-8", timeout=15, check=True)
+            events = [json.loads(line) for line in result.stdout.splitlines()]
+            progress = [event['completed'] for event in events if event['event'] == 'prompt_progress']
+            self.assertEqual(progress, [min(done, size) for done in range(32, size + 32, 32)])
+            event = next(event for event in events if event['event'] == 'token')
+            self.assertEqual(event['id'], max(range(len(logits)), key=lambda i: logits[i]))
+            for item in event['top']: self.assertAlmostEqual(item['logit'], logits[item['id']], delta=0.0001)
 
     def test_session_errors_clear_state_and_hash_tampering_is_refused(self):
         data = Fixture("mamba2").bytes(); self.file.write_bytes(data)

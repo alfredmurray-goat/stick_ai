@@ -6,6 +6,9 @@ on:
       - 'src/tools/**'
       - 'experimental/stellan-runtime/**'
       - 'tests/native-files.test.ts'
+      - 'tests/update-native.test.ts'
+      - 'src/portable/update*.ts'
+      - 'src-tauri/src/updates.rs'
       - '.github/workflows/native-host-app.yml'
 permissions:
   contents: read
@@ -28,8 +31,12 @@ jobs:
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
       - run: cmake -S experimental/stellan-runtime -B native-host-app -DCMAKE_BUILD_TYPE=Release
-      - run: cmake --build native-host-app --config Release --target stellan-host --parallel 2
+      - run: cmake --build native-host-app --config Release --target stellan-host stellan-update-testing --parallel 2
       - name: Exercise agent file tools against the real native host
         env:
           STELLAN_REQUIRE_NATIVE_HOST: '1'
         run: npx vitest run tests/native-files.test.ts
+      - name: Run the native app updater end to end (check, prepare, install, rollback, all-devices sticks)
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/update-native.test.ts

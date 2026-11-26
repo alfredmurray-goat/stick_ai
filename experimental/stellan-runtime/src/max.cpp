@@ -106,10 +106,10 @@ void Max::normalize(std::span<const float> input, std::span<const float> weights
     const auto scale = static_cast<float>(1 / std::sqrt(sum / static_cast<double>(input.size()) + epsilon_));
     for (std::size_t i = 0; i < input.size(); ++i) { output[i] = input[i] * scale * weights[i]; }
 }
-void Max::rotate(std::span<float> values, std::size_t heads) const {
+void Max::rotate(std::span<float> values, std::size_t heads, std::size_t position) const {
     for (std::size_t h = 0; h < heads; ++h) {
         for (std::size_t i = 0; i < head_width_; i += 2) {
-            const auto angle = static_cast<double>(position_) / std::pow(rope_base_, static_cast<double>(i) / static_cast<double>(head_width_));
+            const auto angle = static_cast<double>(position) / std::pow(rope_base_, static_cast<double>(i) / static_cast<double>(head_width_));
             const auto c = static_cast<float>(std::cos(angle));
             const auto s = static_cast<float>(std::sin(angle));
             const auto index = h * head_width_ + i;
@@ -120,6 +120,104 @@ void Max::rotate(std::span<float> values, std::size_t heads) const {
         }
     }
 }
+// Causal attention of one query at `position` over the cached keys and values 0..position (heads shared across cores).
+void Max::attend(Layer &layer, std::span<const float> query, std::size_t position, std::span<float> output, const std::function<bool()> &cancelled) {
+    executor_.parallel(heads_, [&](std::size_t first, std::size_t last) {
+        std::vector<float> scores(position + 1), cached(head_width_);
+        for (auto h = first; h < last; ++h) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            const auto kv_head = h / (heads_ / kv_heads_);
+            float maximum = -INFINITY;
+            for (std::size_t t = 0; t <= position; ++t) {
+                float score = 0;
+                layer.keys.decode(t, kv_head * head_width_, cached);
+                for (std::size_t i = 0; i < head_width_; ++i) { score += query[h * head_width_ + i] * cached[i]; }
+                scores[t] = score / std::sqrt(static_cast<float>(head_width_));
+                maximum = std::max(maximum, scores[t]);
+            }
+            float denominator = 0;
+            for (auto &score : scores) { score = std::exp(score - maximum); denominator += score; }
+            for (auto &score : scores) { score /= denominator; }
+            auto result = output.subspan(h * head_width_, head_width_);
+            std::fill(result.begin(), result.end(), 0.0F);
+            for (std::size_t t = 0; t <= position; ++t) {
+                layer.values.decode(t, kv_head * head_width_, cached);
+                for (std::size_t i = 0; i < head_width_; ++i) { result[i] += scores[t] * cached[i]; }
+            }
+        }
+    });
+}
+// Weights are read once for up to prefill_batch_limit prompt tokens instead of once per token: reading the weights is
+// what limits prompt speed on a CPU. Same arithmetic per token as multiply().
+void Max::multiply_batch(const Tensor *matrix, std::span<const float> input, std::span<float> output, std::size_t batch, const std::function<bool()> &cancelled) {
+    const auto columns = static_cast<std::size_t>(matrix->dimensions[0]);
+    const auto rows = static_cast<std::size_t>(matrix->dimensions[1]);
+    if (batch == 0 || batch > prefill_batch_limit || input.size() != batch * columns || output.size() != batch * rows) { throw std::runtime_error("Invalid prefill matrix dimensions"); }
+    const auto data = model_.data(*matrix);
+    const auto stride = row_bytes(matrix->type, columns);
+    const bool fast = (matrix->type == 12 || matrix->type == 14) && !environment_set("STELLAN_RUNTIME_PRECISE");
+    std::array<std::span<const QuantizedInput>, prefill_batch_limit> views;
+    if (fast) {
+        executor_.parallel(batch, [&](std::size_t first, std::size_t last) {
+            for (auto t = first; t < last; ++t) { quantize_input(input.subspan(t * columns, columns), batch_quantized_[t]); }
+        });
+        for (std::size_t t = 0; t < batch; ++t) { views[t] = batch_quantized_[t]; }
+    }
+    executor_.parallel(rows, [&](std::size_t first, std::size_t last) {
+        std::array<float, prefill_batch_limit> values;
+        for (auto row = first; row < last; ++row) {
+            if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
+            const auto weights = data.subspan(row * stride, stride);
+            if (fast) {
+                quantized_batch_dot(matrix->type, weights, std::span(views).first(batch), std::span(values).first(batch));
+                for (std::size_t t = 0; t < batch; ++t) { output[t * rows + row] = values[t]; }
+            } else {
+                for (std::size_t t = 0; t < batch; ++t) { output[t * rows + row] = dot(matrix->type, weights, input.subspan(t * columns, columns)); }
+            }
+        }
+    });
+}
+void Max::prefill_batch(std::span<const std::int32_t> tokens, const std::function<bool()> &cancelled, bool output_logits) {
+    const auto batch = tokens.size();
+    const auto query_width = heads_ * head_width_, kv_width = kv_heads_ * head_width_;
+    batch_hidden_.resize(batch * width_); batch_normalized_.resize(batch * width_); batch_update_.resize(batch * width_);
+    batch_query_.resize(batch * query_width); batch_attended_.resize(batch * query_width);
+    batch_key_.resize(batch * kv_width); batch_value_.resize(batch * kv_width);
+    batch_gate_.resize(batch * feed_forward_); batch_up_.resize(batch * feed_forward_);
+    const auto row = [](std::vector<float> &v, std::size_t t, std::size_t width) { return std::span(v).subspan(t * width, width); };
+    const auto stride = row_bytes(embedding_->type, width_);
+    for (std::size_t t = 0; t < batch; ++t) { decode_row(embedding_->type, model_.data(*embedding_).subspan(static_cast<std::size_t>(tokens[t]) * stride, stride), row(batch_hidden_, t, width_)); }
+    for (auto &layer : layers_) {
+        for (std::size_t t = 0; t < batch; ++t) { normalize(row(batch_hidden_, t, width_), layer.attention_norm, row(batch_normalized_, t, width_)); }
+        multiply_batch(layer.q, batch_normalized_, batch_query_, batch, cancelled);
+        multiply_batch(layer.k, batch_normalized_, batch_key_, batch, cancelled);
+        multiply_batch(layer.v, batch_normalized_, batch_value_, batch, cancelled);
+        // Attention stays token by token: each token may only see itself and earlier positions.
+        for (std::size_t t = 0; t < batch; ++t) {
+            rotate(row(batch_query_, t, query_width), heads_, position_ + t);
+            rotate(row(batch_key_, t, kv_width), kv_heads_, position_ + t);
+            layer.keys.write(position_ + t, row(batch_key_, t, kv_width));
+            layer.values.write(position_ + t, row(batch_value_, t, kv_width));
+            attend(layer, row(batch_query_, t, query_width), position_ + t, row(batch_attended_, t, query_width), cancelled);
+        }
+        multiply_batch(layer.out, batch_attended_, batch_update_, batch, cancelled);
+        for (std::size_t i = 0; i < batch * width_; ++i) { batch_hidden_[i] += batch_update_[i]; }
+        for (std::size_t t = 0; t < batch; ++t) { normalize(row(batch_hidden_, t, width_), layer.ffn_norm, row(batch_normalized_, t, width_)); }
+        multiply_batch(layer.gate, batch_normalized_, batch_gate_, batch, cancelled);
+        multiply_batch(layer.up, batch_normalized_, batch_up_, batch, cancelled);
+        for (std::size_t i = 0; i < batch * feed_forward_; ++i) { batch_gate_[i] = batch_gate_[i] / (1 + std::exp(-batch_gate_[i])) * batch_up_[i]; }
+        multiply_batch(layer.down, batch_gate_, batch_update_, batch, cancelled);
+        for (std::size_t i = 0; i < batch * width_; ++i) { batch_hidden_[i] += batch_update_[i]; }
+    }
+    position_ += batch;
+    if (output_logits) {
+        normalize(row(batch_hidden_, batch - 1, width_), final_norm_, normalized_);
+        multiply(output_, normalized_, logits_, cancelled);
+        if (!std::all_of(logits_.begin(), logits_.end(), [](float value) { return std::isfinite(value); })) {
+            throw std::runtime_error("Transformer produced non-finite logits");
+        }
+    }
+}
 const std::vector<float> &Max::step(std::int32_t token, const std::function<bool()> &cancelled) {
     return evaluate(token, cancelled, true);
 }
@@ -127,9 +225,18 @@ const std::vector<float> &Max::prefill(std::span<const std::int32_t> tokens, con
     if (tokens.empty() || tokens.size() > context_ - position_ || !std::all_of(tokens.begin(), tokens.end(), [&](auto token) { return token >= 0 && static_cast<std::size_t>(token) < logits_.size(); })) {
         throw std::runtime_error("Invalid transformer prompt or context is full");
     }
-    for (std::size_t i = 0; i < tokens.size(); ++i) {
-        evaluate(tokens[i], cancelled, i + 1 == tokens.size());
-        if (progress) { progress(i + 1); }
+    if (environment_set("STELLAN_RUNTIME_MAX_SEQUENTIAL_PREFILL")) {
+        for (std::size_t i = 0; i < tokens.size(); ++i) {
+            evaluate(tokens[i], cancelled, i + 1 == tokens.size());
+            if (progress) { progress(i + 1); }
+        }
+        return logits_;
+    }
+    for (std::size_t done = 0; done < tokens.size();) {
+        const auto count = std::min(prefill_batch_limit, tokens.size() - done);
+        prefill_batch(tokens.subspan(done, count), cancelled, done + count == tokens.size());
+        done += count;
+        if (progress) { progress(done); }
     }
     return logits_;
 }
@@ -144,34 +251,11 @@ const std::vector<float> &Max::evaluate(std::int32_t token, const std::function<
         multiply(layer.q, normalized_, query_, cancelled);
         multiply(layer.k, normalized_, key_, cancelled);
         multiply(layer.v, normalized_, value_, cancelled);
-        rotate(query_, heads_);
-        rotate(key_, kv_heads_);
+        rotate(query_, heads_, position_);
+        rotate(key_, kv_heads_, position_);
         layer.keys.write(position_, key_);
         layer.values.write(position_, value_);
-        executor_.parallel(heads_, [&](std::size_t first, std::size_t last) {
-            std::vector<float> scores(position_ + 1), cached(head_width_);
-            for (auto h = first; h < last; ++h) {
-                if (cancelled()) { throw std::runtime_error("Generation cancelled"); }
-                const auto kv_head = h / (heads_ / kv_heads_);
-                float maximum = -INFINITY;
-                for (std::size_t t = 0; t <= position_; ++t) {
-                    float score = 0;
-                    layer.keys.decode(t, kv_head * head_width_, cached);
-                    for (std::size_t i = 0; i < head_width_; ++i) { score += query_[h * head_width_ + i] * cached[i]; }
-                    scores[t] = score / std::sqrt(static_cast<float>(head_width_));
-                    maximum = std::max(maximum, scores[t]);
-                }
-                float denominator = 0;
-                for (auto &score : scores) { score = std::exp(score - maximum); denominator += score; }
-                for (auto &score : scores) { score /= denominator; }
-                auto result = std::span(attended_).subspan(h * head_width_, head_width_);
-                std::fill(result.begin(), result.end(), 0.0F);
-                for (std::size_t t = 0; t <= position_; ++t) {
-                    layer.values.decode(t, kv_head * head_width_, cached);
-                    for (std::size_t i = 0; i < head_width_; ++i) { result[i] += scores[t] * cached[i]; }
-                }
-            }
-        });
+        attend(layer, query_, position_, attended_, cancelled);
         multiply(layer.out, attended_, update_, cancelled);
         for (std::size_t i = 0; i < width_; ++i) { hidden_[i] += update_[i]; }
         normalize(hidden_, layer.ffn_norm, normalized_);
