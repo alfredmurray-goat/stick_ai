@@ -158,3 +158,21 @@ rules are hand-written to follow the JavaScript regex exactly, using Unicode cla
 `tokenizer.mjs` on all 203 standard prompts and on 3,000 random prompts mixing line breaks, slashes, accents,
 combining marks, digits, title-case letters and unusual spaces. Max keeps its own template (system text in
 `[SYSTEM_PROMPT]`), plain (untagged) completions and the 8-bit context cache, as before.
+
+## Host runs app updates
+
+`stellan-host --update` is the app updater (`src/updater.cpp`), a line-by-line port of `src/portable/update.ts`,
+`update-format.ts`, `update-package.ts` and `update-entry.ts`: same arguments, same JSON on stdout, same signature,
+size, hash, layout and model checks, the same staging folder, swap and rollback, and the same reopening of the app. The
+desktop shell (`src-tauri/src/updates.rs`) uses it whenever the stick's Host and trusted roots match the manifest, and
+copies Host (instead of Node) to a temporary folder to install. `STICK_UPDATES_ON_NODE=1` keeps the Node updater.
+
+`tests/update-native.test.ts` runs a whole update against a local HTTPS feed: check, prepare (the staged manifest is
+byte-for-byte what the app's own extraction writes), install (models, projects and logs kept), a forged feed and a
+wrong signing key (refused), a download changed after preparing (rolled back, app reopened with `--update-failed`), an
+installer not running from its temporary copy (refused), and an all-devices stick (apps swapped beside `stellan/`). It
+uses a test-only build, `stellan-update-testing`, which also accepts a test signing key and a feed on a local port;
+only `stellan-host` is ever packaged.
+
+Still on Node: the app's own server (`web.ts`) and the launcher. The first Host-only update can only ship once sticks
+have an updater that accepts it (this one does, as does the Node one since the `hostOnly` change).

@@ -44,16 +44,29 @@ pub fn save_app_update_settings(window: WebviewWindow, state: State<'_, Desktop>
     temporary.persist(&state.settings).map_err(|_| "Cannot save update settings")?;
     Ok(json!({"enabled": settings.enabled, "hasToken": !settings.token.is_empty()}))
 }
-fn command(state: &Desktop, action: &str) -> Result<Value, String> {
+/// The updater to run: Stellan-Host's native one (`stellan-host --update`) when the stick's Host and trusted roots
+/// match its manifest, otherwise the Node one. `STICK_UPDATES_ON_NODE=1` keeps Node.
+enum Updater { Host(String), Node(String) }
+fn updater(state: &Desktop) -> Result<Updater, String> {
     let (platform, executable) = target()?;
-    let relative = format!("bin/{platform}/{executable}");
-    for path in [relative.as_str(), "app/stick-update.cjs", "app/update-config.json"] {
+    let host = format!("bin/{platform}/{}", if cfg!(windows) { "stellan-host.exe" } else { "stellan-host" });
+    let native = std::env::var("STICK_UPDATES_ON_NODE").as_deref() != Ok("1")
+        && [host.as_str(), "app/trusted-roots.pem", "app/update-config.json"].iter().all(|path| verify(&state.root, path).is_ok());
+    if native { return Ok(Updater::Host(host)); }
+    let node = format!("bin/{platform}/{executable}");
+    for path in [node.as_str(), "app/stick-update.cjs", "app/update-config.json"] {
         verify(&state.root, path).map_err(|_| "This copy needs a new download once to enable updates")?;
     }
+    Ok(Updater::Node(node))
+}
+fn command(state: &Desktop, action: &str) -> Result<Value, String> {
     let settings = preferences(state)?;
     let token = std::env::var("STICK_UPDATE_TOKEN").unwrap_or(settings.token);
-    let mut command = Command::new(state.root.join(relative));
-    command.arg(state.root.join("app/stick-update.cjs")).arg("--root").arg(&state.root).arg(action).arg("--parent").arg(std::process::id().to_string());
+    let mut command = match updater(state)? {
+        Updater::Host(host) => { let mut c = Command::new(state.root.join(host)); c.arg("--update"); c }
+        Updater::Node(node) => { let mut c = Command::new(state.root.join(node)); c.arg(state.root.join("app/stick-update.cjs")); c }
+    };
+    command.arg("--root").arg(&state.root).arg(action).arg("--parent").arg(std::process::id().to_string());
     command.current_dir(&state.root).env_clear();
     for name in ["PATH", "Path", "SystemRoot", "ComSpec", "HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"] {
         if let Some(value) = std::env::var_os(name) { command.env(name, value); }
@@ -97,13 +110,22 @@ pub async fn install_app_update(window: WebviewWindow, state: State<'_, Desktop>
         if work.parent() != root.parent() || !work.file_name().ok_or("The update was not prepared")?.to_string_lossy().starts_with(&prefix) { return Err("The update folder is invalid".into()); }
         if owned.runtime.lock().unwrap().closing { return Err("Update cancelled".into()); }
         stop(&owned);
-        let (platform, executable) = target()?;
+        // The installer runs from a temporary copy, because the stick's own copy is about to be replaced.
         let temporary = tempfile::Builder::new().prefix("stick-ai-updater-").tempdir().map_err(|_| "Cannot prepare the update installer")?;
-        let node = temporary.path().join(executable); let helper = temporary.path().join("stick-update.cjs");
-        fs::copy(root.join(format!("bin/{platform}/{executable}")), &node).map_err(|_| "Cannot prepare the update installer")?;
-        fs::copy(root.join("app/stick-update.cjs"), &helper).map_err(|_| "Cannot prepare the update installer")?;
-        let mut install = Command::new(node);
-        install.arg(helper).arg("--apply").arg("--root").arg(&root).arg("--work").arg(&work).arg("--parent").arg(std::process::id().to_string()).arg("--temporary").arg(temporary.path());
+        let mut install = match updater(&owned)? {
+            Updater::Host(host) => {
+                let copy = temporary.path().join(Path::new(&host).file_name().ok_or("Cannot prepare the update installer")?);
+                fs::copy(root.join(&host), &copy).map_err(|_| "Cannot prepare the update installer")?;
+                let mut c = Command::new(copy); c.arg("--update"); c
+            }
+            Updater::Node(node) => {
+                let copy = temporary.path().join(Path::new(&node).file_name().ok_or("Cannot prepare the update installer")?); let helper = temporary.path().join("stick-update.cjs");
+                fs::copy(root.join(&node), &copy).map_err(|_| "Cannot prepare the update installer")?;
+                fs::copy(root.join("app/stick-update.cjs"), &helper).map_err(|_| "Cannot prepare the update installer")?;
+                let mut c = Command::new(copy); c.arg(helper); c
+            }
+        };
+        install.arg("--apply").arg("--root").arg(&root).arg("--work").arg(&work).arg("--parent").arg(std::process::id().to_string()).arg("--temporary").arg(temporary.path());
         install.current_dir(temporary.path()).env_clear().stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
         for name in ["PATH", "Path", "SystemRoot", "ComSpec", "HOME", "USERPROFILE", "TMPDIR", "TEMP", "TMP"] {
             if let Some(value) = std::env::var_os(name) { install.env(name, value); }
@@ -129,7 +151,7 @@ pub fn cleanup_runtime() {
     if path.parent() != Some(parent.as_path()) || !path.file_name().map(|value| value.to_string_lossy().starts_with("stick-ai-updater-")).unwrap_or(false) { return; }
     std::thread::spawn(move || {
         for _ in 0..100 {
-            for file in ["node", "node.exe", "stick-update.cjs"] { let _ = fs::remove_file(path.join(file)); }
+            for file in ["node", "node.exe", "stick-update.cjs", "stellan-host", "stellan-host.exe"] { let _ = fs::remove_file(path.join(file)); }
             if fs::remove_dir(&path).is_ok() { break; }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }

@@ -8,6 +8,7 @@
 #include "crypto.hpp"
 #include "inflate.hpp"
 #include "model_server.hpp"
+#include "updater.hpp"
 namespace stellan { int protocol_check(); int compact_check(); int loop_check(); int agent_mode(); int history_check(); }
 #include "runtime.hpp"
 #include <atomic>
@@ -31,6 +32,7 @@ int entry(int argc, char **argv) {
         if (argc == 2 && std::string_view(argv[1]) == "--compact-check") { return stellan::compact_check(); }
         if (argc == 3 && std::string_view(argv[1]) == "--fetch") { return stellan::https::fetch_service(argv[2]); }
         if (argc >= 2 && std::string_view(argv[1]) == "--mcp-client") { return stellan::mcp::mcp_client(argc, argv); }
+        if (argc >= 2 && std::string_view(argv[1]) == "--update") { return stellan::updater::main(argc, argv); }
         if (argc >= 2 && std::string_view(argv[1]) == "--serve-model") { return stellan::model_server::serve(argc, argv); }
         if (argc == 2 && std::string_view(argv[1]) == "--gunzip-check") { return stellan::inflate::gunzip_check(); }
         if (argc == 2 && std::string_view(argv[1]) == "--crypto") { return stellan::crypto::crypto_service(); }

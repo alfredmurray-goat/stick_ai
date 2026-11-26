@@ -41,7 +41,12 @@ The updater verifies an Ed25519 signature against the public key built into the 
 
 The new app is staged beside the current folder. After the desktop app exits, a temporary helper moves the old app aside, moves the existing models, `app/project` and logs into the staged version, verifies the result, and restores the original folder name. Models are moved on the same filesystem: they are neither copied nor downloaded. The app then reopens. This also avoids replacing an executable while Windows is using it. Installing is available before starting the assistant, so it cannot interrupt an active model task.
 
-The old app files remain in a sibling `.FOLDER.update-XXXXXX/previous` folder; they no longer contain your models or project. `rollback.json` records its original location. An installation error attempts to reverse all data moves and restore the previous app. Staging, old app files and a diagnostic log may remain after failure. Do not unplug the drive during installation. Power loss, forced termination, disk errors or other processes holding files open can prevent complete recovery; the previous folder and the staging `next` folder should be inspected before deleting anything. Updates require free space for the downloaded payload, staging and temporary app/runtime copies, but not a second copy of the models. A temporary copy of Node is cleaned up after the app reopens.
+The old app files remain in a sibling `.FOLDER.update-XXXXXX/previous` folder; they no longer contain your models or project. `rollback.json` records its original location. An installation error attempts to reverse all data moves and restore the previous app. Staging, old app files and a diagnostic log may remain after failure. Do not unplug the drive during installation. Power loss, forced termination, disk errors or other processes holding files open can prevent complete recovery; the previous folder and the staging `next` folder should be inspected before deleting anything. Updates require free space for the downloaded payload, staging and temporary app/runtime copies, but not a second copy of the models. A temporary copy of the updater is cleaned up after the app reopens.
+
+**Who runs the update.** When the stick's Stellan-Host and `app/trusted-roots.pem` match the manifest, the desktop app
+runs Host's own updater (`stellan-host --update`, `experimental/stellan-runtime/src/updater.cpp`): the same checks,
+signature, download, staging, swap and rollback as `src/portable/update.ts`, with no Node. Older sticks, or
+`STICK_UPDATES_ON_NODE=1`, use the Node updater (`app/stick-update.cjs`) as before.
 
 ## Publishing signed updates
 
