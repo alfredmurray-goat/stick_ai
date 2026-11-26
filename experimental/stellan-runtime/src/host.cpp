@@ -5,6 +5,7 @@
 #include "https.hpp"
 #include "mcp_wire.hpp"
 #include "mcp_client.hpp"
+#include "crypto.hpp"
 namespace stellan { int protocol_check(); int compact_check(); int loop_check(); int agent_mode(); int history_check(); }
 #include "runtime.hpp"
 #include <atomic>
@@ -28,6 +29,7 @@ int entry(int argc, char **argv) {
         if (argc == 2 && std::string_view(argv[1]) == "--compact-check") { return stellan::compact_check(); }
         if (argc == 3 && std::string_view(argv[1]) == "--fetch") { return stellan::https::fetch_service(argv[2]); }
         if (argc >= 2 && std::string_view(argv[1]) == "--mcp-client") { return stellan::mcp::mcp_client(argc, argv); }
+        if (argc == 2 && std::string_view(argv[1]) == "--crypto") { return stellan::crypto::crypto_service(); }
         if (argc == 2 && std::string_view(argv[1]) == "--mcp-check") { return stellan::mcp::wire_check(); }
         if (argc == 2 && std::string_view(argv[1]) == "--history-check") { return stellan::history_check(); }
         if (argc == 2 && std::string_view(argv[1]) == "--agent") { return stellan::agent_mode(); }
