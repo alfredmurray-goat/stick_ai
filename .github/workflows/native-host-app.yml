@@ -8,6 +8,8 @@ on:
       - 'tests/native-files.test.ts'
       - 'tests/update-native.test.ts'
       - 'tests/documents-native.test.ts'
+      - 'tests/skills-native.test.ts'
+      - 'src/portable/skills.ts'
       - 'portable/input-worker.mjs'
       - 'src/model/inputs.ts'
       - 'src/portable/update*.ts'
@@ -47,3 +49,7 @@ jobs:
         env:
           STELLAN_REQUIRE_NATIVE_HOST: '1'
         run: npx vitest run tests/documents-native.test.ts
+      - name: Read SKILL.md headers with Host's own YAML reader, against the app's
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/skills-native.test.ts

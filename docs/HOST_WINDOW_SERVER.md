@@ -19,7 +19,9 @@ relies on moves into Host first, with Node calling Host for it (as the agent loo
 already did), and the brain and routes move last as a thin layer on top. The contract test still decides the final
 switch.
 
-Pieces still on Node, in order: attached documents (done: `--read-document`), skills (YAML headers), hooks,
+Pieces still on Node, in order: attached documents (done: `--read-document`), skills (the SKILL.md reader is done:
+`--parse-skill`, `src/skills.cpp`, identical to the app's on 39 awkward headers and 70 real skill packs; the skills
+list, enable and save move with the brain), hooks,
 `.gitignore` rules and GitHub workspaces (ZIP), activation, the local app API server, progress, then the brain,
 routes and launcher.
 
