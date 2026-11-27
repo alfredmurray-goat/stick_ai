@@ -2,6 +2,9 @@ import { isUtf8 } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, readdir, lstat, rm, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { unzipSync } from 'fflate';
 import ignore from 'ignore';
 import { Sandbox } from '../sandbox/paths.js';
@@ -41,6 +44,30 @@ export function repositoryFiles(archive:Buffer,tree:GitHubTreeEntry[]):Map<strin
   if(result.size!==blobs.length) throw new GitHubError('The archive omits tracked files (for example export-ignore). This repository needs a complete regular-file archive.');
   return result;
 }
+let archiveHost:string|undefined;
+/** Checks GitHub archives with Stellan-Host (--repository-files) instead of fflate; STICK_REPOSITORY_ON_NODE=1 is the way back. */
+export function useHostRepositoryFiles(executable:string|undefined):void { archiveHost=process.env.STICK_REPOSITORY_ON_NODE==='1'?undefined:executable; }
+export async function verifiedFiles(archive:Buffer,tree:GitHubTreeEntry[],signal:AbortSignal):Promise<Map<string,Buffer>> {
+  if(!archiveHost) return repositoryFiles(archive,tree);
+  const executable=archiveHost, dir=await mkdtemp(join(tmpdir(),'stick-repo-'));
+  try {
+    await writeFile(join(dir,'archive.zip'),archive,{mode:0o600});
+    const reply=await new Promise<{files?:string[];error?:string;github?:boolean}>((resolve,reject)=>{
+      signal.throwIfAborted();
+      const child=spawn(executable,['--repository-files',join(dir,'files')],{stdio:['pipe','pipe','ignore'],windowsHide:true});
+      let output=''; const abort=()=>{child.kill();reject(signal.reason);};
+      signal.addEventListener('abort',abort,{once:true});
+      child.stdout.setEncoding('utf8').on('data',(text:string)=>{output+=text;});
+      child.on('error',(error)=>{signal.removeEventListener('abort',abort);reject(error);});
+      child.on('close',()=>{signal.removeEventListener('abort',abort); try{resolve(JSON.parse(output));}catch{reject(new Error('Stellan-Host could not check the repository archive.'));}});
+      child.stdin.end(JSON.stringify({archive:join(dir,'archive.zip'),tree}));
+    });
+    if(reply.error!==undefined) throw reply.github?new GitHubError(reply.error):new Error(reply.error);
+    const result=new Map<string,Buffer>();
+    for(const path of reply.files??[]) { signal.throwIfAborted(); result.set(path,await readFile(join(dir,'files',path))); }
+    return result;
+  } finally { await rm(dir,{recursive:true,force:true}); }
+}
 export class GitHubWorkspaces {
   private client=new GitHubClient();
   private current:Stored|undefined;
@@ -54,7 +81,7 @@ export class GitHubWorkspaces {
     const client=new GitHubClient(token), repo=await client.repository(input,signal);
     const base=await client.base(repo,branch.trim()||repo.defaultBranch,signal);
     const tree=await client.tree(repo,base.tree,signal);
-    const files=repositoryFiles(await client.archive(repo,base.commit,signal),tree);
+    const files=await verifiedFiles(await client.archive(repo,base.commit,signal),tree,signal);
     const id=randomUUID(), folder=this.folder(id); await mkdir(join(folder,'files'),{recursive:true});
     try {
       for(const [path,bytes] of files) { signal.throwIfAborted(); for(const section of ['files','baseline']) { const file=join(folder,section,path); await mkdir(dirname(file),{recursive:true}); await writeFile(file,bytes,{flag:'wx'}); } }
