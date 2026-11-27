@@ -51,7 +51,6 @@ std::string regex_prefix(const std::string &pattern) {
     struct Step { std::regex pattern; bool global; Replacer replacer; };
     static const std::vector<Step> steps = [] {
         std::vector<Step> s;
-        s.push_back({re("^\\uFEFF"), false, [](auto &, auto, auto &) { return std::string(); }});
         // Trailing spaces, unless escaped.
         s.push_back({re("((?:\\\\\\\\)*?)(\\\\?\\s+)$"), false, [](const std::smatch &m, auto, auto &) { return m[1].str() + (m[2].str().find('\\') == 0 ? " " : ""); }});
         s.push_back({re("(\\\\+?)\\s"), true, [](const std::smatch &m, auto, auto &) { const auto g = m[1].str(); return g.substr(0, g.size() - g.size() % 2) + " "; }});
@@ -78,7 +77,8 @@ std::string regex_prefix(const std::string &pattern) {
         s.push_back({re("(?:[^*])$"), false, [](const std::smatch &m, auto, auto &) { const auto t = m[0].str(); return !t.empty() && t.back() == '/' ? t + "$" : t + "(?=$|\\/$)"; }});
         return s;
     }();
-    std::string value = pattern;
+    // ^\uFEFF: a byte order mark is dropped (by hand: MSVC's std::regex has no \u escape).
+    std::string value = pattern.rfind("\xEF\xBB\xBF", 0) == 0 ? pattern.substr(3) : pattern;
     for (const auto &step : steps) {
         if (!step.replacer) {
             // startingReplacer: depends on the original pattern, not the value so far.
@@ -103,6 +103,7 @@ std::string strict(const std::string &js) {
         const char c = js[i];
         if (c == '\\' && i + 1 < js.size()) {
             const char e = js[i + 1];
+            if (e == '/') { out += '/'; ++i; continue; } // MSVC refuses an escaped slash
             if (e == 'x' && !hex(i + 2, 2)) { out += 'x'; ++i; continue; }
             if (e == 'u' && !hex(i + 2, 4)) { out += 'u'; ++i; continue; }
             if (e == 'c' && !(i + 2 < js.size() && std::isalpha(static_cast<unsigned char>(js[i + 2])))) { out += "\\\\c"; ++i; continue; }
