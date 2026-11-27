@@ -11,6 +11,25 @@ stick: it runs `src/portable/web.ts` (the window's API) and `src/portable/entry.
   hand-offs, settings and chat storage (`--state-store`), file tools (`--workspace`), MCP (`--mcp-client`), HTTPS
   (`--fetch`), activation crypto (`--crypto`) and updates (`--update`).
 
+## Order changed: bottom-up
+
+The brain's view includes live parts owned by other pieces (for example which MCP servers are connected), so moving
+the brain first would mean two processes keeping each other's live state in sync. Instead each piece the window
+relies on moves into Host first, with Node calling Host for it (as the agent loop, MCP, storage, HTTPS and updates
+already did), and the brain and routes move last as a thin layer on top. The contract test still decides the final
+switch.
+
+Pieces still on Node, in order: attached documents (done: `--read-document`), skills (YAML headers), hooks,
+`.gitignore` rules and GitHub workspaces (ZIP), activation, the local app API server, progress, then the brain,
+routes and launcher.
+
+**PDF reading (owner's choice): Stellan's own reader**, not PDFium or PDF.js. `src/pdf.cpp` scans for objects,
+unpacks object streams, walks the page tree and follows text operators with ToUnicode maps or the standard
+encodings; Flate, ASCII85, ASCIIHex and LZW are supported. On 20 real documents (LibreOffice and ReportLab PDFs,
+the stick's own leaflets, Word files) it matched PDF.js word for word on all but one, which it read better (an
+activation code PDF.js split into letters). Encrypted PDFs are refused with the usual "unlock it first" message,
+including ones PDF.js could open with an empty password; that is the known difference.
+
 ## Why it can't move one action at a time
 
 `web.ts` keeps one shared state ("the brain"): phase (choose, loading, ready, error), the running task and its

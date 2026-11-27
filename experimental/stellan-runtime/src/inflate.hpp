@@ -16,6 +16,8 @@ class Decoder {
 public:
     struct State;
     Decoder();
+    /** raw: bare DEFLATE data (as inside ZIP files), with no gzip header, checksum or length. */
+    explicit Decoder(bool raw);
     ~Decoder();
     void set_limit(std::uint64_t bytes) { limit_ = bytes; }
     void feed(const std::uint8_t *data, std::size_t size, const std::function<void(const std::uint8_t *, std::size_t)> &sink);
@@ -25,6 +27,7 @@ private:
     enum class Stage { header, block, trailer, done } stage_ = Stage::header;
     std::uint64_t limit_ = ~0ULL;
     std::unique_ptr<State> state_;
+    bool raw_ = false;
 };
 int gunzip_check();
 }

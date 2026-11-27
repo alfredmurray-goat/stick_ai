@@ -79,11 +79,14 @@ async function session(start: (root: string, model: Model) => Promise<Window>, s
   const window = await start(root, model);
   const transcript: Step[] = [];
   const call = async (path: string, body?: object, extra: { headers?: Record<string, string>; raw?: boolean; quiet?: boolean } = {}) => {
+    // Steps are recorded in the order they were sent, not finished: overlapping requests (a waiting window and the
+    // change that wakes it) can finish in either order on a busy machine.
+    const slot = extra.quiet ? -1 : transcript.push({ method: body ? "POST" : "GET", path: "", status: 0, body: null }) - 1;
     const response = await fetch(window.origin + path, { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${window.token}`, Origin: window.origin, ...(body ? { "Content-Type": "application/json" } : {}), ...extra.headers }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const text = await response.text();
     let parsed: unknown = text; try { parsed = JSON.parse(text); } catch {}
     if (extra.quiet) { return parsed; }
-    transcript.push({ method: body ? "POST" : "GET", path: path.replace(/wait=[^&]*/, "wait=<key>"), status: response.status, body: extra.raw ? `<${text.length} bytes>` : normalise(parsed, root) });
+    transcript[slot] = { method: body ? "POST" : "GET", path: path.replace(/wait=[^&]*/, "wait=<key>"), status: response.status, body: extra.raw ? `<${text.length} bytes>` : normalise(parsed, root) };
     return parsed;
   };
   try { await script(call, model, root); } finally { await window.close(); }

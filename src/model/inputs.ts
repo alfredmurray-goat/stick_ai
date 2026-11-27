@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import { spawn } from "node:child_process";
 import { join, extname } from "node:path";
 
 export class InputError extends Error {}
@@ -47,7 +48,38 @@ export function imageLabel(attachment: PreparedAttachment): string {
   const image = attachment.image; const kb = Math.max(1, Math.round((attachment.bytes?.length ?? 0) / 1024));
   return `${attachment.name} · ${image?.format ?? "image"}${image?.width ? ` ${image.width}×${image.height}` : ""} · ${kb} KB`;
 }
+/**
+ * With a verified Stellan-Host in the package, attached PDFs and Word files are read by Host
+ * (`stellan-host --read-document`, Stellan's own readers): same limits and messages as the worker below.
+ */
+let documentHost: string | undefined;
+export function useHostDocuments(executable: string | undefined): void { documentHost = process.env.STICK_DOCUMENTS_ON_NODE === "1" ? undefined : executable; }
+function hostText(executable: string, bytes: Uint8Array, kind: "pdf" | "docx", signal: AbortSignal): Promise<string> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, ["--read-document", kind], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+    let output = ""; let settled = false;
+    const finish = (error?: Error, value?: string): void => {
+      if (settled) return; settled = true; clearTimeout(timer); signal.removeEventListener("abort", abort);
+      child.kill(); if (error) reject(error); else resolve(value!);
+    };
+    const abort = (): void => finish(new InputError("Attachment reading cancelled."));
+    const timer = setTimeout(() => finish(new InputError("Document reading timed out. Attach a smaller section.")), 15000); timer.unref();
+    signal.addEventListener("abort", abort, { once: true });
+    child.stdout.setEncoding("utf8").on("data", (text: string) => { output += text; if (output.length > 1024 * 1024) finish(new InputError("Invalid document response.")); });
+    child.once("error", () => finish(new InputError("Document reading stopped before finishing.")));
+    child.once("close", () => {
+      let result: { text?: unknown; error?: unknown };
+      try { result = JSON.parse(output); } catch { finish(new InputError("Document reading stopped before finishing.")); return; }
+      if (typeof result.error === "string") { finish(new InputError(result.error)); return; }
+      if (typeof result.text !== "string") { finish(new InputError("Invalid document response.")); return; }
+      finish(undefined, result.text);
+    });
+    child.stdin.on("error", () => {}); child.stdin.end(bytes);
+  });
+}
 function workerText(bytes: Uint8Array, kind: "pdf" | "docx", signal: AbortSignal): Promise<string> {
+  if (documentHost) return hostText(documentHost, bytes, kind, signal);
   signal.throwIfAborted();
   const workerPath = typeof __filename === "string" && __filename.endsWith(".cjs") ? join(__dirname, "stick-inputs.mjs") : new URL("../../portable/input-worker.mjs", import.meta.url);
   return new Promise((resolve, reject) => {

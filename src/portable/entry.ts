@@ -1,3 +1,6 @@
+import { nativeHostExecutable } from "./native-files.js";
+import { hashFile } from "./integrity.js";
+import { useHostDocuments } from "../model/inputs.js";
 import { enableHostNetwork } from "./net.js";
 import { openFrontDoor, type FrontDoor } from "./front-door.js";
 import { liteMinimumBytes } from "../config/models.js";
@@ -95,6 +98,8 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         engine.coder.onProcess = (pid) => notify({ kind: "model_pid", role: "coder", pid });
       }
       await enableHostNetwork(root, log);
+      // Attached PDFs and Word files are read by the package's own verified Host when it has one.
+      try { const host = nativeHostExecutable(root); if (host && (await hashFile(host.executable)).sha256 === host.sha256) useHostDocuments(host.executable); } catch (error) { log(error); }
       const activation = new Activation(root);
       engine.modelKey = (model) => activation.modelKey(model);
       if (engine.coder) { engine.coder.modelKey = engine.modelKey; }
