@@ -94,7 +94,7 @@ std::string regex_prefix(const std::string &pattern) {
 
 // JavaScript accepts some legacy forms (Annex B) that std::regex rejects: an escaped letter with no meaning ("\\R" is
 // "R"), "\\x" or "\\u" without hex digits (a plain "x" or "u"), "\\c" without a letter, and the empty classes "[]"
-// (matches nothing) and "[^]" (matches anything). Rewrites them to strict equivalents with the same meaning.
+// (matches nothing) and "[^]" (matches anything), and a lone "]" or "}". Rewrites them to strict equivalents with the same meaning.
 std::string strict(const std::string &js) {
     const auto hex = [&](std::size_t at, std::size_t n) { if (at + n > js.size()) { return false; } for (std::size_t k = 0; k < n; ++k) { if (!std::isxdigit(static_cast<unsigned char>(js[at + k]))) { return false; } } return true; };
     const auto meaningful = std::string("dDsSwWbBfnrtv0");
@@ -117,7 +117,15 @@ std::string strict(const std::string &js) {
             if (i + 1 < js.size() && js[i + 1] == '^') { out += '^'; ++i; }
             continue;
         }
-        if (in_class && c == ']') { in_class = false; }
+        if (in_class && c == ']') { in_class = false; out += c; continue; }
+        // A backwards range ("z-a") is an error in JavaScript; libc++ (macOS) would accept it, so refuse it here.
+        if (in_class && c == '-' && !out.empty() && out.back() != '[' && i + 1 < js.size() && js[i + 1] != ']' && js[i + 1] != '\\') {
+            const char before = out.back(), after = js[i + 1];
+            const bool escaped_before = out.size() >= 2 && out[out.size() - 2] == '\\';
+            if (!escaped_before && static_cast<unsigned char>(before) > static_cast<unsigned char>(after)) { throw std::regex_error(std::regex_constants::error_range); }
+        }
+        // A lone "]" or "}" is an ordinary character in JavaScript's legacy syntax; libc++ (macOS) refuses it bare.
+        if (!in_class && (c == ']' || c == '}')) { out += '\\'; out += c; continue; }
         out += c;
     }
     return out;
