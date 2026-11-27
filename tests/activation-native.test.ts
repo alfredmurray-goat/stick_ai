@@ -22,7 +22,7 @@ it.skipIf(!ready)("fingerprints the stick (or this disk) exactly as the app does
     expect(JSON.parse(run(["--stick-identity", root])).identity, root).toBe(await stickIdentity(root));
   }
   expect(JSON.parse(run(["--stick-identity", join(tmpdir(), "no-such-folder-here")])).identity).toBe("");
-});
+}, 240000);
 
 it.skipIf(!ready)("reads mount tables and USB device trees exactly as the app does", () => {
   const mountinfo = [
@@ -79,4 +79,4 @@ it.skipIf(!ready)("checks saved activations offline exactly as the app does", as
       if (stick && publicKeyText && name === "genuine with keys") { expect(expected).toEqual({ active: true, keys: { [modelNames[0]]: lite.toString("base64"), [modelNames[1]]: max.toString("base64") } }); }
     }
   }
-});
+}, 300000); // Windows asks PowerShell for the disk serial on every check (a second or two each), on both sides
