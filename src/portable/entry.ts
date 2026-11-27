@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { useHostHooks } from "./hooks.js";
+import { useHostRepositoryFiles } from "./github-workspace.js";
 import { trustedRoots } from "./net.js";
 import { nativeHostExecutable } from "./native-files.js";
 import { hashFile } from "./integrity.js";
@@ -106,6 +107,7 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
         const host = nativeHostExecutable(root);
         if (host && (await hashFile(host.executable)).sha256 === host.sha256) {
           useHostDocuments(host.executable);
+          useHostRepositoryFiles(host.executable);
           const packaged = join(root, "app", "trusted-roots.pem");
           useHostHooks(host.executable, await trustedRoots(existsSync(packaged) ? packaged : undefined));
         }
