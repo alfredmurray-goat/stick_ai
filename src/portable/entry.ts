@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { useHostHooks } from "./hooks.js";
+import { trustedRoots } from "./net.js";
 import { nativeHostExecutable } from "./native-files.js";
 import { hashFile } from "./integrity.js";
 import { useHostDocuments } from "../model/inputs.js";
@@ -99,7 +102,14 @@ async function service(root: string, noSwap: boolean, desktopLog?: string, faste
       }
       await enableHostNetwork(root, log);
       // Attached PDFs and Word files are read by the package's own verified Host when it has one.
-      try { const host = nativeHostExecutable(root); if (host && (await hashFile(host.executable)).sha256 === host.sha256) useHostDocuments(host.executable); } catch (error) { log(error); }
+      try {
+        const host = nativeHostExecutable(root);
+        if (host && (await hashFile(host.executable)).sha256 === host.sha256) {
+          useHostDocuments(host.executable);
+          const packaged = join(root, "app", "trusted-roots.pem");
+          useHostHooks(host.executable, await trustedRoots(existsSync(packaged) ? packaged : undefined));
+        }
+      } catch (error) { log(error); }
       const activation = new Activation(root);
       engine.modelKey = (model) => activation.modelKey(model);
       if (engine.coder) { engine.coder.modelKey = engine.modelKey; }

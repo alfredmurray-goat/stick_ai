@@ -76,3 +76,11 @@ node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const p=JSON.pa
 - **Your settings only.** Hooks are added by you in the app and saved in `stellan/logs/extensions/hooks.json` on the stick. They are never read from a project folder, so opening someone else's project can't make Stick AI run anything.
 - **Your permissions.** Commands run with your permissions, like any program you start yourself. Only add commands you trust.
 - **No more than 50 hooks.**
+
+## Who runs hooks
+
+When the stick's Stellan-Host matches its manifest, hooks run through Host (`stellan-host --run-hook`,
+`experimental/stellan-runtime/src/hooks.cpp`): the same rules, replies and messages as before. A hook that takes too
+long, writes too much or is cancelled is stopped together with everything it started (its own process group on
+macOS and Linux, a job object on Windows). Background programs a hook starts on purpose keep running, as before.
+`STICK_HOOKS_ON_NODE=1` runs hooks in the app itself.

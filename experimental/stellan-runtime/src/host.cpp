@@ -11,6 +11,7 @@
 #include "updater.hpp"
 #include "documents.hpp"
 #include "skills.hpp"
+#include "hooks.hpp"
 namespace stellan { int protocol_check(); int compact_check(); int loop_check(); int agent_mode(); int history_check(); }
 #include "runtime.hpp"
 #include <atomic>
@@ -34,6 +35,8 @@ int entry(int argc, char **argv) {
         if (argc == 2 && std::string_view(argv[1]) == "--compact-check") { return stellan::compact_check(); }
         if (argc == 3 && std::string_view(argv[1]) == "--fetch") { return stellan::https::fetch_service(argv[2]); }
         if (argc >= 2 && std::string_view(argv[1]) == "--mcp-client") { return stellan::mcp::mcp_client(argc, argv); }
+        if (argc >= 2 && std::string_view(argv[1]) == "--hook-config") { return stellan::hooks::hook_config(); }
+        if (argc >= 2 && std::string_view(argv[1]) == "--run-hook") { return stellan::hooks::run_hook(argc, argv); }
         if (argc >= 2 && std::string_view(argv[1]) == "--parse-skill") { return stellan::skills::parse_skill(argc, argv); }
         if (argc >= 2 && std::string_view(argv[1]) == "--read-document") { return stellan::documents::read_document(argc, argv); }
         if (argc >= 2 && std::string_view(argv[1]) == "--update") { return stellan::updater::main(argc, argv); }
