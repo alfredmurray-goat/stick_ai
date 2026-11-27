@@ -10,6 +10,7 @@ on:
       - 'tests/documents-native.test.ts'
       - 'tests/skills-native.test.ts'
       - 'tests/hooks-native.test.ts'
+      - 'tests/gitignore-native.test.ts'
       - 'src/portable/hooks.ts'
       - 'src/portable/skills.ts'
       - 'portable/input-worker.mjs'
@@ -59,3 +60,7 @@ jobs:
         env:
           STELLAN_REQUIRE_NATIVE_HOST: '1'
         run: npx vitest run tests/hooks-native.test.ts
+      - name: Match .gitignore rules with Host's matcher, against the ignore package (fixed and generated cases)
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/gitignore-native.test.ts

@@ -21,7 +21,8 @@ switch.
 
 Pieces still on Node, in order: attached documents (done: `--read-document`), skills (the SKILL.md reader is done:
 `--parse-skill`, `src/skills.cpp`, identical to the app's on 39 awkward headers and 70 real skill packs; the skills
-list, enable and save move with the brain), hooks (done: `--run-hook` and `--hook-config`, used by the app), `.gitignore` rules and GitHub workspaces (ZIP), activation, the local app API server, progress, then the brain,
+list, enable and save move with the brain), hooks (done: `--run-hook` and `--hook-config`, used by the app), `.gitignore` rules (matcher done: `src/gitignore.cpp`, identical to the `ignore` package on hand-picked rules and
+about 187,000 generated paths) and GitHub workspaces (ZIP), activation, the local app API server, progress, then the brain,
 routes and launcher.
 
 **PDF reading (owner's choice): Stellan's own reader**, not PDFium or PDF.js. `src/pdf.cpp` scans for objects,
