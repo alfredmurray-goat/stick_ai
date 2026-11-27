@@ -113,11 +113,15 @@ const scenarios: Record<string, Parameters<typeof session>[1]> = {
   },
   "settings change wakes a waiting window": async (call) => {
     const first = await call("/api/state");
-    const waiting = call(`/api/state?wait=${encodeURIComponent(first.key)}&after=0`);
+    // The waiting window must wake with the new settings. Whether the "Saved." note is already there when it wakes
+    // depends on how fast the disk is (the note follows the save), so the woken reply isn't recorded; the settled
+    // state is.
+    const waiting = call(`/api/state?wait=${encodeURIComponent(first.key)}&after=0`, undefined, { quiet: true });
     await new Promise((done) => setTimeout(done, 100));
     await call("/api/personal", { name: "Ada", about: "Builds things", style: "concise", preferences: "" });
     const woken = await waiting;
     expect(woken.personal.name).toBe("Ada");
+    await settle(call, (state) => state.events.some((event: any) => event.kind === "status"));
   },
   "a task asks to run a command and the user says no": async (call, model, root) => {
     model.replies.push(`<tool_call>${JSON.stringify({ name: "run_shell", arguments: { command: "echo hello > note.txt" } })}</tool_call>`, "<done>Left it alone.</done>");

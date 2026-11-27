@@ -21,6 +21,12 @@ const record = (value: unknown): value is Record<string, unknown> => Boolean(val
 const blocking: HookEvent[] = ["UserPromptSubmit", "PreToolUse", "PostToolUse"];
 const toolEvents: HookEvent[] = ["PreToolUse", "PostToolUse"];
 const outputLimit = 65536;
+/**
+ * With a verified Stellan-Host in the package, hooks run through Host (`stellan-host --run-hook`): the same rules,
+ * replies and messages; Host stops a hook's whole process tree on a time limit or cancel. STICK_HOOKS_ON_NODE=1 keeps Node.
+ */
+let hostHooks: { executable: string; roots: string } | undefined;
+export function useHostHooks(executable: string | undefined, roots = ""): void { hostHooks = executable && process.env.STICK_HOOKS_ON_NODE !== "1" ? { executable, roots } : undefined; }
 
 export function hookConfig(input: unknown, id: string): HookConfig {
   if (!record(input)) { throw new HookError("Enter the hook's settings."); }
@@ -103,13 +109,34 @@ export class Hooks {
       if (signal.aborted) { break; }
       outcome.ran.push(hook.name);
       let reply: ReturnType<typeof readReply>;
-      try { reply = hook.type === "http" ? await this.post(hook, input, signal) : await this.command(hook, event, input, signal); }
+      try { reply = hostHooks ? await this.viaHost(hostHooks, hook, event, input, signal) : hook.type === "http" ? await this.post(hook, input, signal) : await this.command(hook, event, input, signal); }
       catch (error) { if (signal.aborted) { break; } this.log(error); reply = { context: "", problem: error instanceof Error ? error.message : String(error) }; }
       if (reply.problem) { outcome.problems.push(`Hook “${hook.name}” ${reply.problem}`); }
       if (reply.context.trim()) { outcome.context += (outcome.context ? "\n" : "") + reply.context.trim().slice(0, 8000); }
       if (reply.blocked && blocking.includes(event)) { outcome.blocked = `${reply.blocked.slice(0, 2000)} (hook “${hook.name}”)`; break; }
     }
     return outcome;
+  }
+  private viaHost(host: { executable: string; roots: string }, hook: HookConfig, event: HookEvent, input: string, signal: AbortSignal): Promise<ReturnType<typeof readReply>> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(host.executable, ["--run-hook", host.roots], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+      let output = "";
+      // Closing Host's input cancels the hook; Host then stops its whole process tree and replies.
+      const cancel = (): void => { child.stdin.end(); };
+      signal.addEventListener("abort", cancel, { once: true });
+      child.stdout.setEncoding("utf8").on("data", (text: string) => { output += text; });
+      child.stdin.on("error", () => {});
+      child.stdin.write(JSON.stringify({ hook, event, input, project: this.project, online: this.online }) + "\n");
+      if (signal.aborted) { cancel(); }
+      child.once("error", (error) => { signal.removeEventListener("abort", cancel); reject(new HookError(`couldn't start: ${error.message}`)); });
+      child.once("close", () => {
+        signal.removeEventListener("abort", cancel);
+        try {
+          const reply = JSON.parse(output) as { blocked?: string; context: string; problem?: string };
+          resolve({ ...(reply.blocked !== undefined ? { blocked: reply.blocked } : {}), context: reply.context, ...(reply.problem !== undefined ? { problem: reply.problem } : {}) });
+        } catch { reject(new HookError("couldn't start: no reply from Stellan-Host")); }
+      });
+    });
   }
   /** "Allow internet" off: HTTP hooks to other computers are skipped; ones on this computer still run. */
   online = true;
