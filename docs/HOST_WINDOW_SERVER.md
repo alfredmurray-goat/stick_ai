@@ -25,7 +25,10 @@ list, enable and save move with the brain), hooks (done: `--run-hook` and `--hoo
 about 187,000 generated paths), GitHub workspace archives (done: `--repository-files`, `src/repo_archive.cpp`, used by
 the app: every file checked against the pinned commit by its Git hash; same files or same refusal as the app on genuine,
 tampered, incomplete and hostile archives, and 12,000 randomly damaged ones all refused, as the app refuses them; the
-rest of workspaces moves with GitHub in step 7), activation, the local app API server, progress, then the brain,
+rest of workspaces moves with GitHub in step 7), activation (Host side done: `--stick-identity`,
+`--activation-check`, `src/identity.cpp`, tested against the app's fingerprint and offline check on all three systems;
+the app switches over only after those tests pass everywhere, because a different fingerprint would lock out sticks
+that are already activated; going online to activate uses `--fetch`), the local app API server, progress, then the brain,
 routes and launcher.
 
 **PDF reading (owner's choice): Stellan's own reader**, not PDFium or PDF.js. `src/pdf.cpp` scans for objects,

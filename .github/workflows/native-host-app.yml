@@ -12,6 +12,7 @@ on:
       - 'tests/hooks-native.test.ts'
       - 'tests/gitignore-native.test.ts'
       - 'tests/repo-archive-native.test.ts'
+      - 'tests/activation-native.test.ts'
       - 'src/portable/hooks.ts'
       - 'src/portable/skills.ts'
       - 'portable/input-worker.mjs'
@@ -69,3 +70,7 @@ jobs:
         env:
           STELLAN_REQUIRE_NATIVE_HOST: '1'
         run: npx vitest run tests/repo-archive-native.test.ts
+      - name: Fingerprint the disk and check saved activations offline with Host, against the app's
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/activation-native.test.ts
