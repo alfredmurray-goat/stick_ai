@@ -176,3 +176,12 @@ only `stellan-host` is ever packaged.
 
 Still on Node: the app's own server (`web.ts`) and the launcher. The first Host-only update can only ship once sticks
 have an updater that accepts it (this one does, as does the Node one since the `hostOnly` change).
+
+## Host reads attached documents
+
+`stellan-host --read-document pdf|docx` (`src/documents.cpp`, `src/pdf.cpp`) replaces `portable/input-worker.mjs`
+when the package's Host matches its manifest (`STICK_DOCUMENTS_ON_NODE=1` keeps the Node reader). Word files are
+read exactly as before: the same ZIP and size limits, the same text rules and the same messages. PDFs are read by
+Stellan's own reader instead of PDF.js. `tests/documents-native.test.ts` checks both against the Node reader on
+generated documents and the stick's own leaflets: Word output and every refusal identical, PDF text at least 98%
+the same word for word.

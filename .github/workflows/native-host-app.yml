@@ -7,6 +7,9 @@ on:
       - 'experimental/stellan-runtime/**'
       - 'tests/native-files.test.ts'
       - 'tests/update-native.test.ts'
+      - 'tests/documents-native.test.ts'
+      - 'portable/input-worker.mjs'
+      - 'src/model/inputs.ts'
       - 'src/portable/update*.ts'
       - 'src-tauri/src/updates.rs'
       - '.github/workflows/native-host-app.yml'
@@ -40,3 +43,7 @@ jobs:
         env:
           STELLAN_REQUIRE_NATIVE_HOST: '1'
         run: npx vitest run tests/update-native.test.ts
+      - name: Read attached PDFs and Word files with Host's own readers, against the Node reader
+        env:
+          STELLAN_REQUIRE_NATIVE_HOST: '1'
+        run: npx vitest run tests/documents-native.test.ts

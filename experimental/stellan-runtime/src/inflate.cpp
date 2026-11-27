@@ -83,6 +83,7 @@ struct Reader {
 }
 
 Decoder::Decoder() : state_(std::make_unique<State>()) {}
+Decoder::Decoder(bool raw) : stage_(raw ? Stage::block : Stage::header), state_(std::make_unique<State>()), raw_(raw) {}
 Decoder::~Decoder() = default;
 
 void Decoder::emit(std::uint8_t byte) {
@@ -186,7 +187,7 @@ void Decoder::feed(const std::uint8_t *data, std::size_t size, const std::functi
             if (!s.out.empty()) { sink(s.out.data(), s.out.size()); }
             s.out.clear();
             s.in.erase(s.in.begin(), s.in.begin() + static_cast<std::ptrdiff_t>(s.at)); s.at = 0;
-            if (last) { stage_ = Stage::trailer; }
+            if (last) { stage_ = raw_ ? Stage::done : Stage::trailer; }
         } catch (const NeedMore &) {
             s.at = saved_at; s.bits = saved_bits; s.count = saved_count; s.written = saved_written; s.out.clear();
             if (!saved_window.empty()) { s.window = std::move(saved_window); }
